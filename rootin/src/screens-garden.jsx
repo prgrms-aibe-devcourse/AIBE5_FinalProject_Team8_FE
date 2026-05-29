@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, DEX, USER, TILS } from './data.jsx';
+import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, DEX, TILS } from './data.jsx';
+import { useUser } from './context/UserContext.jsx';
 import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { tilCountToStage, STAGE_META } from './plants.jsx';
@@ -370,6 +371,7 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
 // Garden Screen
 // ============================
 function GardenScreen({ onOpenPot }) {
+  const { user } = useUser();
   const [editMode, setEditMode] = useState(false);
   const [themeId, setThemeId] = useState('meadow');
   const [layout, setLayout] = useState(DEFAULT_GARDEN_LAYOUT);
@@ -405,7 +407,7 @@ function GardenScreen({ onOpenPot }) {
           <div style={{ minWidth: 0, flex: '1 1 320px' }}>
             <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>나의 정원</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.02em', marginTop: 4, whiteSpace: 'nowrap' }}>
-              소연님의 정원 · TIL <span style={{ color: 'var(--moss-2)' }}>{USER.totalTil}</span>개
+              {user?.name ?? ''}님의 정원 · TIL <span style={{ color: 'var(--moss-2)' }}>{user?.totalTil ?? 0}</span>개
             </h2>
             <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
               4개의 화분이 자라고 있어요. 오늘 <b style={{ color: 'var(--moss-2)' }}>2개</b>의 화분에 물을 줬어요.

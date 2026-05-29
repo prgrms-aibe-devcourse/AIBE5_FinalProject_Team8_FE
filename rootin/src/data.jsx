@@ -1,16 +1,5 @@
 // Mock data for Rootin prototype
-
-const USER = {
-  name: '소연',
-  handle: 'soyeon',
-  email: 'soyeon@rootin.app',
-  joinedAt: '2026.02.14',
-  bio: '루틴처럼 기록하고, 뿌리처럼 깊어지는 중.',
-  totalTil: 47,
-  streak: 12,
-  bestStreak: 21,
-  points: 1240,
-};
+// NOTE: USER 목업 제거됨 — 유저 정보는 context/UserContext.jsx (useUser 훅) 사용
 
 const POTS = [
   {
@@ -232,4 +221,4 @@ const DEFAULT_GARDEN_LAYOUT = {
   workout: { x: 82, y: 74 },
 };
 
-export { USER, POTS, GRASS, TILS, DEX, WEEKLY, TODAY_GOALS, TEMPLATES, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT };
+export { POTS, GRASS, TILS, DEX, WEEKLY, TODAY_GOALS, TEMPLATES, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT };

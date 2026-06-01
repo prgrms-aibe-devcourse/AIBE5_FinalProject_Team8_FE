@@ -235,7 +235,7 @@ function CollectionScreen() {
   const locked    = plants.filter(p => !p.isCollected);
 
   return (
-    <div style={{ padding: 32, maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1400, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
@@ -528,7 +528,7 @@ function AIScreen() {
   };
 
   return (
-    <div style={{ padding: 32, display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24, maxWidth: 1280, margin: '0 auto' }}>
+    <div style={{ padding: 32, width: '100%', display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24, maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
 
       {/* Left — source picker */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -889,7 +889,7 @@ function ProfileScreen() {
   const [bio, setBio] = useState(user?.bio ?? '');
 
   return (
-    <div style={{ padding: 32, maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22 }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1300, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
 
       <Card padding={28}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>

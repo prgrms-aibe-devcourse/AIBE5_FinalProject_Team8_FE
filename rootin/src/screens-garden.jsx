@@ -395,7 +395,7 @@ function GardenScreen({ onOpenPot }) {
   const harvestedPlants = DEX.filter(d => d.state === 'harvested');
 
   return (
-    <div style={{ padding: 32, maxWidth: 1280, margin: '0 auto' }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
 
       {/* Hero with scene */}
       <Card padding={0} style={{
@@ -654,7 +654,7 @@ function PotDetailScreen({ potId, onBack }) {
   const isRare = pot.species === 'moonlight';
 
   return (
-    <div style={{ padding: 32, maxWidth: 1280, margin: '0 auto' }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
       <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14 }}>
         <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
       </button>

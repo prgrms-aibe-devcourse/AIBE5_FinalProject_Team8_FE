@@ -15,8 +15,9 @@ import { request } from './client.js';
  *   tilCount: number,
  * }>}
  */
-export function getMe() {
-  return request('/api/v1/users/me');
+export async function getMe() {
+  const res = await request('/api/v1/users/me');
+  return res.data ?? res;
 }
 
 /**
@@ -35,9 +36,10 @@ export function getMe() {
  *   tilCount: number,
  * }>}
  */
-export function patchUserMe(data) {
-  return request('/api/v1/users/me', {
+export async function patchUserMe(data) {
+  const res = await request('/api/v1/users/me', {
     method: 'PATCH',
     body: JSON.stringify(data),
   });
+  return res.data ?? res;
 }

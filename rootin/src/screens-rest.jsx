@@ -883,10 +883,27 @@ function SummaryResult({ pot, summary, keyPoints }) {
 // === Profile Screen ===
 
 function ProfileScreen() {
-  const { user } = useUser();
+  const { user, updateUser } = useUser();
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState(user?.name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  async function handleSave() {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const { patchUserMe } = await import('./api/user.js');
+      await patchUserMe({ nickname, bio });
+      updateUser({ name: nickname, bio });
+      setEditing(false);
+    } catch (err) {
+      setSaveError(err?.body?.message ?? '저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div style={{ padding: 32, maxWidth: 1000, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -938,9 +955,27 @@ function ProfileScreen() {
             )}
           </div>
 
-          <Btn variant={editing ? 'green' : 'secondary'} onClick={() => setEditing(!editing)}>
-            {editing ? '저장' : '프로필 수정'}
-          </Btn>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
+            {editing ? (
+              <>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <Btn variant="secondary" onClick={() => { setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
+                    취소
+                  </Btn>
+                  <Btn variant="green" onClick={handleSave} disabled={saving}>
+                    {saving ? '저장 중…' : '저장'}
+                  </Btn>
+                </div>
+                {saveError && (
+                  <span style={{ fontSize: 12, color: '#e05252' }}>{saveError}</span>
+                )}
+              </>
+            ) : (
+              <Btn variant="secondary" onClick={() => setEditing(true)}>
+                프로필 수정
+              </Btn>
+            )}
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginTop: 24, paddingTop: 22, borderTop: '0.5px solid var(--rule)' }}>

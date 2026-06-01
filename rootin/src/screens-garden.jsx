@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, DEX, TILS } from './data.jsx';
+import { harvestPot } from './api/garden.js';
 import { useUser } from './context/UserContext.jsx';
 import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
@@ -791,45 +792,121 @@ function PotDetailScreen({ potId, onBack }) {
 }
 
 function HarvestModal({ pot, onClose }) {
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  const handleHarvest = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await harvestPot(pot.id);
+      setResult(data);
+    } catch (err) {
+      if (err.status === 400) {
+        setError('아직 수확할 수 없어요. 식물이 만개(🌸) 단계에 도달해야 합니다.');
+      } else {
+        setError('수확에 실패했어요. 잠시 후 다시 시도해 주세요.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div style={{
       position: 'fixed', inset: 0, background: 'rgba(15, 42, 71, 0.4)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
       backdropFilter: 'blur(4px)',
-    }} onClick={onClose}>
+    }} onClick={result ? undefined : onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         width: 480, background: '#fff', borderRadius: 18,
         padding: '32px 28px', boxShadow: 'var(--shadow-lg)',
         textAlign: 'center',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-          <PixelPlant species={pot.species} stage="full" size={140} glow={pot.species === 'moonlight'} />
-        </div>
-        <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>수확하기</div>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
-          {pot.emoji} {pot.name}의 식물을 수확할까요?
-        </h2>
-        <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8, lineHeight: 1.6 }}>
-          수확하면 식물 아이템으로 정원에 장식할 수 있어요.<br />
-          현재 식물을 유지하거나, 새로운 씨앗을 심을 수 있어요.
-        </div>
-        <div style={{
-          margin: '20px 0',
-          padding: '12px 16px',
-          background: 'var(--paper-2)',
-          borderRadius: 10,
-          fontSize: 11.5, color: 'var(--ink-3)',
-          fontFamily: 'var(--font-mono)',
-          display: 'flex', justifyContent: 'space-around',
-        }}>
-          <span>수확일 <b style={{ color: 'var(--ink)' }}>2026.05.22</b></span>
-          <span>화분 Lv.<b style={{ color: 'var(--ink)' }}>{pot.level}</b></span>
-          <span>총 <b style={{ color: 'var(--ink)' }}>{pot.tilCount} TIL</b></span>
-        </div>
-        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-          <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={onClose}>현재 식물 유지</Btn>
-          <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={onClose}>새 씨앗 심기</Btn>
-        </div>
+
+        {result ? (
+          /* 수확 완료 결과 화면 */
+          <>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+            <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>수확 완료</div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+              {result.harvestedPlantName} 수확!
+            </h2>
+            <div style={{
+              margin: '20px 0',
+              padding: '16px',
+              background: 'var(--paper-2)',
+              borderRadius: 12,
+              display: 'flex', flexDirection: 'column', gap: 10,
+              fontSize: 13, color: 'var(--ink-2)', textAlign: 'left',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>수확한 식물</span>
+                <b style={{ color: 'var(--ink)' }}>
+                  {result.harvestedPlantName}
+                  <span style={{ fontSize: 11, marginLeft: 6, color: result.harvestedRarity === '희귀' ? '#534ab7' : 'var(--moss-2)' }}>
+                    {result.harvestedRarity === '희귀' ? '✦ 희귀종' : '일반종'}
+                  </span>
+                </b>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>수확 레벨</span>
+                <b style={{ color: 'var(--ink)' }}>Lv.{result.harvestedLevel}</b>
+              </div>
+              <div style={{ borderTop: '0.5px solid var(--rule)', paddingTop: 10, display: 'flex', justifyContent: 'space-between' }}>
+                <span>새로 심어진 씨앗</span>
+                <b style={{ color: result.nextRarity === '희귀' ? '#534ab7' : 'var(--moss-2)' }}>
+                  {result.nextRarity === '희귀' ? '✦ ' : ''}{result.nextPlantName}
+                </b>
+              </div>
+            </div>
+            <Btn variant="green" size="lg" style={{ width: '100%' }} onClick={onClose}>
+              확인
+            </Btn>
+          </>
+        ) : (
+          /* 수확 확인 화면 */
+          <>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
+              <PixelPlant species={pot.species} stage="full" size={140} glow={pot.species === 'moonlight'} />
+            </div>
+            <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>수확하기</div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+              {pot.emoji} {pot.name}의 식물을 수확할까요?
+            </h2>
+            <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8, lineHeight: 1.6 }}>
+              수확하면 식물 도감에 기록되고, 새로운 씨앗이 심어져요.<br />
+              다음 씨앗은 일반(90%) 또는 희귀(10%) 중 랜덤으로 배정됩니다.
+            </div>
+            <div style={{
+              margin: '20px 0', padding: '12px 16px',
+              background: 'var(--paper-2)', borderRadius: 10,
+              fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)',
+              display: 'flex', justifyContent: 'space-around',
+            }}>
+              <span>화분 Lv.<b style={{ color: 'var(--ink)' }}>{pot.level}</b></span>
+              <span>총 <b style={{ color: 'var(--ink)' }}>{pot.tilCount} TIL</b></span>
+            </div>
+            {error && (
+              <div style={{
+                marginBottom: 14, padding: '10px 14px', borderRadius: 8,
+                background: '#fff3f5', border: '0.5px solid #f7c1c1',
+                fontSize: 12.5, color: '#b8536a',
+              }}>
+                {error}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+              <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={onClose} disabled={loading}>
+                취소
+              </Btn>
+              <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={handleHarvest} disabled={loading}>
+                {loading ? '수확 중...' : '새 씨앗 심기 🌱'}
+              </Btn>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

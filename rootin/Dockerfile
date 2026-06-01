@@ -9,6 +9,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
+# 빌드 타임 환경변수 (Vite는 빌드 시점에 번들에 포함됨)
+ARG VITE_API_BASE_URL
+ARG VITE_GOOGLE_CLIENT_ID
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+
 # 소스 복사 후 빌드
 COPY . .
 RUN npm run build

@@ -996,8 +996,111 @@ function ProfileScreen() {
 
 // === Auth Screen ===
 
+// 클라이언트 유효성 검사
+function validate({ mode, email, password, nickname }) {
+  if (mode === 'signup' && !nickname.trim()) return '닉네임을 입력해주세요.';
+  if (!email.trim()) return '이메일을 입력해주세요.';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return '올바른 이메일 형식이 아닙니다.';
+  if (!password) return '비밀번호를 입력해주세요.';
+  if (password.length < 8) return '비밀번호는 8자 이상이어야 합니다.';
+  return null;
+}
+
+// API 에러 → 사용자 메시지 변환
+function parseApiError(err) {
+  if (err?.status === 401) return '비밀번호가 올바르지 않습니다.';
+  if (err?.status === 409) return '이미 사용 중인 이메일입니다.';
+  if (err?.status === 404) return '등록되지 않은 이메일입니다.';
+  return err?.body?.message ?? '오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+}
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
+
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState('login'); // login | signup
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [nickname, setNickname] = useState('');
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  // Google SDK 초기화
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+    const scriptId = 'google-gsi-script';
+    if (document.getElementById(scriptId)) return;
+    const script = document.createElement('script');
+    script.id = scriptId;
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
+  }, []);
+
+  async function handleGoogleLogin() {
+    if (!GOOGLE_CLIENT_ID || !window.google) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const idToken = await new Promise((resolve, reject) => {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: ({ credential }) => resolve(credential),
+          error_callback: reject,
+        });
+        window.google.accounts.id.prompt(notification => {
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            reject(new Error('Google 로그인 창을 열 수 없습니다.'));
+          }
+        });
+      });
+      const { googleLogin, googleLogin: _g } = await import('./api/auth.js');
+      const result = await googleLogin({ idToken });
+      const { getMe } = await import('./api/user.js');
+      const userData = await getMe();
+      onAuth(userData);
+    } catch (err) {
+      setError(err?.message ?? parseApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmit() {
+    setError(null);
+    const validationError = validate({ mode, email, password, nickname });
+    if (validationError) { setError(validationError); return; }
+
+    setLoading(true);
+    try {
+      if (mode === 'login') {
+        const { login } = await import('./api/auth.js');
+        await login({ email, password });
+        const { getMe } = await import('./api/user.js');
+        const userData = await getMe();
+        onAuth(userData);
+      } else {
+        const { signup } = await import('./api/auth.js');
+        await signup({ email, password, nickname });
+        const { getMe } = await import('./api/user.js');
+        const userData = await getMe();
+        onAuth(userData);
+      }
+    } catch (err) {
+      setError(parseApiError(err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function switchMode(nextMode) {
+    setMode(nextMode);
+    setError(null);
+    setEmail('');
+    setPassword('');
+    setNickname('');
+  }
+
   return (
     <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1.1fr 1fr', background: 'var(--paper)' }}>
 
@@ -1055,19 +1158,25 @@ function AuthScreen({ onAuth }) {
 
         {/* Social */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 28 }}>
-          <button style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            padding: '12px 16px', borderRadius: 10,
-            background: '#fff', border: '1px solid var(--rule-2)',
-            fontSize: 13.5, fontWeight: 500, color: 'var(--ink)',
-          }}>
+          <button
+            onClick={handleGoogleLogin}
+            disabled={loading || !GOOGLE_CLIENT_ID}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '12px 16px', borderRadius: 10,
+              background: '#fff', border: '1px solid var(--rule-2)',
+              fontSize: 13.5, fontWeight: 500, color: 'var(--ink)',
+              opacity: (!GOOGLE_CLIENT_ID || loading) ? 0.5 : 1,
+              cursor: (!GOOGLE_CLIENT_ID || loading) ? 'not-allowed' : 'pointer',
+            }}
+          >
             <svg width="18" height="18" viewBox="0 0 18 18">
               <path d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.09-1.8 2.73v2.27h2.92c1.7-1.57 2.68-3.88 2.68-6.64z" fill="#4285F4"/>
               <path d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.92-2.27c-.81.54-1.84.87-3.04.87-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A8.99 8.99 0 0 0 9 18z" fill="#34A853"/>
               <path d="M3.97 10.71A5.41 5.41 0 0 1 3.68 9c0-.6.1-1.18.29-1.71V4.96H.96A8.99 8.99 0 0 0 0 9c0 1.45.35 2.82.96 4.04l3.01-2.33z" fill="#FBBC05"/>
               <path d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A8.99 8.99 0 0 0 .96 4.96L3.97 7.3C4.68 5.16 6.66 3.58 9 3.58z" fill="#EA4335"/>
             </svg>
-            Google로 계속하기
+            Google로 계속하기{!GOOGLE_CLIENT_ID && <span style={{ fontSize: 10.5, color: '#888', marginLeft: 4 }}>(미설정)</span>}
           </button>
           <button style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -1091,39 +1200,84 @@ function AuthScreen({ onAuth }) {
           {mode === 'signup' && (
             <div>
               <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>닉네임</label>
-              <input placeholder="정원에서 불릴 이름" style={{
-                width: '100%', padding: '12px 14px', marginTop: 6,
-                borderRadius: 10, border: '0.5px solid var(--rule-2)',
-                fontSize: 14, outline: 'none', background: '#fff',
-              }} />
+              <input
+                placeholder="정원에서 불릴 이름"
+                value={nickname}
+                onChange={e => setNickname(e.target.value)}
+                disabled={loading}
+                style={{
+                  width: '100%', padding: '12px 14px', marginTop: 6,
+                  borderRadius: 10, border: '0.5px solid var(--rule-2)',
+                  fontSize: 14, outline: 'none', background: '#fff',
+                  boxSizing: 'border-box',
+                }}
+              />
             </div>
           )}
           <div>
             <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>이메일</label>
-            <input placeholder="you@example.com" style={{
-              width: '100%', padding: '12px 14px', marginTop: 6,
-              borderRadius: 10, border: '0.5px solid var(--rule-2)',
-              fontSize: 14, outline: 'none', background: '#fff',
-            }} />
+            <input
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={loading}
+              style={{
+                width: '100%', padding: '12px 14px', marginTop: 6,
+                borderRadius: 10, border: '0.5px solid var(--rule-2)',
+                fontSize: 14, outline: 'none', background: '#fff',
+                boxSizing: 'border-box',
+              }}
+            />
             {mode === 'signup' && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>해당 이메일로 인증메일을 전송합니다.</div>}
           </div>
           <div>
             <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>비밀번호</label>
-            <input type="password" placeholder="••••••••" style={{
-              width: '100%', padding: '12px 14px', marginTop: 6,
-              borderRadius: 10, border: '0.5px solid var(--rule-2)',
-              fontSize: 14, outline: 'none', background: '#fff',
-            }} />
+            <input
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              disabled={loading}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              style={{
+                width: '100%', padding: '12px 14px', marginTop: 6,
+                borderRadius: 10, border: '0.5px solid var(--rule-2)',
+                fontSize: 14, outline: 'none', background: '#fff',
+                boxSizing: 'border-box',
+              }}
+            />
           </div>
         </div>
 
-        <Btn variant="primary" size="lg" style={{ width: '100%', marginTop: 22 }} onClick={onAuth}>
-          {mode === 'login' ? '정원으로 들어가기' : '첫 화분 받기'} →
+        {/* 에러 메시지 */}
+        {error && (
+          <div style={{
+            marginTop: 14,
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: '#fef2f2',
+            border: '0.5px solid #fca5a5',
+            fontSize: 12.5,
+            color: '#b91c1c',
+          }}>
+            {error}
+          </div>
+        )}
+
+        <Btn
+          variant="primary"
+          size="lg"
+          style={{ width: '100%', marginTop: 16, opacity: loading ? 0.7 : 1 }}
+          onClick={handleSubmit}
+          disabled={loading}
+        >
+          {loading ? '처리 중…' : mode === 'login' ? '정원으로 들어가기 →' : '첫 화분 받기 →'}
         </Btn>
 
         <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12.5, color: 'var(--ink-3)' }}>
           {mode === 'login' ? '아직 계정이 없으세요? ' : '이미 계정이 있으세요? '}
-          <button onClick={() => setMode(mode === 'login' ? 'signup' : 'login')} style={{ color: 'var(--moss-2)', fontWeight: 500 }}>
+          <button onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')} style={{ color: 'var(--moss-2)', fontWeight: 500 }}>
             {mode === 'login' ? '회원가입' : '로그인'}
           </button>
         </div>

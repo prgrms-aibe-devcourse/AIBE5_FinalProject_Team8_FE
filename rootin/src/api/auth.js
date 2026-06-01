@@ -25,8 +25,8 @@ export async function signup({ email, password, nickname }) {
     method: 'POST',
     body: JSON.stringify({ email, password, nickname }),
   });
-  saveTokens(data.result);
-  return data.result;
+  saveTokens(data.data);
+  return data.data;
 }
 
 // =====================================================================
@@ -40,8 +40,8 @@ export async function login({ email, password }) {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
-  saveTokens(data.result);
-  return data.result;
+  saveTokens(data.data);
+  return data.data;
 }
 
 // =====================================================================
@@ -55,8 +55,8 @@ export async function googleLogin({ idToken }) {
     method: 'POST',
     body: JSON.stringify({ idToken }),
   });
-  saveTokens(data.result);
-  return data.result;
+  saveTokens(data.data);
+  return data.data;
 }
 
 // =====================================================================
@@ -71,8 +71,8 @@ export async function reissue() {
     method: 'POST',
     body: JSON.stringify({ refreshToken }),
   });
-  saveTokens(data.result);
-  return data.result;
+  saveTokens(data.data);
+  return data.data;
 }
 
 // =====================================================================

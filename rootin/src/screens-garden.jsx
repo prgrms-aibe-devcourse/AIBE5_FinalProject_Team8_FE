@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, DEX, TILS } from './data.jsx';
 import { harvestPot } from './api/garden.js';
+import { createPot, getGardenDashboard, getPots } from './api/pot.js';
 import { useUser } from './context/UserContext.jsx';
 import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
@@ -8,13 +9,264 @@ import { tilCountToStage, STAGE_META } from './plants.jsx';
 
 // Garden + Pot Detail screens — pixel-art edition with 정원 꾸미기 mode
 
+const GROWTH_STAGE_TO_PIXEL_STAGE = {
+  SEED: 'seed',
+  SPROUT: 'sprout',
+  MATURE: 'leaf',
+  LEAF: 'leaf',
+  BLOOM: 'bloom',
+  FULL_BLOOM: 'full',
+};
+
+const STAGE_REPRESENTATIVE_TIL_COUNT = {
+  seed: 1,
+  sprout: 6,
+  leaf: 16,
+  bloom: 26,
+  full: 40,
+};
+
+const POT_LAYOUT_SLOTS = [
+  { x: 18, y: 78 },
+  { x: 40, y: 72 },
+  { x: 62, y: 80 },
+  { x: 82, y: 74 },
+  { x: 28, y: 88 },
+  { x: 52, y: 86 },
+  { x: 74, y: 90 },
+];
+
+function growthStageToPixelStage(growthStage) {
+  return GROWTH_STAGE_TO_PIXEL_STAGE[growthStage] ?? 'seed';
+}
+
+function inferSpecies(plantName = '') {
+  if (plantName.includes('달빛')) return 'moonlight';
+  if (plantName.includes('버섯')) return 'mushroom';
+  return 'seed';
+}
+
+function getStageEmoji(stage) {
+  const stageEmojis = {
+    seed: '🫘',
+    sprout: '🌱',
+    leaf: '🌿',
+    bloom: '🌸',
+    full: '💐',
+  };
+  return stageEmojis[stage] ?? '🫘';
+}
+
+function calculateLevelProgress(totalExp = 0, level = 1) {
+  const safeLevel = Math.max(1, Number(level) || 1);
+  const minExpForLevel = ((safeLevel - 1) * safeLevel * 100) / 2;
+  const currentLevelExp = Math.max(0, Number(totalExp) - minExpForLevel);
+  return Math.min(1, currentLevelExp / (safeLevel * 100));
+}
+
+function percentFromRatio(value = 0) {
+  return Math.min(100, Math.max(0, Math.round((Number(value) || 0) * 100)));
+}
+
+function formatPotExperience(pot) {
+  return `${percentFromRatio(pot.levelProgress)}/100`;
+}
+
+function formatPlantGrowthPercent(pot) {
+  const growth = Number(pot.plantGrowthPercentage);
+  if (Number.isFinite(growth) && growth > 0) {
+    return Math.min(100, Math.max(0, Math.round(growth)));
+  }
+  return percentFromRatio(pot.levelProgress);
+}
+
+function getPlantStageStatus(stage) {
+  const stageStatuses = {
+    seed: '씨앗',
+    sprout: '새싹',
+    leaf: '성숙',
+    bloom: '개화',
+    full: '만개',
+  };
+  return stageStatuses[stage] ?? '씨앗';
+}
+
+function getHarvestStatus(canHarvest) {
+  return canHarvest ? '수확 가능' : '수확 불가';
+}
+
+function toGardenPot(apiPot) {
+  const growthStage = apiPot.growthStage;
+  const stage = growthStageToPixelStage(growthStage);
+  const level = apiPot.level ?? 1;
+  const levelProgress = calculateLevelProgress(apiPot.totalExp, level);
+  return {
+    id: apiPot.id,
+    name: apiPot.title,
+    emoji: getStageEmoji(stage),
+    species: inferSpecies(apiPot.plantName),
+    intro: apiPot.description || '아직 소개글이 없는 화분이에요.',
+    tilCount: STAGE_REPRESENTATIVE_TIL_COUNT[stage],
+    level,
+    levelProgress,
+    totalExp: apiPot.totalExp ?? 0,
+    color: '#a8d5b5',
+    createdAt: '',
+    waterToday: false,
+    plantName: apiPot.plantName,
+    growthStage,
+    plantGrowthPercentage: 0,
+    canHarvest: false,
+    stage,
+  };
+}
+
+function toDashboardPot(dashboard) {
+  const growthStage = dashboard.plant?.growthStage;
+  const stage = growthStageToPixelStage(growthStage);
+  const levelProgress = Math.min(1, Math.max(0, (dashboard.progressPercentage ?? 0) / 100));
+  return {
+    id: dashboard.potId,
+    name: dashboard.title,
+    emoji: getStageEmoji(stage),
+    species: inferSpecies(dashboard.plant?.name),
+    intro: dashboard.description || '아직 소개글이 없는 화분이에요.',
+    tilCount: dashboard.totalTilCount ?? STAGE_REPRESENTATIVE_TIL_COUNT[stage],
+    level: dashboard.level ?? 1,
+    levelProgress,
+    totalExp: dashboard.totalExp ?? 0,
+    currentLevelExp: dashboard.currentLevelExp ?? 0,
+    nextLevelExpRequired: dashboard.nextLevelExpRequired ?? 0,
+    streakDays: dashboard.streakDays ?? 0,
+    lastWateredAt: dashboard.lastWateredAt ?? null,
+    waterToday: false,
+    plantName: dashboard.plant?.name,
+    growthStage,
+    plantGrowthPercentage: dashboard.plant?.growthPercentage ?? 0,
+    canHarvest: dashboard.plant?.canHarvest ?? false,
+    imageUrl: dashboard.plant?.imageUrl ?? null,
+    silhouetteUrl: dashboard.plant?.silhouetteUrl ?? null,
+    createdAt: '',
+    color: '#a8d5b5',
+    stage,
+  };
+}
+
+function formatDateTime(value) {
+  if (!value) return '아직 물주기 기록 없음';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function buildGardenLayout(pots) {
+  return pots.reduce((layout, pot, index) => {
+    const slot = POT_LAYOUT_SLOTS[index % POT_LAYOUT_SLOTS.length];
+    const row = Math.floor(index / POT_LAYOUT_SLOTS.length);
+    layout[pot.id] = {
+      x: Math.min(92, slot.x + row * 6),
+      y: Math.min(94, slot.y + row * 3),
+    };
+    return layout;
+  }, {});
+}
+
+function getLayoutSlot(index) {
+  const slot = POT_LAYOUT_SLOTS[index % POT_LAYOUT_SLOTS.length];
+  const row = Math.floor(index / POT_LAYOUT_SLOTS.length);
+  return {
+    x: Math.min(92, slot.x + row * 6),
+    y: Math.min(94, slot.y + row * 3),
+  };
+}
+
+function PottedPlant({ species, stage, size = 64, locked = false, glow = false }) {
+  const potWidth = size * 0.5;
+  const potHeight = size * 0.26;
+  const rimHeight = size * 0.09;
+
+  return (
+    <div style={{
+      position: 'relative',
+      width: size,
+      height: size,
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    }}>
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transform: 'translateY(-8%)',
+        zIndex: 1,
+      }}>
+        <PixelPlant species={species} stage={stage} size={size} locked={locked} glow={glow} />
+      </div>
+      <div style={{
+        position: 'absolute',
+        left: '50%',
+        bottom: size * 0.02,
+        width: potWidth,
+        height: potHeight,
+        transform: 'translateX(-50%)',
+        zIndex: 2,
+        pointerEvents: 'none',
+        filter: 'drop-shadow(0 3px 2px rgba(26, 58, 92, 0.16))',
+      }}>
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: 0,
+          width: potWidth * 1.18,
+          height: rimHeight,
+          transform: 'translateX(-50%)',
+          background: 'linear-gradient(180deg, #d2ae86 0%, #a87552 100%)',
+          border: '0.5px solid rgba(92, 48, 16, 0.22)',
+          borderRadius: Math.max(4, size * 0.05),
+        }} />
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: rimHeight * 0.56,
+          width: potWidth * 0.88,
+          height: potHeight - rimHeight * 0.2,
+          transform: 'translateX(-50%)',
+          background: 'linear-gradient(180deg, #c89468 0%, #9f6545 100%)',
+          border: '0.5px solid rgba(92, 48, 16, 0.22)',
+          clipPath: 'polygon(8% 0, 92% 0, 76% 100%, 24% 100%)',
+        }} />
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: rimHeight * 0.9,
+          width: potWidth * 0.48,
+          height: Math.max(2, size * 0.025),
+          transform: 'translateX(-50%)',
+          background: 'rgba(92, 48, 16, 0.28)',
+          borderRadius: 999,
+        }} />
+      </div>
+    </div>
+  );
+}
+
 // ============================
 // Pot card (used in grid)
 // ============================
 function PotCard({ pot, onClick }) {
-  const stage = tilCountToStage(pot.tilCount);
+  const stage = pot.stage ?? tilCountToStage(pot.tilCount ?? 0);
   const stageMeta = STAGE_META[stage];
   const rare = pot.species === 'moonlight';
+  const levelProgress = pot.levelProgress ?? ((pot.tilCount ?? 0) / stageMeta.next);
   return (
     <Card padding={20} hoverable onClick={onClick} style={{
       display: 'flex', flexDirection: 'column', gap: 12,
@@ -47,7 +299,7 @@ function PotCard({ pot, onClick }) {
       }}>
         <div style={{ position: 'absolute', left: 0, right: 0, bottom: 18, height: 1, background: 'linear-gradient(90deg, transparent, var(--leaf), transparent)' }} />
         <div style={{ paddingBottom: 6 }}>
-          <PixelPlant species={pot.species} stage={stage} size={110} />
+          <PottedPlant species={pot.species} stage={stage} size={112} />
         </div>
       </div>
 
@@ -55,10 +307,10 @@ function PotCard({ pot, onClick }) {
 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>
-          <span>다음 단계까지 {Math.max(0, stageMeta.next - pot.tilCount)} TIL</span>
-          <span style={{ color: 'var(--moss-2)' }}>{pot.tilCount} / {stageMeta.next}</span>
+          <span>화분 레벨 진척도</span>
+          <span style={{ color: 'var(--moss-2)' }}>{Math.round(levelProgress * 100)}%</span>
         </div>
-        <ProgressBar value={pot.tilCount / stageMeta.next} />
+        <ProgressBar value={levelProgress} />
       </div>
     </Card>
   );
@@ -280,7 +532,7 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
 
       {/* pots — positioned by layout[id].x / .y */}
       {pots.filter(p => !hiddenPots[p.id]).map(pot => {
-        const stage = tilCountToStage(pot.tilCount);
+        const stage = pot.stage ?? tilCountToStage(pot.tilCount ?? 0);
         const pos = layout[pot.id] || { x: 50, y: 75 };
         const size = dense ? 76 : 92;
         const isDragging = dragging?.kind === 'pot' && dragging?.id === pot.id;
@@ -312,7 +564,7 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
                 background: 'radial-gradient(ellipse, rgba(0,0,0,0.18), transparent 70%)',
                 filter: 'blur(2px)',
               }} />
-              <PixelPlant species={pot.species} stage={stage} size={size} glow={pot.species === 'moonlight'} />
+              <PottedPlant species={pot.species} stage={stage} size={size} glow={pot.species === 'moonlight'} />
               <div style={{
                 fontSize: 10.5, color: isDark ? '#e8f4ec' : 'var(--ink)',
                 fontFamily: 'var(--font-display)', fontWeight: 600,
@@ -378,6 +630,10 @@ function GardenScreen({ onOpenPot }) {
   const [layout, setLayout] = useState(DEFAULT_GARDEN_LAYOUT);
   const [decorations, setDecorations] = useState([]);
   const [hiddenPots, setHiddenPots] = useState({}); // { potId: true }
+  const [pots, setPots] = useState([]);
+  const [potsLoading, setPotsLoading] = useState(true);
+  const [potsError, setPotsError] = useState(null);
+  const [showCreatePot, setShowCreatePot] = useState(false);
 
   const theme = GARDEN_THEMES.find(t => t.id === themeId);
   const movePot = (id, x, y) => setLayout(L => ({ ...L, [id]: { x, y } }));
@@ -393,6 +649,58 @@ function GardenScreen({ onOpenPot }) {
 
   // Harvested plants from DEX — actual list user has collected
   const harvestedPlants = DEX.filter(d => d.state === 'harvested');
+  const visiblePots = pots.filter(p => !hiddenPots[p.id]);
+  const wateredCount = pots.filter(p => p.waterToday).length;
+  const attentionPot = pots.find(p => !p.waterToday) ?? pots[0] ?? null;
+  const handlePotCreated = (createdPot) => {
+    const nextPot = toGardenPot({
+      ...createdPot,
+      plantName: createdPot.plantName ?? '기본 씨앗',
+      growthStage: createdPot.growthStage ?? 'SEED',
+    });
+
+    const nextIndex = pots.length;
+    setPots(current => current.some(p => p.id === nextPot.id) ? current : [...current, nextPot]);
+    setLayout(current => ({
+      ...current,
+      [nextPot.id]: current[nextPot.id] ?? getLayoutSlot(nextIndex),
+    }));
+    setHiddenPots(current => {
+      if (!current[nextPot.id]) return current;
+      const next = { ...current };
+      delete next[nextPot.id];
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    let active = true;
+    setPotsLoading(true);
+    setPotsError(null);
+
+    getPots(user?.userId)
+      .then(data => {
+        if (!active) return;
+        const list = Array.isArray(data) ? data.map(toGardenPot) : [];
+        setPots(list);
+        setLayout(current => ({
+          ...buildGardenLayout(list),
+          ...current,
+        }));
+      })
+      .catch(() => {
+        if (!active) return;
+        setPots([]);
+        setPotsError('화분 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      })
+      .finally(() => {
+        if (active) setPotsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user?.userId]);
 
   return (
     <div style={{ padding: 32, maxWidth: 1280, margin: '0 auto' }}>
@@ -411,11 +719,13 @@ function GardenScreen({ onOpenPot }) {
               {user?.name ?? ''}님의 정원 · TIL <span style={{ color: 'var(--moss-2)' }}>{user?.totalTil ?? 0}</span>개
             </h2>
             <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
-              4개의 화분이 자라고 있어요. 오늘 <b style={{ color: 'var(--moss-2)' }}>2개</b>의 화분에 물을 줬어요.
+              {potsLoading
+                ? '화분을 불러오는 중이에요.'
+                : `${pots.length}개의 화분이 자라고 있어요. 오늘 ${wateredCount}개의 화분에 물을 줬어요.`}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
-            <Btn variant="secondary" size="md" icon={Icon.plus}>새 화분</Btn>
+            <Btn variant="secondary" size="md" icon={Icon.plus} onClick={() => setShowCreatePot(true)}>새 화분</Btn>
             {editMode ? (
               <Btn variant="green" size="md" icon={Icon.check} onClick={() => setEditMode(false)}>꾸미기 완료</Btn>
             ) : (
@@ -427,7 +737,7 @@ function GardenScreen({ onOpenPot }) {
         {/* Scene */}
         <div style={{ padding: '0 20px 20px' }}>
           <GardenScene
-            pots={POTS}
+            pots={pots}
             theme={theme}
             layout={layout}
             editMode={editMode}
@@ -553,8 +863,8 @@ function GardenScreen({ onOpenPot }) {
                   <>
                     <div className="eyebrow" style={{ marginTop: 14, marginBottom: 8 }}>숨긴 화분 · 다시 정원에 배치</div>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {POTS.filter(p => hiddenPots[p.id]).map(p => {
-                        const stage = tilCountToStage(p.tilCount);
+                      {pots.filter(p => hiddenPots[p.id]).map(p => {
+                        const stage = p.stage ?? tilCountToStage(p.tilCount ?? 0);
                         return (
                           <button
                             key={p.id}
@@ -568,7 +878,7 @@ function GardenScreen({ onOpenPot }) {
                               cursor: 'pointer',
                             }}
                           >
-                            <PixelPlant species={p.species} stage={stage} size={32} />
+                            <PottedPlant species={p.species} stage={stage} size={34} />
                             <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
                               {p.emoji} {p.name}
                             </span>
@@ -597,14 +907,32 @@ function GardenScreen({ onOpenPot }) {
       {/* Pot grid */}
       <SectionHeader eyebrow="화분" title="키우는 화분" action={
         <div style={{ display: 'flex', gap: 6, fontSize: 12 }}>
-          <Pill>전체 4</Pill>
-          <Pill tone="green">활동 중 3</Pill>
+          <Pill>전체 {pots.length}</Pill>
+          <Pill tone="green">활동 중 {visiblePots.length}</Pill>
         </div>
       } />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
-        {POTS.map(p => <PotCard key={p.id} pot={p} onClick={() => onOpenPot(p.id)} />)}
+        {potsLoading && (
+          <Card padding={24} style={{ minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+            화분 목록을 불러오는 중이에요.
+          </Card>
+        )}
 
-        <Card padding={20} hoverable style={{
+        {!potsLoading && potsError && (
+          <Card padding={24} style={{ minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b8536a', fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>
+            {potsError}
+          </Card>
+        )}
+
+        {!potsLoading && !potsError && pots.length === 0 && (
+          <Card padding={24} style={{ minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>
+            아직 생성된 화분이 없어요.<br />새 화분을 만들어 첫 씨앗을 심어보세요.
+          </Card>
+        )}
+
+        {!potsLoading && !potsError && pots.map(p => <PotCard key={p.id} pot={p} onClick={() => onOpenPot(p.id)} />)}
+
+        <Card padding={20} hoverable onClick={() => setShowCreatePot(true)} style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 14, minHeight: 320,
           background: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(168, 213, 181, 0.08) 8px, rgba(168, 213, 181, 0.08) 16px)',
@@ -623,18 +951,193 @@ function GardenScreen({ onOpenPot }) {
         </Card>
       </div>
 
-      <div style={{
-        marginTop: 28, padding: '16px 22px',
-        background: '#fff', border: '0.5px solid var(--rule)',
-        borderRadius: 12,
-        display: 'flex', alignItems: 'center', gap: 18,
-      }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--paper-2)', color: 'var(--moss-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🌱</div>
-        <div style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
-          <b style={{ color: 'var(--ink)' }}>운동 화분</b>이 4일째 비어있어요. 한 줄이라도 물을 주면 씨앗이 새싹으로 자라요.
+      {!potsLoading && !potsError && attentionPot && (
+        <div style={{
+          marginTop: 28, padding: '16px 22px',
+          background: '#fff', border: '0.5px solid var(--rule)',
+          borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 18,
+        }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--paper-2)', color: 'var(--moss-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🌱</div>
+          <div style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
+            <b style={{ color: 'var(--ink)' }}>{attentionPot.name} 화분</b>에 오늘의 TIL을 남기면 경험치가 쌓이고 식물이 자라요.
+          </div>
+          <Btn variant="secondary" size="sm" onClick={() => onOpenPot(attentionPot.id)}>화분으로 이동</Btn>
         </div>
-        <Btn variant="secondary" size="sm">운동 화분으로 이동</Btn>
-      </div>
+      )}
+      {showCreatePot && (
+        <CreatePotModal
+          userId={user?.userId}
+          onClose={() => setShowCreatePot(false)}
+          onCreated={handlePotCreated}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreatePotModal({ userId, onClose, onCreated }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const titleLength = title.trim().length;
+  const descriptionLength = description.length;
+  const titleInvalid = titleLength === 0 || title.length > 100;
+  const descriptionInvalid = descriptionLength > 255;
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError(null);
+
+    if (title.trim().length === 0) {
+      setError('화분 제목을 입력해 주세요.');
+      return;
+    }
+    if (title.length > 100) {
+      setError('화분 제목은 최대 100자까지 입력할 수 있어요.');
+      return;
+    }
+    if (description.length > 255) {
+      setError('화분 소개글은 최대 255자까지 입력할 수 있어요.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const created = await createPot({
+        title: title.trim(),
+        description: description.trim(),
+      }, userId);
+      onCreated(created);
+      onClose();
+    } catch (err) {
+      setError(err?.body?.message ?? '화분을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(15, 42, 71, 0.38)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 50,
+      backdropFilter: 'blur(4px)',
+    }} onClick={loading ? undefined : onClose}>
+      <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()} style={{
+        width: 460,
+        background: '#fff',
+        borderRadius: 18,
+        padding: '28px 28px 24px',
+        boxShadow: 'var(--shadow-lg)',
+        border: '0.5px solid var(--rule)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div>
+            <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>New Pot</div>
+            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+              새 화분 만들기
+            </h2>
+            <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.6 }}>
+              새로운 학습 주제를 정하고 기본 씨앗을 심어요.
+            </div>
+          </div>
+          <button type="button" onClick={onClose} disabled={loading} style={{
+            width: 32,
+            height: 32,
+            borderRadius: 8,
+            border: '0.5px solid var(--rule)',
+            color: 'var(--ink-3)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            opacity: loading ? 0.5 : 1,
+          }}>
+            {Icon.close}
+          </button>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <span>화분 제목</span>
+              <span style={{ color: title.length > 100 ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/100</span>
+            </span>
+            <input
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="예: Spring 공부"
+              disabled={loading}
+              autoFocus
+              style={{
+                height: 42,
+                borderRadius: 10,
+                border: `0.5px solid ${titleInvalid && title.length > 0 ? '#f0c4cc' : 'var(--rule-2)'}`,
+                background: 'var(--paper)',
+                padding: '0 13px',
+                outline: 'none',
+                fontSize: 13.5,
+              }}
+            />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+              <span>소개글</span>
+              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{descriptionLength}/255</span>
+            </span>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="이 화분에 어떤 기록을 모을지 적어보세요."
+              disabled={loading}
+              rows={4}
+              style={{
+                minHeight: 96,
+                resize: 'vertical',
+                borderRadius: 10,
+                border: `0.5px solid ${descriptionInvalid ? '#f0c4cc' : 'var(--rule-2)'}`,
+                background: 'var(--paper)',
+                padding: '12px 13px',
+                outline: 'none',
+                fontSize: 13.5,
+                lineHeight: 1.6,
+              }}
+            />
+          </label>
+        </div>
+
+        {error && (
+          <div style={{
+            marginTop: 16,
+            padding: '10px 12px',
+            borderRadius: 9,
+            background: '#fff3f5',
+            border: '0.5px solid #f7c1c1',
+            fontSize: 12.5,
+            color: '#b8536a',
+            lineHeight: 1.5,
+          }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+          <Btn type="button" variant="secondary" size="lg" style={{ flex: 1 }} onClick={onClose} disabled={loading}>
+            취소
+          </Btn>
+          <Btn type="submit" variant="green" size="lg" style={{ flex: 1 }} disabled={loading || titleInvalid || descriptionInvalid}>
+            {loading ? '만드는 중...' : '씨앗 심기'}
+          </Btn>
+        </div>
+      </form>
     </div>
   );
 }
@@ -643,15 +1146,84 @@ function GardenScreen({ onOpenPot }) {
 // Pot Detail Screen
 // ============================
 function PotDetailScreen({ potId, onBack }) {
-  const pot = POTS.find(p => p.id === potId);
+  const { user } = useUser();
+  const fallbackPot = POTS.find(p => p.id === potId);
   const [showHarvest, setShowHarvest] = useState(false);
-  if (!pot) return null;
-  const stage = tilCountToStage(pot.tilCount);
-  const stageMeta = STAGE_META[stage];
-  const tils = TILS.filter(t => t.potId === potId);
+  const [dashboard, setDashboard] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState(null);
+
+  useEffect(() => {
+    if (!potId) return;
+    let active = true;
+    setDashboardLoading(true);
+    setDashboardError(null);
+
+    getGardenDashboard(potId, user?.userId)
+      .then(data => {
+        if (!active) return;
+        setDashboard(data);
+      })
+      .catch(() => {
+        if (!active) return;
+        setDashboard(null);
+        setDashboardError('화분 대시보드 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      })
+      .finally(() => {
+        if (active) setDashboardLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [potId, user?.userId]);
+
+  const pot = dashboard ? toDashboardPot(dashboard) : fallbackPot;
+
+  if (dashboardLoading && !pot) {
+    return (
+      <div style={{ padding: 32, maxWidth: 960, margin: '0 auto' }}>
+        <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14 }}>
+          <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
+        </button>
+        <Card padding={28} style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+          화분 대시보드를 불러오는 중이에요.
+        </Card>
+      </div>
+    );
+  }
+
+  if (!pot) {
+    return (
+      <div style={{ padding: 32, maxWidth: 960, margin: '0 auto' }}>
+        <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14 }}>
+          <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
+        </button>
+        <Card padding={28} style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>🌱</div>
+          <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>Garden Detail</div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+            화분 정보를 불러오지 못했어요
+          </h2>
+          <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8, lineHeight: 1.6 }}>
+            {dashboardError ?? '목록에서 화분을 다시 선택해 주세요.'}
+          </div>
+        </Card>
+      </div>
+    );
+  }
+  const stage = pot.stage ?? tilCountToStage(pot.tilCount ?? 0);
+  const tils = fallbackPot ? TILS.filter(t => t.potId === potId) : [];
   const speciesInfo = PIXEL_SPECIES[pot.species];
   const monName = speciesInfo?.stages[stage]?.name;
   const isRare = pot.species === 'moonlight';
+  const detailSubText = dashboard
+    ? `최근 물주기 ${formatDateTime(pot.lastWateredAt)} · 누적 ${pot.totalExp} EXP`
+    : `${pot.createdAt} 생성 · 누적 ${Math.floor(pot.tilCount * 850)}자`;
+  const potExperienceText = formatPotExperience(pot);
+  const plantGrowthPercent = formatPlantGrowthPercent(pot);
+  const plantStageStatus = getPlantStageStatus(stage);
+  const harvestStatus = getHarvestStatus(pot.canHarvest);
 
   return (
     <div style={{ padding: 32, maxWidth: 1280, margin: '0 auto' }}>
@@ -676,11 +1248,11 @@ function PotDetailScreen({ potId, onBack }) {
                 position: 'absolute', top: 14, left: 14, right: 14,
                 display: 'flex', justifyContent: 'space-between',
               }}>
-                <Pill tone={isRare ? 'navy' : 'green'}>{isRare && '✦ '}#{String(POTS.indexOf(pot) + 1).padStart(3, '0')}</Pill>
+                <Pill tone={isRare ? 'navy' : 'green'}>{isRare && '✦ '}#{String(pot.id).padStart(3, '0')}</Pill>
                 <Pill>{pot.tilCount} TIL</Pill>
               </div>
               <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
-                <PixelPlant species={pot.species} stage={stage} size={180} glow={isRare} />
+                <PottedPlant species={pot.species} stage={stage} size={182} glow={isRare} />
               </div>
               {monName && (
                 <div style={{ marginTop: 12, fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
@@ -693,27 +1265,90 @@ function PotDetailScreen({ potId, onBack }) {
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
                   {pot.emoji} {pot.name}
                 </div>
+                <span style={{
+                  padding: '2px 7px',
+                  borderRadius: 999,
+                  background: 'var(--paper-2)',
+                  border: '0.5px solid var(--rule)',
+                  color: 'var(--moss-2)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono)',
+                  lineHeight: 1.5,
+                  whiteSpace: 'nowrap',
+                }}>
+                  Lv. {pot.level}
+                </span>
                 <Pill tone={isRare ? 'navy' : 'default'}>{isRare ? '✦ 희귀종' : '일반종'}</Pill>
               </div>
-              <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
-                {speciesInfo?.label} · Lv.{pot.level} · {stageMeta.label}
-              </div>
               <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 10, lineHeight: 1.6 }}>{pot.intro}</div>
-              <div style={{ marginTop: 16 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>
-                  <span>화분 레벨 진척도</span>
-                  <span style={{ color: 'var(--moss-2)' }}>{Math.round(pot.levelProgress * 100)}%</span>
-                </div>
-                <ProgressBar value={pot.levelProgress} />
+              <div style={{
+                marginTop: 18,
+                background: '#fff',
+                border: '0.5px solid var(--rule)',
+                borderRadius: 12,
+                overflow: 'hidden',
+              }}>
+                {[
+                  { label: '화분 경험치', value: potExperienceText, progress: pot.levelProgress },
+                  { label: '식물 상태', value: `${plantStageStatus} · ${plantGrowthPercent}%`, tone: 'stage' },
+                  { label: '수확 가능 여부', value: harvestStatus, tone: pot.canHarvest ? 'ready' : 'disabled' },
+                ].map((item, index) => (
+                  <div key={item.label} style={{
+                    padding: '13px 14px',
+                    borderTop: index === 0 ? 'none' : '0.5px solid var(--rule)',
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      justifyContent: 'space-between',
+                      gap: 14,
+                    }}>
+                      <span style={{
+                        fontSize: 11,
+                        color: 'var(--ink-3)',
+                        fontFamily: 'var(--font-display)',
+                        letterSpacing: '0.06em',
+                      }}>
+                        {item.label}
+                      </span>
+                      <span style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: item.tone === 'ready' || item.tone === 'stage' ? 'var(--moss-2)' : item.tone === 'disabled' ? 'var(--ink-3)' : 'var(--ink)',
+                        fontFamily: 'var(--font-display)',
+                        lineHeight: 1.45,
+                        textAlign: 'right',
+                      }}>
+                        {item.value}
+                      </span>
+                    </div>
+                    {typeof item.progress === 'number' && (
+                      <>
+                        <div style={{ marginTop: 8 }}>
+                          <ProgressBar value={item.progress} height={8} />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
               <div style={{ marginTop: 14, fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-                {pot.createdAt} 생성 · 누적 {Math.floor(pot.tilCount * 850)}자
+                {detailSubText}
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
                 <Btn variant={pot.waterToday ? 'secondary' : 'green'} size="md" icon={Icon.drop} style={{ flex: 1 }}>
-                  {pot.waterToday ? '오늘 물 줬어요' : '물 주기 · +1 TIL'}
+                  {pot.waterToday ? '오늘 물 줬어요' : 'TIL 작성하면 물주기'}
                 </Btn>
-                <Btn variant="secondary" size="md" onClick={() => setShowHarvest(true)}>수확</Btn>
+                <Btn
+                  variant={pot.canHarvest ? 'green' : 'secondary'}
+                  size="md"
+                  onClick={() => setShowHarvest(true)}
+                  disabled={dashboard && !pot.canHarvest}
+                  style={dashboard && !pot.canHarvest ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
+                >
+                  수확
+                </Btn>
               </div>
             </div>
           </Card>
@@ -757,6 +1392,12 @@ function PotDetailScreen({ potId, onBack }) {
             </div>
           } />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {dashboard && tils.length === 0 && (
+              <Card padding={22} style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6 }}>
+                이 화분의 TIL 목록은 아직 별도 API가 연결되지 않았어요.<br />
+                현재 대시보드 API로는 총 TIL 개수와 성장 정보까지만 표시합니다.
+              </Card>
+            )}
             {tils.map(t => (
               <Card key={t.id} padding={20} hoverable>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
@@ -777,7 +1418,7 @@ function PotDetailScreen({ potId, onBack }) {
                     </div>
                   </div>
                   <div style={{ width: 56, height: 56, borderRadius: 10, background: isRare ? '#eef2fa' : 'var(--paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <PixelPlant species={pot.species} stage={stage} size={42} />
+                    <PottedPlant species={pot.species} stage={stage} size={44} />
                   </div>
                 </div>
               </Card>
@@ -869,7 +1510,7 @@ function HarvestModal({ pot, onClose }) {
           /* 수확 확인 화면 */
           <>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-              <PixelPlant species={pot.species} stage="full" size={140} glow={pot.species === 'moonlight'} />
+              <PottedPlant species={pot.species} stage="full" size={142} glow={pot.species === 'moonlight'} />
             </div>
             <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>수확하기</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>

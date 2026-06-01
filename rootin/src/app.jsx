@@ -19,7 +19,6 @@ const NAV = [
   { id: 'profile',   label: '프로필',    icon: Icon.user },
 ];
 
-
 function Sidebar({ current, onNav }) {
   const { user } = useUser();
 
@@ -153,7 +152,12 @@ function AppShell() {
     dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
     editor:     { title: '오늘의 TIL 작성', subtitle: 'New entry' },
     garden:     { title: '나의 정원', subtitle: 'Garden · 4개의 화분' },
-    'pot-detail': { title: potFocus ? `${POTS.find(p => p.id === potFocus)?.emoji} ${POTS.find(p => p.id === potFocus)?.name}` : '화분', subtitle: 'Garden / Detail' },
+    'pot-detail': {
+      title: potFocus
+        ? `${POTS.find(p => p.id === potFocus)?.emoji ?? '🌱'} ${POTS.find(p => p.id === potFocus)?.name ?? '화분 상세'}`
+        : '화분',
+      subtitle: 'Garden / Detail',
+    },
     collection: { title: '식물 도감', subtitle: 'Collection · ' + DEX.filter(d => d.state !== 'locked').length + ' / ' + DEX.length + ' 종 해금' },
     ai:         { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
     profile:    { title: '내 계정', subtitle: 'Account' },

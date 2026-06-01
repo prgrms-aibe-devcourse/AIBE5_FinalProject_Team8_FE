@@ -1011,9 +1011,7 @@ function ProfileScreen() {
           {[
             { label: '이메일', value: user?.email ?? '', sub: '구글 계정 연동됨' },
             { label: '비밀번호', value: '••••••••', action: '변경' },
-            { label: '연결된 SNS', value: '🟢 Google · 🟡 Kakao (예정)' },
-            { label: '알림', value: '데일리 리마인드 22:00', action: '설정' },
-            { label: '데이터 내보내기', value: 'JSON · Markdown', action: '내보내기' },
+            { label: '연결된 SNS', value: '🟢 Google' },
           ].map((row, i, arr) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 20,
@@ -1220,15 +1218,6 @@ function AuthScreen({ onAuth }) {
               <path d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A8.99 8.99 0 0 0 .96 4.96L3.97 7.3C4.68 5.16 6.66 3.58 9 3.58z" fill="#EA4335"/>
             </svg>
             Google로 계속하기{!GOOGLE_CLIENT_ID && <span style={{ fontSize: 10.5, color: '#888', marginLeft: 4 }}>(미설정)</span>}
-          </button>
-          <button style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            padding: '12px 16px', borderRadius: 10,
-            background: '#fee500', border: 'none',
-            fontSize: 13.5, fontWeight: 500, color: '#191919',
-            opacity: 0.6, cursor: 'not-allowed',
-          }}>
-            💬 Kakao로 계속하기 <span style={{ fontSize: 10.5, color: '#666', marginLeft: 4 }}>(예정)</span>
           </button>
         </div>
 

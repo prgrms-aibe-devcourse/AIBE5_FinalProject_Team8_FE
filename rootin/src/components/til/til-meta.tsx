@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { POTS } from '@/data.jsx'
 import { useTilEditor } from './til-editor-context'
 
 const TODAY = new Date().toLocaleDateString('ko-KR', {
@@ -21,7 +20,7 @@ const TODAY = new Date().toLocaleDateString('ko-KR', {
 })
 
 export function TilMeta() {
-  const { title, setTitle, tags, setTags, selectedPotId, setSelectedPotId } =
+  const { title, setTitle, tags, setTags, selectedPotId, setSelectedPotId, pots, potsLoading } =
     useTilEditor()
   const [tagInput, setTagInput] = useState('')
   const [adding, setAdding] = useState(false)
@@ -51,19 +50,23 @@ export function TilMeta() {
           <SelectTrigger
             aria-label="화분 선택"
             className="h-7 w-auto gap-1.5 rounded-full border-border bg-card px-3 text-xs"
+            disabled={potsLoading}
           >
             <Sprout className="size-3.5 text-primary/70" />
-            <SelectValue placeholder="화분 선택" />
+            <SelectValue placeholder={potsLoading ? '불러오는 중…' : '화분 선택'} />
           </SelectTrigger>
           <SelectContent>
-            {POTS.map((pot) => (
-              <SelectItem key={pot.id} value={pot.id}>
-                <span className="flex items-center gap-2">
-                  <span>{pot.emoji}</span>
-                  {pot.name}
-                </span>
-              </SelectItem>
-            ))}
+            {pots.length === 0 ? (
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                화분이 없습니다
+              </div>
+            ) : (
+              pots.map((pot) => (
+                <SelectItem key={pot.id} value={String(pot.id)}>
+                  {pot.title}
+                </SelectItem>
+              ))
+            )}
           </SelectContent>
         </Select>
       </div>

@@ -1,0 +1,80 @@
+import { request } from './client.js';
+
+// =====================================================================
+// TIL 발행
+// =====================================================================
+
+// POST /api/v1/tils
+// Body: { title, content, potId, tags }
+export async function createTil({ title, content, potId, tags }) {
+  const res = await request('/api/v1/tils', {
+    method: 'POST',
+    body: JSON.stringify({ title, content, potId, tags }),
+  });
+  return res.data;
+}
+
+// =====================================================================
+// 임시저장 (화분당 1개)
+// =====================================================================
+
+// 임시저장 저장/덮어쓰기
+// POST /api/v1/tils/draft
+// Body: { potId, title, content, tags }
+export async function saveDraft({ potId, title, content, tags }) {
+  const res = await request('/api/v1/tils/draft', {
+    method: 'POST',
+    body: JSON.stringify({ potId, title, content, tags }),
+  });
+  return res.data;
+}
+
+// 임시저장 불러오기 — 없으면(404) null 반환
+// GET /api/v1/tils/draft?potId=
+export async function getDraft(potId) {
+  try {
+    const res = await request(`/api/v1/tils/draft?potId=${potId}`);
+    return res.data;
+  } catch (err) {
+    if (err.status === 404) return null;
+    throw err;
+  }
+}
+
+// 임시저장 삭제 — 없어도(404) 조용히 무시
+// DELETE /api/v1/tils/draft?potId=  → 204
+export async function deleteDraft(potId) {
+  try {
+    await request(`/api/v1/tils/draft?potId=${potId}`, { method: 'DELETE' });
+  } catch (err) {
+    if (err.status !== 404) throw err;
+  }
+}
+
+// =====================================================================
+// 템플릿 (사용자 템플릿 + 기본 제공 템플릿)
+// =====================================================================
+
+// 템플릿 목록 조회
+// GET /api/v1/til-templates
+export async function getTemplates() {
+  const res = await request('/api/v1/til-templates');
+  return res.data;
+}
+
+// 템플릿 저장
+// POST /api/v1/til-templates
+// Body: { title, content }
+export async function createTemplate({ title, content }) {
+  const res = await request('/api/v1/til-templates', {
+    method: 'POST',
+    body: JSON.stringify({ title, content }),
+  });
+  return res.data;
+}
+
+// 템플릿 삭제
+// DELETE /api/v1/til-templates/{templateId}  → 204
+export function deleteTemplate(templateId) {
+  return request(`/api/v1/til-templates/${templateId}`, { method: 'DELETE' });
+}

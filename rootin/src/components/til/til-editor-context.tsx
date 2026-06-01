@@ -4,25 +4,43 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
   type Dispatch,
   type ReactNode,
   type SetStateAction,
 } from 'react'
 import type { Editor } from '@tiptap/react'
+import { getPots } from '@/api/pot.js'
+import {
+  createTil,
+  saveDraft as apiSaveDraft,
+  getDraft as apiGetDraft,
+  deleteDraft as apiDeleteDraft,
+  getTemplates as apiGetTemplates,
+  createTemplate as apiCreateTemplate,
+  deleteTemplate as apiDeleteTemplate,
+} from '@/api/til.js'
 
-export type CustomTemplate = { id: string; name: string; content: string }
+export type Pot = {
+  id: number
+  title: string
+  [key: string]: unknown
+}
+
+export type Template = {
+  id: number
+  name: string
+  content: string
+  isDefault: boolean
+}
 
 export type DraftData = {
   title: string
   tags: string[]
   potId: string | null
   content: string
-  savedAt: number
 }
-
-const DRAFT_KEY = 'rootin:til-draft'
-const TEMPLATES_KEY = 'rootin:til-custom-templates'
 
 type TilEditorContextValue = {
   editor: Editor | null
@@ -33,13 +51,17 @@ type TilEditorContextValue = {
   setTags: Dispatch<SetStateAction<string[]>>
   selectedPotId: string | null
   setSelectedPotId: (v: string | null) => void
-  customTemplates: CustomTemplate[]
+  pots: Pot[]
+  potsLoading: boolean
+  templates: Template[]
   applyTemplate: (content: string) => void
-  saveCustomTemplate: (name: string) => void
-  deleteCustomTemplate: (id: string) => void
-  saveDraft: () => void
-  loadDraft: () => DraftData | null
-  clearDraft: () => void
+  saveCustomTemplate: (name: string) => Promise<void>
+  deleteCustomTemplate: (id: number) => Promise<void>
+  saveDraft: () => Promise<boolean>
+  loadDraft: (potId: number) => Promise<DraftData | null>
+  clearDraft: () => Promise<void>
+  publish: () => Promise<unknown>
+  publishing: boolean
   draftSavedAt: number | null
 }
 
@@ -53,24 +75,44 @@ export function useTilEditor() {
   return ctx
 }
 
-function readTemplates(): CustomTemplate[] {
-  try {
-    const raw = localStorage.getItem(TEMPLATES_KEY)
-    return raw ? (JSON.parse(raw) as CustomTemplate[]) : []
-  } catch {
-    return []
-  }
-}
-
 export function TilEditorProvider({ children }: { children: ReactNode }) {
   const [editor, setEditor] = useState<Editor | null>(null)
   const [title, setTitle] = useState('')
   const [tags, setTags] = useState<string[]>([])
   const [selectedPotId, setSelectedPotId] = useState<string | null>(null)
-  const [customTemplates, setCustomTemplates] = useState<CustomTemplate[]>(() =>
-    typeof window === 'undefined' ? [] : readTemplates(),
-  )
+  const [pots, setPots] = useState<Pot[]>([])
+  const [potsLoading, setPotsLoading] = useState(true)
+  const [templates, setTemplates] = useState<Template[]>([])
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
+  const [publishing, setPublishing] = useState(false)
+
+  // 진입 시 화분 목록 로딩
+  useEffect(() => {
+    getPots()
+      .then((data) => setPots(Array.isArray(data) ? (data as Pot[]) : []))
+      .catch(() => setPots([]))
+      .finally(() => setPotsLoading(false))
+  }, [])
+
+  // 진입 시 템플릿 목록 로딩 (사용자 + 기본 제공)
+  const refreshTemplates = useCallback(async () => {
+    try {
+      const list = await apiGetTemplates()
+      const normalized: Template[] = (Array.isArray(list) ? list : []).map((t: any) => ({
+        id: t.templateId,
+        name: t.title,
+        content: t.content,
+        isDefault: t.isDefault,
+      }))
+      setTemplates(normalized)
+    } catch {
+      setTemplates([])
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshTemplates()
+  }, [refreshTemplates])
 
   const applyTemplate = useCallback(
     (content: string) => {
@@ -79,69 +121,76 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     [editor],
   )
 
-  const persistTemplates = useCallback((list: CustomTemplate[]) => {
-    setCustomTemplates(list)
-    try {
-      localStorage.setItem(TEMPLATES_KEY, JSON.stringify(list))
-    } catch {
-      /* localStorage 사용 불가 시 무시 */
-    }
-  }, [])
-
   const saveCustomTemplate = useCallback(
-    (name: string) => {
+    async (name: string) => {
       if (!editor) return
-      const tpl: CustomTemplate = {
-        id: `tpl-${Date.now()}`,
-        name,
-        content: editor.getHTML(),
-      }
-      persistTemplates([...customTemplates, tpl])
+      await apiCreateTemplate({ title: name, content: editor.getHTML() })
+      await refreshTemplates()
     },
-    [editor, customTemplates, persistTemplates],
+    [editor, refreshTemplates],
   )
 
   const deleteCustomTemplate = useCallback(
-    (id: string) => {
-      persistTemplates(customTemplates.filter((t) => t.id !== id))
+    async (id: number) => {
+      await apiDeleteTemplate(id)
+      await refreshTemplates()
     },
-    [customTemplates, persistTemplates],
+    [refreshTemplates],
   )
 
-  const saveDraft = useCallback(() => {
-    if (!editor) return
-    const data: DraftData = {
+  // 임시저장 — 화분이 선택돼 있어야 저장 가능 (서버 draft는 화분당 1개)
+  const saveDraft = useCallback(async (): Promise<boolean> => {
+    if (!editor || !selectedPotId) return false
+    await apiSaveDraft({
+      potId: Number(selectedPotId),
       title,
-      tags,
-      potId: selectedPotId,
       content: editor.getHTML(),
-      savedAt: Date.now(),
-    }
-    try {
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(data))
-    } catch {
-      /* localStorage 사용 불가 시 무시 */
-    }
-    setDraftSavedAt(data.savedAt)
+      tags,
+    })
+    setDraftSavedAt(Date.now())
+    return true
   }, [editor, title, tags, selectedPotId])
 
-  const loadDraft = useCallback((): DraftData | null => {
-    try {
-      const raw = localStorage.getItem(DRAFT_KEY)
-      return raw ? (JSON.parse(raw) as DraftData) : null
-    } catch {
-      return null
+  const loadDraft = useCallback(async (potId: number): Promise<DraftData | null> => {
+    const draft = await apiGetDraft(potId)
+    if (!draft) return null
+    return {
+      title: draft.title ?? '',
+      tags: draft.tags ?? [],
+      potId: draft.potId != null ? String(draft.potId) : null,
+      content: draft.content ?? '',
     }
   }, [])
 
-  const clearDraft = useCallback(() => {
-    try {
-      localStorage.removeItem(DRAFT_KEY)
-    } catch {
-      /* 무시 */
-    }
+  const clearDraft = useCallback(async () => {
+    if (!selectedPotId) return
+    await apiDeleteDraft(Number(selectedPotId))
     setDraftSavedAt(null)
-  }, [])
+  }, [selectedPotId])
+
+  // 발행 — 성공 시 해당 화분의 임시저장 삭제 후 에디터 초기화
+  const publish = useCallback(async () => {
+    if (!editor || !selectedPotId) return
+    setPublishing(true)
+    try {
+      const result = await createTil({
+        title,
+        content: editor.getHTML(),
+        potId: Number(selectedPotId),
+        tags,
+      })
+      await apiDeleteDraft(Number(selectedPotId))
+      // 발행 후 에디터 상태 초기화 (Provider가 화면 전환에도 유지되므로 명시적 리셋)
+      editor.commands.clearContent()
+      setTitle('')
+      setTags([])
+      setSelectedPotId(null)
+      setDraftSavedAt(null)
+      return result
+    } finally {
+      setPublishing(false)
+    }
+  }, [editor, title, tags, selectedPotId])
 
   const value: TilEditorContextValue = {
     editor,
@@ -152,13 +201,17 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     setTags,
     selectedPotId,
     setSelectedPotId,
-    customTemplates,
+    pots,
+    potsLoading,
+    templates,
     applyTemplate,
     saveCustomTemplate,
     deleteCustomTemplate,
     saveDraft,
     loadDraft,
     clearDraft,
+    publish,
+    publishing,
     draftSavedAt,
   }
 

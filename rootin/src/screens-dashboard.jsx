@@ -289,7 +289,7 @@ function DashboardScreen({ onNav }) {
   const totalToday  = quests?.totalToday  ?? 0;
 
   return (
-    <div style={{ padding: 32, display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1280, margin: '0 auto' }}>
+    <div style={{ padding: 32, width: '100%', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
 
       {/* Greeting card */}
       <Card padding={24} style={{ background: 'linear-gradient(120deg, #ebf5ef 0%, #f5f7f5 50%, #f9f6ed 100%)', border: '0.5px solid var(--leaf)' }}>

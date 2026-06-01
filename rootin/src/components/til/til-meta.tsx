@@ -1,8 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarDays, Hash, X, Plus } from 'lucide-react'
+import { CalendarDays, Hash, X, Plus, Sprout } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { POTS } from '@/data.jsx'
+import { useTilEditor } from './til-editor-context'
 
 const TODAY = new Date().toLocaleDateString('ko-KR', {
   year: 'numeric',
@@ -12,8 +21,8 @@ const TODAY = new Date().toLocaleDateString('ko-KR', {
 })
 
 export function TilMeta() {
-  const [title, setTitle] = useState('')
-  const [tags, setTags] = useState<string[]>(['React', 'Hooks'])
+  const { title, setTitle, tags, setTags, selectedPotId, setSelectedPotId } =
+    useTilEditor()
   const [tagInput, setTagInput] = useState('')
   const [adding, setAdding] = useState(false)
 
@@ -28,9 +37,35 @@ export function TilMeta() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-        <CalendarDays className="size-3.5" />
-        <span>{TODAY}</span>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <CalendarDays className="size-3.5" />
+          <span>{TODAY}</span>
+        </div>
+        <span className="hidden size-1 rounded-full bg-border sm:block" />
+        {/* BM-03 화분(주제) 선택 */}
+        <Select
+          value={selectedPotId ?? undefined}
+          onValueChange={(v) => setSelectedPotId(v)}
+        >
+          <SelectTrigger
+            aria-label="화분 선택"
+            className="h-7 w-auto gap-1.5 rounded-full border-border bg-card px-3 text-xs"
+          >
+            <Sprout className="size-3.5 text-primary/70" />
+            <SelectValue placeholder="화분 선택" />
+          </SelectTrigger>
+          <SelectContent>
+            {POTS.map((pot) => (
+              <SelectItem key={pot.id} value={pot.id}>
+                <span className="flex items-center gap-2">
+                  <span>{pot.emoji}</span>
+                  {pot.name}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Title */}

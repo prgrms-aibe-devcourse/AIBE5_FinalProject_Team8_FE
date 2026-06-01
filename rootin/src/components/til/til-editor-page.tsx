@@ -2,7 +2,7 @@
 
 import 'katex/dist/katex.min.css'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -18,12 +18,16 @@ import Superscript from '@tiptap/extension-superscript'
 import Placeholder from '@tiptap/extension-placeholder'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { Mathematics } from '@tiptap/extension-mathematics'
+import Image from '@tiptap/extension-image'
 import { createLowlight, common } from 'lowlight'
 
 import { EditorToolbar } from './editor-toolbar'
 import { EditorBubbleMenu } from './editor-bubble-menu'
-import { TilHeader } from './til-header'
+import { SidebarTrigger } from '@/components/ui/sidebar'
+
+import { TilStatusIsland } from './til-status-island'
 import { TilMeta } from './til-meta'
+import { useTilEditor } from './til-editor-context'
 
 const lowlight = createLowlight(common)
 
@@ -45,6 +49,20 @@ const STARTER_CONTENT = `
 
 export function TilEditorPage() {
   const [saved, setSaved] = useState(false)
+  const {
+    setEditor,
+    title,
+    tags,
+    selectedPotId,
+    setTitle,
+    setTags,
+    setSelectedPotId,
+    saveDraft,
+    loadDraft,
+  } = useTilEditor()
+
+  const restoredRef = useRef(false)
+  const settledRef = useRef(false)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -66,6 +84,7 @@ export function TilEditorPage() {
       Superscript,
       CodeBlockLowlight.configure({ lowlight }),
       Mathematics,
+      Image.configure({ HTMLAttributes: { class: 'til-image' } }),
       Placeholder.configure({
         placeholder: '오늘 배운 것을 자유롭게 기록해보세요. “/” 없이 위 도구 모음을 사용하세요…',
       }),
@@ -80,6 +99,42 @@ export function TilEditorPage() {
     onUpdate: () => setSaved(false),
   })
 
+  // 사이드바(템플릿)·아일랜드가 editor에 접근할 수 있도록 context에 등록
+  useEffect(() => {
+    if (!editor) return
+    setEditor(editor)
+    return () => setEditor(null)
+  }, [editor, setEditor])
+
+  // 진입 시 임시저장된 draft가 있으면 1회 복원
+  useEffect(() => {
+    if (!editor || restoredRef.current) return
+    restoredRef.current = true
+    const draft = loadDraft()
+    if (draft) {
+      editor.commands.setContent(draft.content || '')
+      setTitle(draft.title || '')
+      setTags(draft.tags || [])
+      setSelectedPotId(draft.potId ?? null)
+      setSaved(true)
+    }
+  }, [editor, loadDraft, setTitle, setTags, setSelectedPotId])
+
+  // 본문/제목/태그/화분 변경 시 디바운스 자동 임시저장 (최초 1회는 건너뜀)
+  useEffect(() => {
+    if (!editor) return
+    if (!settledRef.current) {
+      settledRef.current = true
+      return
+    }
+    const t = setTimeout(() => {
+      saveDraft()
+      setSaved(true)
+    }, 1500)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor?.state, title, tags, selectedPotId])
+
   const stats = useMemo(() => {
     if (!editor) return { words: 0, chars: 0, minutes: 0 }
     const text = editor.getText().trim()
@@ -92,18 +147,18 @@ export function TilEditorPage() {
   }, [editor?.state])
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <TilHeader saved={saved} onSave={() => setSaved(true)} stats={stats} />
-
-      {/* Sticky toolbar */}
-      <div className="sticky top-14 z-30 border-b border-border/70 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto w-full max-w-3xl px-4 py-1.5 md:px-6">
+    <div className="flex h-screen flex-col overflow-y-auto bg-background">
+      {/* Sticky toolbar (헤더 제거 — 사이드바 토글을 툴바 좌측에 통합) */}
+      <div className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 py-1.5 md:px-6">
+          <SidebarTrigger className="size-8 shrink-0 text-muted-foreground" />
+          <span className="h-5 w-px shrink-0 bg-border/70" />
           {editor ? (
-            <div className="scrollbar-subtle overflow-x-auto">
+            <div className="scrollbar-subtle min-w-0 flex-1 overflow-x-auto">
               <EditorToolbar editor={editor} />
             </div>
           ) : (
-            <div className="h-9" />
+            <div className="h-9 flex-1" />
           )}
         </div>
       </div>
@@ -125,6 +180,15 @@ export function TilEditorPage() {
           )}
         </div>
       </main>
+
+      <TilStatusIsland
+        saved={saved}
+        onSave={() => {
+          saveDraft()
+          setSaved(true)
+        }}
+        stats={stats}
+      />
     </div>
   )
 }

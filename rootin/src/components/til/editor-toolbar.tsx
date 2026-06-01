@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import type { Editor } from '@tiptap/react'
 import {
   Bold,
@@ -16,6 +17,7 @@ import {
   Code2,
   Sigma,
   Minus,
+  Image as ImageIcon,
   Undo2,
   Redo2,
   RemoveFormatting,
@@ -87,6 +89,24 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
   const block = currentBlock(editor)
   const active = BLOCK_OPTIONS.find((b) => b.value === block) ?? BLOCK_OPTIONS[0]
   const ActiveIcon = active.icon
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // BM-02 이미지: 파일 → base64로 본문에 삽입
+  // TODO: API 연동 시 서버 업로드 후 반환된 URL로 setImage 교체
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const src = reader.result
+        if (typeof src === 'string') {
+          editor.chain().focus().setImage({ src }).run()
+        }
+      }
+      reader.readAsDataURL(file)
+    }
+    e.target.value = ''
+  }
 
   return (
     <div className="flex flex-wrap items-center gap-0.5">
@@ -223,6 +243,18 @@ export function EditorToolbar({ editor }: { editor: Editor }) {
       <Divider />
 
       {/* Insert */}
+      <ToolbarButton
+        label="이미지"
+        icon={<ImageIcon className="size-4" />}
+        onClick={() => fileInputRef.current?.click()}
+      />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        hidden
+        onChange={handleImageFile}
+      />
       <ToolbarButton
         label="수식 ($...$)"
         icon={<Sigma className="size-4" />}

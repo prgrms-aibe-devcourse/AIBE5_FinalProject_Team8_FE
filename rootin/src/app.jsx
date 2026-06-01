@@ -12,6 +12,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbS
 import { Separator } from '@/components/ui/separator';
 import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
+import { TilEditorProvider } from '@/components/til/til-editor-context';
 
 // App shell — sidebar + topbar + screen routing
 
@@ -53,8 +54,9 @@ function AppShell() {
   const meta = titles[screen] || { title: '', subtitle: '' };
 
   return (
-    <SidebarProvider 
-      style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper)', minWidth: 1180 }} 
+    <TilEditorProvider>
+    <SidebarProvider
+      style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper)', minWidth: 1180 }}
       data-screen-label={screen}
     >
       <RootinSidebarLeft 
@@ -67,23 +69,25 @@ function AppShell() {
         }}
       />
       <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); setScreen('dashboard'); }}>
-                  Rootin
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>{meta.title}</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
-        </header>
+        {screen !== 'editor' && (
+          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); setScreen('dashboard'); }}>
+                    Rootin
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{meta.title}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </header>
+        )}
         <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
           {screen === 'dashboard'  && <DashboardScreen onNav={setScreen} />}
           {screen === 'editor'     && <EditorScreen onNav={setScreen} />}
@@ -96,6 +100,7 @@ function AppShell() {
       </SidebarInset>
       {screen === 'editor' && <RootinSidebarRight />}
     </SidebarProvider>
+    </TilEditorProvider>
   );
 }
 

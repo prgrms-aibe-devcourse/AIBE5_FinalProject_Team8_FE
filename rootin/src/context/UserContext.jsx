@@ -67,8 +67,13 @@ export function UserProvider({ children, initialUser = null, onAuthExpired }) {
     setUser(null);
   }
 
+  /** 프로필 수정 후 로컬 상태 부분 업데이트 */
+  function updateUser(patch) {
+    setUser(prev => (prev ? { ...prev, ...patch } : prev));
+  }
+
   return (
-    <UserContext.Provider value={{ user, loading, setUserFromApi, clearUser }}>
+    <UserContext.Provider value={{ user, loading, setUserFromApi, clearUser, updateUser }}>
       {children}
     </UserContext.Provider>
   );

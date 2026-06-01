@@ -31,23 +31,7 @@ import { useTilEditor } from './til-editor-context'
 
 const lowlight = createLowlight(common)
 
-const STARTER_CONTENT = `
-<h1>리액트 useEffect 클린업 함수</h1>
-<p>오늘은 <strong>useEffect</strong>의 클린업 동작 원리를 정리했다. 의존성이 바뀌면 이전 이펙트가 <mark data-color="rgba(251,191,36,0.28)" style="background-color: rgba(251,191,36,0.28)">정리(cleanup)</mark>된 뒤 새 이펙트가 실행된다.</p>
-<ul data-type="taskList">
-  <li data-type="taskItem" data-checked="true"><div><p>의존성 배열의 역할 이해</p></div></li>
-  <li data-type="taskItem" data-checked="false"><div><p>클린업 타이밍 실험해보기</p></div></li>
-</ul>
-<h2>핵심 코드</h2>
-<pre><code class="language-tsx">useEffect(() => {
-  const id = setInterval(tick, 1000)
-  return () => clearInterval(id) // cleanup
-}, [tick])</code></pre>
-<blockquote><p>이펙트는 "동기화"라는 관점으로 보면 더 명확해진다.</p></blockquote>
-<p>수식으로도 표현 가능하다: $f(x) = \\int_{0}^{x} e^{-t^2}\\,dt$</p>
-`
-
-export function TilEditorPage() {
+export function TilEditorPage({ onNav }: { onNav?: (screen: string) => void }) {
   const [saved, setSaved] = useState(false)
   const {
     setEditor,
@@ -56,9 +40,10 @@ export function TilEditorPage() {
     selectedPotId,
     setTitle,
     setTags,
-    setSelectedPotId,
     saveDraft,
     loadDraft,
+    publish,
+    publishing,
   } = useTilEditor()
 
   const restoredRef = useRef(false)
@@ -89,7 +74,7 @@ export function TilEditorPage() {
         placeholder: '오늘 배운 것을 자유롭게 기록해보세요. “/” 없이 위 도구 모음을 사용하세요…',
       }),
     ],
-    content: STARTER_CONTENT,
+    content: '',
     editorProps: {
       attributes: {
         class: 'til-prose-content focus:outline-none',
@@ -106,34 +91,76 @@ export function TilEditorPage() {
     return () => setEditor(null)
   }, [editor, setEditor])
 
-  // 진입 시 임시저장된 draft가 있으면 1회 복원
+  // 화분 선택 시, 해당 화분의 서버 임시저장을 1회 복원
   useEffect(() => {
-    if (!editor || restoredRef.current) return
+    if (!editor || !selectedPotId || restoredRef.current) return
     restoredRef.current = true
-    const draft = loadDraft()
-    if (draft) {
-      editor.commands.setContent(draft.content || '')
-      setTitle(draft.title || '')
-      setTags(draft.tags || [])
-      setSelectedPotId(draft.potId ?? null)
-      setSaved(true)
+    let cancelled = false
+    loadDraft(Number(selectedPotId))
+      .then((draft) => {
+        if (cancelled || !draft) return
+        editor.commands.setContent(draft.content || '')
+        setTitle(draft.title || '')
+        setTags(draft.tags || [])
+        setSaved(true)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
     }
-  }, [editor, loadDraft, setTitle, setTags, setSelectedPotId])
+  }, [editor, selectedPotId, loadDraft, setTitle, setTags])
 
-  // 본문/제목/태그/화분 변경 시 디바운스 자동 임시저장 (최초 1회는 건너뜀)
+  // 본문/제목/태그 변경 시 디바운스 자동 임시저장 (화분 선택 시에만, 최초 1회는 건너뜀)
   useEffect(() => {
-    if (!editor) return
+    if (!editor || !selectedPotId) return
     if (!settledRef.current) {
       settledRef.current = true
       return
     }
     const t = setTimeout(() => {
-      saveDraft()
-      setSaved(true)
+      saveDraft().then((ok) => {
+        if (ok) setSaved(true)
+      }).catch(() => {})
     }, 1500)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor?.state, title, tags, selectedPotId])
+
+  const handleSaveDraft = () => {
+    if (!selectedPotId) {
+      window.alert('화분을 먼저 선택해주세요.')
+      return
+    }
+    saveDraft().then((ok) => {
+      if (ok) setSaved(true)
+    }).catch(() => {})
+  }
+
+  const handlePublish = async () => {
+    if (!editor) return
+    if (!selectedPotId) {
+      window.alert('화분을 먼저 선택해주세요.')
+      return
+    }
+    if (!title.trim()) {
+      window.alert('제목을 입력해주세요.')
+      return
+    }
+    if (!editor.getText().trim()) {
+      window.alert('본문을 입력해주세요.')
+      return
+    }
+    try {
+      await publish()
+      onNav?.('dashboard')
+    } catch {
+      window.alert('발행에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    }
+  }
+
+  const canPublish = Boolean(
+    selectedPotId && title.trim() && editor && editor.getText().trim().length > 0,
+  )
 
   const stats = useMemo(() => {
     if (!editor) return { words: 0, chars: 0, minutes: 0 }
@@ -183,10 +210,10 @@ export function TilEditorPage() {
 
       <TilStatusIsland
         saved={saved}
-        onSave={() => {
-          saveDraft()
-          setSaved(true)
-        }}
+        onSave={handleSaveDraft}
+        onPublish={handlePublish}
+        publishing={publishing}
+        canPublish={canPublish}
         stats={stats}
       />
     </div>

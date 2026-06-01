@@ -10,10 +10,16 @@ type Stats = { words: number; chars: number; minutes: number }
 export function TilStatusIsland({
   saved,
   onSave,
+  onPublish,
+  publishing,
+  canPublish,
   stats,
 }: {
   saved: boolean
   onSave: () => void
+  onPublish: () => void
+  publishing: boolean
+  canPublish: boolean
   stats: Stats
 }) {
   const [hidden, setHidden] = useState(false)
@@ -77,9 +83,14 @@ export function TilStatusIsland({
         >
           임시저장
         </Button>
-        <Button size="sm" className="h-7 gap-1.5 text-xs font-medium">
+        <Button
+          size="sm"
+          className="h-7 gap-1.5 text-xs font-medium"
+          onClick={onPublish}
+          disabled={!canPublish || publishing}
+        >
           <Send className="size-3.5" />
-          발행
+          {publishing ? '발행 중…' : '발행'}
         </Button>
       </div>
     </div>

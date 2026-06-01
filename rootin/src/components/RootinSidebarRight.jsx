@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
 import { Plant } from '@/plants.jsx';
 import { useTilEditor } from '@/components/til/til-editor-context';
@@ -12,31 +12,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-
-// 기본 제공 템플릿 — content는 에디터에 삽입될 HTML
-const BUILTIN_TEMPLATES = [
-  {
-    id: 'b1',
-    name: '오늘의 배움',
-    desc: '새로 알게된 점과 적용할 점',
-    content:
-      '<h2>오늘 배운 것</h2><p></p><h2>왜 중요한가</h2><p></p><h2>다음에 적용할 점</h2><p></p>',
-  },
-  {
-    id: 'b2',
-    name: '트러블슈팅',
-    desc: '문제 원인과 해결 과정 기록',
-    content:
-      '<h2>문제 상황</h2><p></p><h2>원인 분석</h2><p></p><h2>해결 과정</h2><p></p><h2>회고</h2><p></p>',
-  },
-  {
-    id: 'b3',
-    name: '알고리즘',
-    desc: '접근 방식과 코드 설명',
-    content:
-      '<h2>문제</h2><p></p><h2>접근 방식</h2><p></p><h2>코드</h2><pre><code>// 여기에 코드</code></pre><h2>복잡도 · 회고</h2><p></p>',
-  },
-];
 
 function ProgressBar({ value }) {
   return (
@@ -100,9 +75,10 @@ function TemplateButton({ name, desc, highlight, onApply, onDelete }) {
 
 export function RootinSidebarRight({ ...props }) {
   const xpGain = 120;
-  const { editor, applyTemplate, customTemplates, saveCustomTemplate, deleteCustomTemplate } = useTilEditor();
+  const { editor, applyTemplate, templates, saveCustomTemplate, deleteCustomTemplate } = useTilEditor();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newName, setNewName] = useState('');
+  const [saving, setSaving] = useState(false);
 
   // BM-06 템플릿 이용 — 본문에 내용이 있으면 덮어쓰기 확인
   const handleApply = (content) => {
@@ -112,13 +88,28 @@ export function RootinSidebarRight({ ...props }) {
     applyTemplate(content);
   };
 
-  // BM-07 템플릿 제작 — 현재 본문을 새 템플릿으로 저장
-  const handleSaveTemplate = () => {
+  // BM-07 템플릿 제작 — 현재 본문을 새 템플릿으로 저장 (서버 연동)
+  const handleSaveTemplate = async () => {
     const name = newName.trim();
-    if (!name) return;
-    saveCustomTemplate(name);
-    setNewName('');
-    setDialogOpen(false);
+    if (!name || saving) return;
+    setSaving(true);
+    try {
+      await saveCustomTemplate(name);
+      setNewName('');
+      setDialogOpen(false);
+    } catch {
+      window.alert('템플릿 저장에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // 템플릿 삭제 (서버 연동) — 기본 제공 템플릿은 삭제 불가
+  const handleDeleteTemplate = (id) => {
+    if (!window.confirm('이 템플릿을 삭제할까요?')) return;
+    deleteCustomTemplate(id).catch(() => {
+      window.alert('템플릿 삭제에 실패했습니다.');
+    });
   };
 
   return (
@@ -164,24 +155,22 @@ export function RootinSidebarRight({ ...props }) {
             >+ 새 템플릿</button>
           } />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {BUILTIN_TEMPLATES.map((t, i) => (
-              <TemplateButton
-                key={t.id}
-                name={t.name}
-                desc={t.desc}
-                highlight={i === 0}
-                onApply={() => handleApply(t.content)}
-              />
-            ))}
-            {customTemplates.map((t) => (
-              <TemplateButton
-                key={t.id}
-                name={t.name}
-                desc="내 템플릿"
-                onApply={() => handleApply(t.content)}
-                onDelete={() => deleteCustomTemplate(t.id)}
-              />
-            ))}
+            {templates.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '4px 2px' }}>
+                저장된 템플릿이 없습니다.
+              </div>
+            ) : (
+              templates.map((t, i) => (
+                <TemplateButton
+                  key={t.id}
+                  name={t.name}
+                  desc={t.isDefault ? '기본 제공' : '내 템플릿'}
+                  highlight={i === 0}
+                  onApply={() => handleApply(t.content)}
+                  onDelete={t.isDefault ? undefined : () => handleDeleteTemplate(t.id)}
+                />
+              ))
+            )}
           </div>
         </div>
 
@@ -215,7 +204,7 @@ export function RootinSidebarRight({ ...props }) {
           />
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDialogOpen(false)}>취소</Button>
-            <Button onClick={handleSaveTemplate} disabled={!newName.trim()}>저장</Button>
+            <Button onClick={handleSaveTemplate} disabled={!newName.trim() || saving}>{saving ? '저장 중…' : '저장'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

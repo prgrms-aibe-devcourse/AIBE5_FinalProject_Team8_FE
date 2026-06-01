@@ -30,5 +30,8 @@ export async function request(path, options = {}) {
     throw err;
   }
 
+  // 204 No Content (삭제 등) 는 본문이 없으므로 json 파싱을 건너뛴다
+  if (res.status === 204) return null;
+
   return res.json();
 }

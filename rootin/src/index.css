@@ -1,1 +1,501 @@
-@import './tokens.css';
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/geist";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Rootin Design System Light Theme */
+  --paper: oklch(0.975 0.008 90);
+  --paper-2: oklch(0.955 0.012 90);
+  --ink: oklch(0.20 0.02 150);
+  --ink-2: oklch(0.38 0.02 150);
+  --ink-3: oklch(0.55 0.015 140);
+  --moss: oklch(0.42 0.085 145);
+  --moss-2: oklch(0.32 0.07 145);
+  --sprout: oklch(0.72 0.13 135);
+  --leaf: oklch(0.88 0.05 130);
+  --amber: oklch(0.74 0.13 70);
+  --amber-soft: oklch(0.93 0.05 80);
+  --rule: oklch(0.91 0.012 100);
+  --rule-2: oklch(0.85 0.015 100);
+  --danger: oklch(0.58 0.16 25);
+  
+  /* shadcn semantic tokens mapped to Rootin design tokens */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: oklch(1 0 0); /* white */
+  --card-foreground: var(--ink);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--ink);
+  --primary: var(--moss);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: var(--paper-2);
+  --secondary-foreground: var(--ink-2);
+  --muted: var(--paper-2);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--leaf);
+  --accent-foreground: var(--moss-2);
+  --destructive: var(--danger);
+  --destructive-foreground: oklch(1 0 0);
+  --border: var(--rule);
+  --input: var(--rule-2);
+  --ring: var(--moss);
+  --chart-1: var(--moss);
+  --chart-2: var(--sprout);
+  --chart-3: var(--amber);
+  --chart-4: var(--leaf);
+  --chart-5: var(--moss-2);
+  --radius: 0.625rem;
+  --sidebar: var(--paper-2);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--moss);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: var(--leaf);
+  --sidebar-accent-foreground: var(--moss-2);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--moss);
+
+  /* Restored missing legacy variables for other pages */
+  --font-display: 'Space Grotesk', 'Noto Sans KR', sans-serif;
+  --font-body: 'Noto Sans KR', 'Space Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --shadow-sm: 0 1px 2px rgba(26, 58, 92, 0.04), 0 1px 1px rgba(26, 58, 92, 0.03);
+  --shadow-md: 0 4px 16px rgba(26, 58, 92, 0.06), 0 1px 2px rgba(26, 58, 92, 0.04);
+  --shadow-lg: 0 12px 40px rgba(26, 58, 92, 0.10);
+}
+
+.dark {
+  /* Rootin Design System Dark Theme (theme-night) */
+  /* Rootin tokens overridden for dark so brand utilities stay coherent */
+  --paper: oklch(0.20 0.012 150);
+  --paper-2: oklch(0.255 0.014 150);
+  --ink: oklch(0.95 0.01 100);
+  --ink-2: oklch(0.78 0.01 100);
+  --ink-3: oklch(0.62 0.02 140);
+  --moss: oklch(0.78 0.10 145);
+  --moss-2: oklch(0.88 0.08 145);
+  --sprout: oklch(0.72 0.13 135);
+  --leaf: oklch(0.30 0.05 145);
+  --rule: oklch(0.32 0.012 150);
+  --rule-2: oklch(0.36 0.015 150);
+
+  /* shadcn semantic tokens */
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: oklch(0.255 0.014 150);
+  --card-foreground: var(--ink);
+  --popover: oklch(0.255 0.014 150);
+  --popover-foreground: var(--ink);
+  --primary: var(--moss);
+  --primary-foreground: oklch(0.20 0.012 150);
+  --secondary: oklch(0.28 0.04 145);
+  --secondary-foreground: var(--moss-2);
+  --muted: var(--paper-2);
+  --muted-foreground: var(--ink-3);
+  --accent: var(--leaf);
+  --accent-foreground: var(--moss-2);
+  --destructive: oklch(0.70 0.19 25);
+  --destructive-foreground: oklch(0.95 0.01 100);
+  --border: var(--rule);
+  --input: var(--rule-2);
+  --ring: var(--moss);
+  --chart-1: var(--moss);
+  --chart-2: var(--sprout);
+  --chart-3: oklch(0.80 0.13 75);
+  --chart-4: oklch(0.55 0.09 145);
+  --chart-5: oklch(0.65 0.10 160);
+  --sidebar: oklch(0.225 0.013 150);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--moss);
+  --sidebar-primary-foreground: oklch(0.20 0.012 150);
+  --sidebar-accent: var(--leaf);
+  --sidebar-accent-foreground: var(--moss-2);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--moss);
+}
+
+@theme inline {
+  --font-sans: 'Geist Variable', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-serif: 'Newsreader', Georgia, serif;
+  
+  /* Rootin specific variables */
+  --color-paper: var(--paper);
+  --color-paper-2: var(--paper-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-moss: var(--moss);
+  --color-moss-2: var(--moss-2);
+  --color-leaf: var(--leaf);
+  --color-sprout: var(--sprout);
+  --color-rule: var(--rule);
+  --color-rule-2: var(--rule-2);
+  
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --font-heading: var(--font-sans);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  ::selection {
+    background: color-mix(in oklch, var(--primary) 28%, transparent);
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Custom scrollbar                                                  */
+/* ---------------------------------------------------------------- */
+@layer utilities {
+  /* Restored legacy utilities */
+  .eyebrow {
+    font-family: var(--font-display);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .kbd {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 0.5px solid var(--rule-2);
+    background: var(--paper);
+    color: var(--ink-2);
+  }
+  .divider { height: 1px; background: var(--rule); border: 0; }
+
+  .scrollbar-subtle {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .scrollbar-subtle::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-subtle::-webkit-scrollbar-thumb {
+    background-color: var(--border);
+    border-radius: 9999px;
+  }
+  .scrollbar-subtle::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Tiptap / ProseMirror editor content                              */
+/* ---------------------------------------------------------------- */
+.til-prose .ProseMirror {
+  outline: none;
+  min-height: 50vh;
+  color: var(--foreground);
+  font-size: 1.0625rem;
+  line-height: 1.85;
+  letter-spacing: -0.003em;
+  -webkit-font-smoothing: antialiased;
+}
+
+.til-prose .ProseMirror > * + * {
+  margin-top: 1.1em;
+}
+
+.til-prose .ProseMirror p {
+  margin: 0;
+}
+
+.til-prose .ProseMirror h1,
+.til-prose .ProseMirror h2,
+.til-prose .ProseMirror h3 {
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  margin-top: 1.7em;
+  scroll-margin-top: 6rem;
+}
+.til-prose .ProseMirror h1 {
+  font-size: 1.9rem;
+}
+.til-prose .ProseMirror h2 {
+  font-size: 1.5rem;
+}
+.til-prose .ProseMirror h3 {
+  font-size: 1.22rem;
+}
+
+.til-prose .ProseMirror ul,
+.til-prose .ProseMirror ol {
+  padding-left: 1.4em;
+}
+.til-prose .ProseMirror ul {
+  list-style: disc;
+}
+.til-prose .ProseMirror ol {
+  list-style: decimal;
+}
+.til-prose .ProseMirror li {
+  margin: 0.35em 0;
+}
+.til-prose .ProseMirror li p {
+  margin: 0;
+}
+.til-prose .ProseMirror li::marker {
+  color: var(--muted-foreground);
+}
+
+/* Task list */
+.til-prose .ProseMirror ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0.2em;
+}
+.til-prose .ProseMirror ul[data-type='taskList'] li {
+  display: flex;
+  gap: 0.65em;
+  align-items: flex-start;
+}
+.til-prose .ProseMirror ul[data-type='taskList'] li > label {
+  margin-top: 0.42em;
+  user-select: none;
+}
+.til-prose .ProseMirror ul[data-type='taskList'] li > div {
+  flex: 1 1 auto;
+}
+.til-prose .ProseMirror ul[data-type='taskList'] input[type='checkbox'] {
+  appearance: none;
+  width: 1.05em;
+  height: 1.05em;
+  border: 1.5px solid var(--border);
+  border-radius: 0.35em;
+  background: var(--card);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+.til-prose .ProseMirror ul[data-type='taskList'] input[type='checkbox']:hover {
+  border-color: var(--primary);
+}
+.til-prose .ProseMirror ul[data-type='taskList'] input[type='checkbox']:checked {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.til-prose
+  .ProseMirror
+  ul[data-type='taskList']
+  input[type='checkbox']:checked::after {
+  content: '';
+  position: absolute;
+  left: 0.32em;
+  top: 0.12em;
+  width: 0.28em;
+  height: 0.55em;
+  border: solid var(--primary-foreground);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.til-prose
+  .ProseMirror
+  ul[data-type='taskList']
+  li[data-checked='true']
+  > div {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+
+/* Blockquote */
+.til-prose .ProseMirror blockquote {
+  border-left: 2px solid var(--primary);
+  padding: 0.15em 0 0.15em 1.15em;
+  margin-left: 0;
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+/* Horizontal rule */
+.til-prose .ProseMirror hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2em 0;
+}
+
+/* Images */
+.til-prose .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.6rem;
+  margin: 0.5em 0;
+}
+.til-prose .ProseMirror img.ProseMirror-selectednode {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Inline code */
+.til-prose .ProseMirror code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--secondary);
+  color: oklch(0.86 0.1 78);
+  padding: 0.15em 0.4em;
+  border-radius: 0.4em;
+  border: 1px solid var(--border);
+}
+
+/* Links */
+.til-prose .ProseMirror a {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
+}
+
+/* Code block */
+.til-prose .ProseMirror pre {
+  font-family: var(--font-mono);
+  background: oklch(0.13 0.005 70);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.1em 1.25em;
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+.til-prose .ProseMirror pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* Placeholder */
+.til-prose .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--muted-foreground);
+  pointer-events: none;
+  height: 0;
+}
+
+/* KaTeX math node */
+.til-prose .ProseMirror .Tiptap-mathematics-render {
+  padding: 0 0.15em;
+}
+.til-prose .ProseMirror .Tiptap-mathematics-render--editable {
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-radius: 0.3em;
+}
+.til-prose .ProseMirror .Tiptap-mathematics-render--editable:hover {
+  background: var(--accent);
+}
+.til-prose .ProseMirror .Tiptap-mathematics-editor {
+  font-family: var(--font-mono);
+  background: var(--secondary);
+  color: oklch(0.86 0.1 78);
+  padding: 0.1em 0.35em;
+  border-radius: 0.35em;
+  border: 1px solid var(--border);
+}
+
+/* ---------------------------------------------------------------- */
+/* Syntax highlighting (lowlight / highlight.js token classes)      */
+/* ---------------------------------------------------------------- */
+.til-prose .ProseMirror pre .hljs-comment,
+.til-prose .ProseMirror pre .hljs-quote {
+  color: oklch(0.6 0.012 75);
+  font-style: italic;
+}
+.til-prose .ProseMirror pre .hljs-keyword,
+.til-prose .ProseMirror pre .hljs-selector-tag,
+.til-prose .ProseMirror pre .hljs-literal,
+.til-prose .ProseMirror pre .hljs-section {
+  color: oklch(0.72 0.16 350);
+}
+.til-prose .ProseMirror pre .hljs-string,
+.til-prose .ProseMirror pre .hljs-attr,
+.til-prose .ProseMirror pre .hljs-meta .hljs-string {
+  color: oklch(0.78 0.14 145);
+}
+.til-prose .ProseMirror pre .hljs-number,
+.til-prose .ProseMirror pre .hljs-built_in,
+.til-prose .ProseMirror pre .hljs-class .hljs-title {
+  color: oklch(0.8 0.13 75);
+}
+.til-prose .ProseMirror pre .hljs-title,
+.til-prose .ProseMirror pre .hljs-function .hljs-title,
+.til-prose .ProseMirror pre .hljs-name {
+  color: oklch(0.78 0.12 230);
+}
+.til-prose .ProseMirror pre .hljs-attribute,
+.til-prose .ProseMirror pre .hljs-variable,
+.til-prose .ProseMirror pre .hljs-template-variable {
+  color: oklch(0.8 0.12 50);
+}
+.til-prose .ProseMirror pre .hljs-symbol,
+.til-prose .ProseMirror pre .hljs-bullet,
+.til-prose .ProseMirror pre .hljs-regexp {
+  color: oklch(0.75 0.12 190);
+}
+.til-prose .ProseMirror pre .hljs-emphasis {
+  font-style: italic;
+}
+.til-prose .ProseMirror pre .hljs-strong {
+  font-weight: 700;
+}

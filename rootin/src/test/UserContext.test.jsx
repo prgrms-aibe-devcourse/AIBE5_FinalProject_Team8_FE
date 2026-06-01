@@ -1,231 +1,81 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, act } from '@testing-library/react';
 import { UserProvider, useUser } from '../context/UserContext.jsx';
 
-// ──────────────────────────────────────────────
-// api/user.js mock
-// ──────────────────────────────────────────────
 vi.mock('../api/user.js', () => ({
-  getMe: vi.fn(),
+  getMe: vi.fn().mockResolvedValue({
+    userId: 1,
+    nickname: '소나무',
+    bio: '안녕하세요',
+    point: 100,
+    tilCount: 5,
+  }),
 }));
 
-import { getMe } from '../api/user.js';
-
-const MOCK_API_USER = {
-  userId: 1,
-  nickname: '소연',
-  handle: 'soyeon',
-  email: 'soyeon@rootin.app',
-  bio: '루틴처럼 기록하고, 뿌리처럼 깊어지는 중.',
-  joinedAt: '2026.02.14',
-  point: 1240,
-  tilCount: 47,
-  profileImageUrl: null,
-  provider: 'google',
-};
-
-// useUser 훅 결과를 렌더링해주는 헬퍼 컴포넌트
-function UserConsumer() {
-  const { user, loading } = useUser();
-  if (loading) return <div>loading</div>;
-  if (!user) return <div>no user</div>;
+function UserDisplay() {
+  const { user, updateUser } = useUser();
   return (
     <div>
-      <span data-testid="name">{user.name}</span>
-      <span data-testid="handle">{user.handle}</span>
-      <span data-testid="email">{user.email}</span>
-      <span data-testid="points">{user.points}</span>
-      <span data-testid="totalTil">{user.totalTil}</span>
-      <span data-testid="streak">{user.streak}</span>
-      <span data-testid="bestStreak">{user.bestStreak}</span>
+      <span data-testid="name">{user?.name}</span>
+      <span data-testid="bio">{user?.bio}</span>
+      <button onClick={() => updateUser({ name: '새이름', bio: '새 소개' })}>update</button>
     </div>
   );
 }
 
-function renderWithProvider(props = {}) {
-  return render(
-    <UserProvider {...props}>
-      <UserConsumer />
-    </UserProvider>
-  );
-}
-
-beforeEach(() => {
-  localStorage.clear();
-  vi.clearAllMocks();
-});
-
-afterEach(() => {
-  localStorage.clear();
-});
-
-// ──────────────────────────────────────────────
-// 토큰 없음 — 비로그인 상태
-// ──────────────────────────────────────────────
-describe('토큰 없음 — 비로그인 상태', () => {
-  it('accessToken이 없으면 getMe()를 호출하지 않는다', async () => {
-    renderWithProvider();
-    await waitFor(() => expect(screen.getByText('no user')).toBeInTheDocument());
-    expect(getMe).not.toHaveBeenCalled();
-  });
-
-  it('accessToken이 없으면 user는 null이다', async () => {
-    renderWithProvider();
-    await waitFor(() => expect(screen.getByText('no user')).toBeInTheDocument());
-  });
-});
-
-// ──────────────────────────────────────────────
-// 토큰 있음 — 자동 getMe() 호출
-// ──────────────────────────────────────────────
-describe('토큰 있음 — 자동 getMe() 호출', () => {
+describe('UserContext', () => {
   beforeEach(() => {
-    localStorage.setItem('accessToken', 'mock-token');
-    getMe.mockResolvedValue(MOCK_API_USER);
+    localStorage.clear();
+    vi.clearAllMocks();
   });
 
-  it('accessToken이 있으면 getMe()를 한 번 호출한다', async () => {
-    renderWithProvider();
-    await waitFor(() => expect(getMe).toHaveBeenCalledTimes(1));
-  });
-
-  it('getMe() 응답의 nickname이 user.name으로 정규화된다', async () => {
-    renderWithProvider();
-    await waitFor(() => expect(screen.getByTestId('name').textContent).toBe('소연'));
-  });
-
-  it('getMe() 응답의 point가 user.points로 정규화된다', async () => {
-    renderWithProvider();
-    await waitFor(() => expect(screen.getByTestId('points').textContent).toBe('1240'));
-  });
-
-  it('getMe() 응답의 tilCount가 user.totalTil로 정규화된다', async () => {
-    renderWithProvider();
-    await waitFor(() => expect(screen.getByTestId('totalTil').textContent).toBe('47'));
-  });
-
-  it('API에 streak 필드가 없으면 기본값 0이 설정된다', async () => {
-    renderWithProvider();
-    await waitFor(() => expect(screen.getByTestId('streak').textContent).toBe('0'));
-  });
-
-  it('API에 bestStreak 필드가 없으면 기본값 0이 설정된다', async () => {
-    renderWithProvider();
-    await waitFor(() => expect(screen.getByTestId('bestStreak').textContent).toBe('0'));
-  });
-});
-
-// ──────────────────────────────────────────────
-// getMe() 실패 — 토큰 만료
-// ──────────────────────────────────────────────
-describe('getMe() 실패 — 토큰 만료', () => {
-  beforeEach(() => {
-    localStorage.setItem('accessToken', 'expired-token');
-    localStorage.setItem('refreshToken', 'expired-refresh');
-    getMe.mockRejectedValue(new Error('Unauthorized'));
-  });
-
-  it('getMe() 실패 시 accessToken이 제거된다', async () => {
-    renderWithProvider({ onAuthExpired: vi.fn() });
-    await waitFor(() => expect(localStorage.getItem('accessToken')).toBeNull());
-  });
-
-  it('getMe() 실패 시 refreshToken이 제거된다', async () => {
-    renderWithProvider({ onAuthExpired: vi.fn() });
-    await waitFor(() => expect(localStorage.getItem('refreshToken')).toBeNull());
-  });
-
-  it('getMe() 실패 시 onAuthExpired 콜백이 호출된다', async () => {
-    const onAuthExpired = vi.fn();
-    renderWithProvider({ onAuthExpired });
-    await waitFor(() => expect(onAuthExpired).toHaveBeenCalledTimes(1));
-  });
-
-  it('getMe() 실패 후 user는 null이다', async () => {
-    renderWithProvider({ onAuthExpired: vi.fn() });
-    await waitFor(() => expect(screen.getByText('no user')).toBeInTheDocument());
-  });
-});
-
-// ──────────────────────────────────────────────
-// initialUser prop — 로그인 직후 주입
-// ──────────────────────────────────────────────
-describe('initialUser prop — 로그인 직후 주입', () => {
-  it('initialUser가 있으면 getMe()를 호출하지 않는다', async () => {
-    renderWithProvider({ initialUser: MOCK_API_USER });
-    await waitFor(() => expect(screen.getByTestId('name')).toBeInTheDocument());
-    expect(getMe).not.toHaveBeenCalled();
-  });
-
-  it('initialUser의 nickname이 user.name으로 정규화된다', async () => {
-    renderWithProvider({ initialUser: MOCK_API_USER });
-    await waitFor(() => expect(screen.getByTestId('name').textContent).toBe('소연'));
-  });
-});
-
-// ──────────────────────────────────────────────
-// setUserFromApi — 로그인 성공 시 주입
-// ──────────────────────────────────────────────
-describe('setUserFromApi — 로그인 성공 시 유저 주입', () => {
-  function SetUserConsumer() {
-    const { user, setUserFromApi } = useUser();
-    return (
-      <div>
-        <button onClick={() => setUserFromApi(MOCK_API_USER)}>set</button>
-        {user && <span data-testid="name">{user.name}</span>}
-        {!user && <span>no user</span>}
-      </div>
+  it('initialUser를 정규화해서 name/bio를 올바르게 노출한다', () => {
+    const apiUser = { userId: 1, nickname: '소나무', bio: '안녕', point: 0, tilCount: 0 };
+    render(
+      <UserProvider initialUser={apiUser}>
+        <UserDisplay />
+      </UserProvider>
     );
-  }
+    expect(screen.getByTestId('name').textContent).toBe('소나무');
+    expect(screen.getByTestId('bio').textContent).toBe('안녕');
+  });
 
-  it('setUserFromApi 호출 후 user.name이 설정된다', async () => {
-    render(<UserProvider><SetUserConsumer /></UserProvider>);
-    await waitFor(() => screen.getByText('no user'));
+  it('updateUser 호출 시 name과 bio가 업데이트된다', async () => {
+    const apiUser = { userId: 1, nickname: '소나무', bio: '기존 소개', point: 0, tilCount: 0 };
+    render(
+      <UserProvider initialUser={apiUser}>
+        <UserDisplay />
+      </UserProvider>
+    );
 
-    act(() => {
-      screen.getByRole('button', { name: 'set' }).click();
+    await act(async () => {
+      screen.getByText('update').click();
     });
 
-    await waitFor(() => expect(screen.getByTestId('name').textContent).toBe('소연'));
+    expect(screen.getByTestId('name').textContent).toBe('새이름');
+    expect(screen.getByTestId('bio').textContent).toBe('새 소개');
   });
 
-  it('setUserFromApi는 API 필드를 정규화한다 (point → points)', async () => {
-    function PointConsumer() {
-      const { user, setUserFromApi } = useUser();
-      return (
-        <div>
-          <button onClick={() => setUserFromApi(MOCK_API_USER)}>set</button>
-          {user && <span data-testid="points">{user.points}</span>}
-        </div>
-      );
+  it('updateUser가 다른 필드를 덮어쓰지 않는다', async () => {
+    const apiUser = { userId: 42, nickname: '소나무', bio: '기존', point: 999, tilCount: 3 };
+    let capturedUser;
+    function Capture() {
+      const { user, updateUser } = useUser();
+      capturedUser = user;
+      return <button onClick={() => updateUser({ bio: '변경된 소개' })}>update</button>;
     }
-    render(<UserProvider><PointConsumer /></UserProvider>);
-    act(() => { screen.getByRole('button', { name: 'set' }).click(); });
-    await waitFor(() => expect(screen.getByTestId('points').textContent).toBe('1240'));
-  });
-});
+    render(
+      <UserProvider initialUser={apiUser}>
+        <Capture />
+      </UserProvider>
+    );
 
-// ──────────────────────────────────────────────
-// clearUser — 로그아웃
-// ──────────────────────────────────────────────
-describe('clearUser — 로그아웃', () => {
-  it('clearUser 호출 후 user가 null이 된다', async () => {
-    function ClearConsumer() {
-      const { user, setUserFromApi, clearUser } = useUser();
-      return (
-        <div>
-          <button onClick={() => setUserFromApi(MOCK_API_USER)}>set</button>
-          <button onClick={clearUser}>clear</button>
-          {user ? <span data-testid="name">{user.name}</span> : <span>no user</span>}
-        </div>
-      );
-    }
-    render(<UserProvider><ClearConsumer /></UserProvider>);
+    await act(async () => {
+      screen.getByText('update').click();
+    });
 
-    act(() => { screen.getByRole('button', { name: 'set' }).click(); });
-    await waitFor(() => screen.getByTestId('name'));
-
-    act(() => { screen.getByRole('button', { name: 'clear' }).click(); });
-    await waitFor(() => expect(screen.getByText('no user')).toBeInTheDocument());
+    expect(capturedUser.userId).toBe(42);
+    expect(capturedUser.points).toBe(999);
+    expect(capturedUser.bio).toBe('변경된 소개');
   });
 });

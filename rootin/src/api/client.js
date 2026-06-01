@@ -8,11 +8,13 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
  */
 export async function request(path, options = {}) {
   const token = localStorage.getItem('accessToken');
+  const userId = localStorage.getItem('userId');
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(userId ? { 'X-USER-ID': userId } : {}),
       ...options.headers,
     },
   });

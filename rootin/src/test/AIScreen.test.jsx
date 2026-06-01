@@ -303,7 +303,8 @@ describe('생성 전/후 화면', () => {
 
   it('생성 완료 후 퀴즈 결과가 표시된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     await waitFor(() => expect(screen.getByRole('button', { name: '결과 저장' })).toBeInTheDocument());
 
@@ -424,7 +425,8 @@ describe('에러 처리', () => {
     generateQuiz.mockRejectedValue(new Error('Network Error'));
 
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
 
     await waitFor(() =>

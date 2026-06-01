@@ -21,8 +21,8 @@ function normalizeUser(apiUser) {
     points:      apiUser.point    ?? 0,
     streak:      apiUser.streak      ?? 0,
     bestStreak:  apiUser.bestStreak  ?? 0,
-    profileImageUrl: apiUser.profileImageUrl ?? null,
-    userId:      apiUser.userId   ?? null,
+    profileImageUrl: apiUser.profileImage ?? apiUser.profileImageUrl ?? null,
+    userId:      apiUser.id       ?? apiUser.userId   ?? null,
     provider:    apiUser.provider ?? null,
   };
 }
@@ -45,6 +45,9 @@ export function UserProvider({ children, initialUser = null, onAuthExpired }) {
     import('../api/user.js').then(({ getMe }) =>
       getMe()
         .then(data => {
+          if (data?.userId != null) {
+            localStorage.setItem('userId', data.userId);
+          }
           setUser(normalizeUser(data));
           setLoading(false);
         })
@@ -59,16 +62,25 @@ export function UserProvider({ children, initialUser = null, onAuthExpired }) {
 
   /** 로그인 성공 후 외부에서 유저 정보 주입 */
   function setUserFromApi(apiUser) {
+    if (apiUser?.userId != null) {
+      localStorage.setItem('userId', apiUser.userId);
+    }
     setUser(normalizeUser(apiUser));
   }
 
   /** 로그아웃 시 초기화 */
   function clearUser() {
+    localStorage.removeItem('userId');
     setUser(null);
   }
 
+  /** 프로필 수정 후 로컬 상태 부분 업데이트 */
+  function updateUser(patch) {
+    setUser(prev => (prev ? { ...prev, ...patch } : prev));
+  }
+
   return (
-    <UserContext.Provider value={{ user, loading, setUserFromApi, clearUser }}>
+    <UserContext.Provider value={{ user, loading, setUserFromApi, clearUser, updateUser }}>
       {children}
     </UserContext.Provider>
   );

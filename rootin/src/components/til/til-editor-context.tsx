@@ -12,6 +12,7 @@ import {
 } from 'react'
 import type { Editor } from '@tiptap/react'
 import { getPots } from '@/api/pot.js'
+import { useUser } from '@/context/UserContext.jsx'
 import {
   createTil,
   saveDraft as apiSaveDraft,
@@ -85,14 +86,23 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
   const [templates, setTemplates] = useState<Template[]>([])
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [publishing, setPublishing] = useState(false)
+  const { user } = useUser()
 
   // 진입 시 화분 목록 로딩
+  // pots API는 임시로 X-USER-ID 헤더의 사용자 화분을 반환하므로,
+  // TIL 발행(JWT 사용자)과 동일한 사용자가 되도록 실제 userId를 전달한다.
   useEffect(() => {
-    getPots()
+    const userId = user?.userId ?? localStorage.getItem('userId')
+    if (!userId) {
+      setPotsLoading(false)
+      return
+    }
+    setPotsLoading(true)
+    getPots(userId)
       .then((data) => setPots(Array.isArray(data) ? (data as Pot[]) : []))
       .catch(() => setPots([]))
       .finally(() => setPotsLoading(false))
-  }, [])
+  }, [user?.userId])
 
   // 진입 시 템플릿 목록 로딩 (사용자 + 기본 제공)
   const refreshTemplates = useCallback(async () => {

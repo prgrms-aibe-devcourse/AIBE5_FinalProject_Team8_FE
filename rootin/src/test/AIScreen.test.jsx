@@ -562,7 +562,8 @@ describe('결과 저장 및 보관함', () => {
 describe('4지선다 QuizResult UI', () => {
   async function renderAndGenerate() {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정을 보장한다.
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     await waitFor(() => screen.getByText('CSS Container Queries에서 필수 속성은?'));
   }

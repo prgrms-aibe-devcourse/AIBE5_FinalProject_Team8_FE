@@ -890,6 +890,14 @@ function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
+  // user가 비동기로 로드된 후 입력 상태 동기화
+  useEffect(() => {
+    if (user && !editing) {
+      setNickname(user.name ?? '');
+      setBio(user.bio ?? '');
+    }
+  }, [user]);
+
   async function handleSave() {
     setSaving(true);
     setSaveError(null);

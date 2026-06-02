@@ -927,17 +927,13 @@ function ProfileScreen() {
       });
 
       // LocalStack 환경에서는 Docker 내부 호스트 → 브라우저 접근 가능한 주소로 치환
-      const localstackEndpoint = import.meta.env.VITE_LOCALSTACK_ENDPOINT;
-      const uploadUrl = localstackEndpoint
-        ? presignedUrl.replace(localstackEndpoint, 'http://localhost:4566')
-        : presignedUrl;
+      const replaceLocalstackHost = (url) => {
+        const endpoint = import.meta.env.VITE_LOCALSTACK_ENDPOINT;
+        return endpoint ? url.replace(endpoint, 'http://localhost:4566') : url;
+      };
 
-      // fileUrl: LocalStack이면 localhost path-style URL로 변환, AWS면 그대로 사용
-      // fileUrl 형태: http://localstack:4566/{bucket}/{key} (endpoint 설정 시 BE가 이 형태로 반환)
-      // → localstack 호스트만 localhost로 치환
-      const displayUrl = localstackEndpoint
-        ? fileUrl.replace(localstackEndpoint, 'http://localhost:4566')
-        : fileUrl;
+      const uploadUrl = replaceLocalstackHost(presignedUrl);
+      const displayUrl = replaceLocalstackHost(fileUrl);
 
       await fetch(uploadUrl, {
         method: 'PUT',
@@ -946,7 +942,7 @@ function ProfileScreen() {
       });
 
       // 서버에 profileImageUrl 저장 (nickname은 @NotBlank 필수값이므로 같이 전송)
-      await patchUserMe({ nickname: user?.name ?? nickname, bio: user?.bio ?? bio, profileImageUrl: displayUrl });
+      await patchUserMe({ nickname, bio, profileImageUrl: displayUrl });
       console.log('[이미지 업로드 완료] displayUrl:', displayUrl);
       updateUser({ profileImageUrl: displayUrl });
     } catch (err) {

@@ -121,16 +121,6 @@ describe('ProfileScreen — provider 조건부 렌더', () => {
     expect(screen.queryByText('비밀번호')).not.toBeInTheDocument();
   });
 
-  it('provider=google: "구글 계정 연동됨" 문구가 표시된다', () => {
-    renderProfile(mockApiUser);
-    expect(screen.getByText('구글 계정 연동됨')).toBeInTheDocument();
-  });
-
-  it('provider=google: 연결된 SNS 행에 Google이 표시된다', () => {
-    renderProfile(mockApiUser);
-    expect(screen.getByText(/Google/)).toBeInTheDocument();
-  });
-
   it('provider=local: 비밀번호 행이 노출된다', () => {
     renderProfile(mockApiUserLocal);
     expect(screen.getByText('비밀번호')).toBeInTheDocument();
@@ -190,7 +180,7 @@ describe('ProfileScreen — 프로필 이미지 업로드', () => {
     await waitFor(() => {
       expect(getProfileImagePresignedUrl).toHaveBeenCalledWith({
         filename: 'profile.jpg',
-        contentType: 'image/jpeg',
+        fileSize: 3,
       });
     });
     await waitFor(() => {

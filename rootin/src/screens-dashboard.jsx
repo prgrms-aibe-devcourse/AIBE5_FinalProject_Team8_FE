@@ -6,16 +6,20 @@ import { getPointSummary } from './api/points.js';
 
 // ─── 변환 유틸 ────────────────────────────────────────────────
 
-// BE cells([{date, tilCount, charCount, level}]) → 13주×7일 2D 배열 (0~4)
-function buildGrassGrid(cells = []) {
+// months → 주 수 (3개월≈13주, 6개월≈26주, 1년≈52주)
+const MONTHS_TO_WEEKS = { 3: 13, 6: 26, 12: 52 };
+
+// BE cells([{date, tilCount, charCount, level}]) → N주×7일 2D 배열 (0~4)
+function buildGrassGrid(cells = [], months = 3) {
   const levelMap = {};
   cells.forEach(c => { levelMap[c.date] = c.level; });
 
+  const weeks = MONTHS_TO_WEEKS[months] ?? 13;
   const today = new Date();
   const start = new Date(today);
-  start.setDate(today.getDate() - today.getDay() - 12 * 7); // 13주 전 일요일
+  start.setDate(today.getDate() - today.getDay() - (weeks - 1) * 7);
 
-  return Array.from({ length: 13 }, (_, w) =>
+  return Array.from({ length: weeks }, (_, w) =>
     Array.from({ length: 7 }, (_, d) => {
       const dt = new Date(start);
       dt.setDate(start.getDate() + w * 7 + d);
@@ -171,54 +175,243 @@ function PotDistribution({ distribution }) {
   );
 }
 
-function InterestFlow({ interests }) {
+// ── 관심사 라인 차트 (선 두께 = 밀도) ──────────────────────────
+
+const COLORS = ['#1a3a5c', '#3d8b5e', '#c8733a', '#534ab7', '#c45c8a'];
+const W = 700, H = 220;
+const PAD = { top: 14, right: 16, bottom: 36, left: 40 };
+
+function InterestLineChart({ interests, months, onMonthsChange }) {
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+  const [hiddenTags, setHiddenTags] = useState(new Set());
+
   if (!interests || interests.length === 0) {
     return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>관심사 데이터가 없습니다.</div>;
   }
 
+  // 상위 5개 태그
   const tagTotals = {};
   interests.forEach(m => m.topTags.forEach(t => {
     tagTotals[t.tag] = (tagTotals[t.tag] ?? 0) + t.count;
   }));
   const topTags = Object.entries(tagTotals)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 4)
-    .map(([tag]) => tag);
+    .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([tag]) => tag);
 
-  const colorKeys = ['var(--ink)', 'var(--moss)', 'var(--amber)', 'var(--leaf)'];
-  const tagColors = Object.fromEntries(topTags.map((tag, i) => [tag, colorKeys[i]]));
+  const n = interests.length;
+  const monthLabels = interests.map(m => m.month.slice(5) + '월');
 
-  const chartData = interests.map(m => {
-    const row = Object.fromEntries(topTags.map(t => [t, 0]));
-    m.topTags.forEach(t => { if (row[t.tag] !== undefined) row[t.tag] = t.count; });
-    return row;
+  // 태그별 월별 count
+  const tagCounts = {};
+  topTags.forEach(tag => {
+    tagCounts[tag] = interests.map(m => {
+      const f = m.topTags.find(t => t.tag === tag);
+      return f ? Number(f.count) : 0;
+    });
   });
+
+  // 태그별 상대 밀도 (0~1)
+  const tagDensity = {};
+  topTags.forEach(tag => {
+    const mx = Math.max(...tagCounts[tag], 1);
+    tagDensity[tag] = tagCounts[tag].map(c => c / mx);
+  });
+
+  const maxCount = Math.max(...topTags.flatMap(tag => tagCounts[tag]), 1);
+  const xScale = i => PAD.left + (n <= 1 ? 0 : (i / (n - 1))) * (W - PAD.left - PAD.right);
+  const yScale = v => PAD.top + (1 - v / maxCount) * (H - PAD.top - PAD.bottom);
+  const strokeW = d => 1.5 + d * 6.5;
+
+  // Y 눈금
+  const yTicks = Array.from({ length: 5 }, (_, i) => Math.round((maxCount / 4) * i));
+
+  // 요약 카드
+  const totals = topTags.map((tag, ci) => ({
+    tag, color: COLORS[ci],
+    sum: tagCounts[tag].reduce((a, b) => a + b, 0),
+    avgD: tagDensity[tag].reduce((a, b) => a + b, 0) / tagDensity[tag].length,
+    lastCount: tagCounts[tag].at(-1),
+    lastD: tagDensity[tag].at(-1),
+  })).filter(t => !hiddenTags.has(t.tag));
+
+  const topSum     = [...totals].sort((a, b) => b.sum - a.sum)[0];
+  const topConsist = [...totals].sort((a, b) => b.avgD - a.avgD)[0];
+  const topThis    = [...totals].sort((a, b) => b.lastCount - a.lastCount)[0];
+
+  const toggleTag = tag => {
+    setHiddenTags(prev => {
+      const next = new Set(prev);
+      if (next.has(tag)) { next.delete(tag); }
+      else if (next.size < topTags.length - 1) { next.add(tag); }
+      return next;
+    });
+  };
+
+  const handleMouseMove = e => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const svgX = ((e.clientX - rect.left) / rect.width) * W;
+    if (n <= 1) { setHoveredIdx(0); return; }
+    let closest = 0;
+    let minDist = Infinity;
+    for (let i = 0; i < n; i++) {
+      const dist = Math.abs(svgX - xScale(i));
+      if (dist < minDist) { minDist = dist; closest = i; }
+    }
+    setHoveredIdx(closest);
+  };
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 140, paddingTop: 12 }}>
-        {chartData.map((m, i) => {
-          const total = topTags.reduce((s, t) => s + (m[t] ?? 0), 0);
-          return (
-            <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%' }}>
-              <div style={{ flex: 1, width: '70%', display: 'flex', flexDirection: 'column-reverse', borderRadius: '6px 6px 2px 2px', overflow: 'hidden' }}>
-                {total > 0 && topTags.map(tag => (
-                  m[tag] > 0 && <div key={tag} style={{ height: `${(m[tag] / total) * 100}%`, background: tagColors[tag] }} />
-                ))}
+      {/* 범례 + 밀도 안내 */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {topTags.map((tag, i) => {
+            const hidden = hiddenTags.has(tag);
+            return (
+              <div key={tag} onClick={() => toggleTag(tag)} style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '4px 10px', borderRadius: 20,
+                border: `0.5px solid ${COLORS[i]}50`,
+                background: hidden ? 'transparent' : `${COLORS[i]}18`,
+                opacity: hidden ? 0.35 : 1,
+                cursor: 'pointer', transition: 'all 0.15s',
+              }}>
+                <div style={{ width: 18, height: 3, borderRadius: 2, background: COLORS[i] }} />
+                <span style={{ fontSize: 11.5, color: COLORS[i], fontWeight: 500 }}>{tag}</span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)' }}>{interests[i].month}</div>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--ink-3)' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <svg width="32" height="8"><line x1="0" y1="4" x2="32" y2="4" stroke="#aaa" strokeWidth="6" strokeLinecap="round"/></svg>
+            꾸준히 작성
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <svg width="32" height="8"><line x1="0" y1="4" x2="32" y2="4" stroke="#aaa" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            집중 작성
+          </span>
+        </div>
+      </div>
+
+      {/* SVG 차트 */}
+      <div style={{ position: 'relative' }}>
+        <svg
+          viewBox={`0 0 ${W} ${H}`} width="100%" height={H}
+          style={{ overflow: 'visible', cursor: 'crosshair' }}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => setHoveredIdx(null)}
+        >
+          {/* Y 눈금선 */}
+          {yTicks.map(v => (
+            <g key={v}>
+              <line x1={PAD.left} y1={yScale(v)} x2={W - PAD.right} y2={yScale(v)}
+                stroke="rgba(0,0,0,0.05)" strokeWidth={1} />
+              <text x={PAD.left - 6} y={yScale(v) + 4} textAnchor="end"
+                fontSize={10} fill="#aaa">{v}개</text>
+            </g>
+          ))}
+
+          {/* X 라벨 */}
+          {monthLabels.map((label, i) => (
+            <text key={i} x={xScale(i)} y={H - 6} textAnchor="middle"
+              fontSize={10} fill={hoveredIdx === i ? '#1a3a5c' : '#bbb'} fontWeight={hoveredIdx === i ? 600 : 400}>
+              {label}
+            </text>
+          ))}
+
+          {/* 호버 수직선 */}
+          {hoveredIdx !== null && (
+            <line x1={xScale(hoveredIdx)} y1={PAD.top} x2={xScale(hoveredIdx)} y2={H - PAD.bottom}
+              stroke="#ddd" strokeWidth={1} strokeDasharray="4,3" />
+          )}
+
+          {/* 태그별 라인 */}
+          {topTags.map((tag, ci) => {
+            if (hiddenTags.has(tag)) return null;
+            const counts = tagCounts[tag];
+            const density = tagDensity[tag];
+            const color = COLORS[ci];
+            return (
+              <g key={tag}>
+                {/* 선 세그먼트 (두께 가변) */}
+                {counts.map((_, i) => {
+                  if (i === 0) return null;
+                  return (
+                    <line key={i}
+                      x1={xScale(i - 1)} y1={yScale(counts[i - 1])}
+                      x2={xScale(i)}     y2={yScale(counts[i])}
+                      stroke={color}
+                      strokeWidth={strokeW((density[i - 1] + density[i]) / 2)}
+                      strokeLinecap="round"
+                      opacity={0.85}
+                    />
+                  );
+                })}
+                {/* 점 */}
+                {counts.map((v, i) => (
+                  <circle key={i}
+                    cx={xScale(i)} cy={yScale(v)} r={hoveredIdx === i ? 6 : 4}
+                    fill={color} stroke="#fff" strokeWidth={2}
+                    opacity={v === 0 ? 0 : 1}
+                  />
+                ))}
+              </g>
+            );
+          })}
+
+          {/* 호버 툴팁 */}
+          {hoveredIdx !== null && (() => {
+            const tx = xScale(hoveredIdx);
+            const isRight = tx > W * 0.7;
+            const bx = isRight ? tx - 144 : tx + 12;
+            const visibleTags = topTags.filter(t => !hiddenTags.has(t) && tagCounts[t][hoveredIdx] > 0);
+            if (visibleTags.length === 0) return null;
+            const bh = 24 + visibleTags.length * 18;
+            return (
+              <g>
+                <rect x={bx} y={PAD.top} width={132} height={bh} rx={6}
+                  fill="white" stroke="#e0ece0" strokeWidth={0.5}
+                  filter="drop-shadow(0 2px 6px rgba(0,0,0,0.08))" />
+                <text x={bx + 10} y={PAD.top + 15} fontSize={10} fill="#aaa">
+                  {monthLabels[hoveredIdx]}
+                </text>
+                {visibleTags.map((tag, i) => {
+                  const ci = topTags.indexOf(tag);
+                  const pct = Math.round(tagDensity[tag][hoveredIdx] * 100);
+                  return (
+                    <g key={tag}>
+                      <rect x={bx + 10} y={PAD.top + 22 + i * 18} width={8} height={8} rx={2} fill={COLORS[ci]} />
+                      <text x={bx + 22} y={PAD.top + 30 + i * 18} fontSize={10} fill="#333">
+                        {tag}: {tagCounts[tag][hoveredIdx]}개 · 밀도 {pct}%
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })()}
+        </svg>
+      </div>
+
+      {/* 요약 카드 */}
+      {totals.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+          {[
+            { label: '가장 많이 쓴 주제', t: topSum,     sub: `${topSum?.sum ?? 0}개` },
+            { label: '가장 꾸준한 주제', t: topConsist, sub: `평균 밀도 ${Math.round((topConsist?.avgD ?? 0) * 100)}%` },
+            { label: '이번 달 1위',      t: topThis,    sub: `${topThis?.lastCount ?? 0}개 · 밀도 ${Math.round((topThis?.lastD ?? 0) * 100)}%` },
+          ].map(({ label, t, sub }) => t ? (
+            <div key={label} style={{
+              flex: 1, background: 'var(--paper-2)', borderRadius: 10, padding: '10px 14px',
+              borderLeft: `3px solid ${t.color}`,
+            }}>
+              <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginBottom: 3 }}>{label}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: t.color, fontFamily: 'var(--font-display)' }}>{t.tag}</div>
+              <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>{sub}</div>
             </div>
-          );
-        })}
-      </div>
-      <div style={{ display: 'flex', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
-        {topTags.map((tag, i) => (
-          <div key={tag} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink-2)' }}>
-            <div style={{ width: 9, height: 9, borderRadius: 2, background: colorKeys[i] }} />
-            {tag}
-          </div>
-        ))}
-      </div>
+          ) : null)}
+        </div>
+      )}
     </div>
   );
 }
@@ -252,28 +445,40 @@ function GoalRow({ goal }) {
 
 function DashboardScreen({ onNav }) {
   const [summary, setSummary]           = useState(null);
-  const [grassGrid, setGrassGrid]       = useState(buildGrassGrid([]));
+  const [grassMonths, setGrassMonths]   = useState(3);
+  const [grassGrid, setGrassGrid]       = useState(buildGrassGrid([], 3));
   const [weekly, setWeekly]             = useState([]);
   const [distribution, setDistribution] = useState([]);
-  const [interests, setInterests]       = useState([]);
-  const [quests, setQuests]             = useState(null);
-  const [currentPoint, setCurrentPoint] = useState(0);
+  const [interests, setInterests]           = useState([]);
+  const [interestMonths, setInterestMonths] = useState(6);
+  const [quests, setQuests]                 = useState(null);
+  const [currentPoint, setCurrentPoint]     = useState(0);
+
+  // 잔디 기간 변경 시 재요청
+  useEffect(() => {
+    getGrass(grassMonths).then(data => {
+      setGrassGrid(buildGrassGrid(data?.cells ?? [], grassMonths));
+    }).catch(() => {});
+  }, [grassMonths]);
+
+  // 관심사 기간 변경 시 재요청
+  useEffect(() => {
+    getInterests(interestMonths).then(data => {
+      setInterests(data?.interests ?? []);
+    }).catch(() => {});
+  }, [interestMonths]);
 
   useEffect(() => {
     Promise.allSettled([
       getSummary(),
-      getGrass(),
       getWeekly(),
       getDistribution(),
-      getInterests(),
       getQuests(),
       getPointSummary(),
-    ]).then(([sumRes, grassRes, weekRes, distRes, intRes, questRes, pointRes]) => {
+    ]).then(([sumRes, weekRes, distRes, questRes, pointRes]) => {
       if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
-      if (grassRes.status === 'fulfilled') setGrassGrid(buildGrassGrid(grassRes.value?.cells ?? []));
       if (weekRes.status === 'fulfilled')  setWeekly(transformWeekly(weekRes.value?.weeklyData ?? []));
       if (distRes.status === 'fulfilled')  setDistribution(distRes.value?.distribution ?? []);
-      if (intRes.status === 'fulfilled')   setInterests(intRes.value?.interests ?? []);
       if (questRes.status === 'fulfilled') setQuests(questRes.value);
       if (pointRes.status === 'fulfilled') setCurrentPoint(pointRes.value?.currentPoint ?? 0);
     });
@@ -321,7 +526,19 @@ function DashboardScreen({ onNav }) {
       {/* Grass + Today goals */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
         <Card padding={22}>
-          <SectionHeader eyebrow="활동" title="잔디 그래프" />
+          <SectionHeader eyebrow="활동" title="잔디 그래프" action={
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[['3개월', 3], ['6개월', 6], ['1년', 12]].map(([label, m]) => (
+                <button key={m} onClick={() => setGrassMonths(m)} style={{
+                  padding: '5px 10px', fontSize: 11.5, borderRadius: 7,
+                  background: grassMonths === m ? 'var(--ink)' : 'transparent',
+                  color: grassMonths === m ? '#fff' : 'var(--ink-2)',
+                  border: grassMonths === m ? 'none' : '0.5px solid var(--rule-2)',
+                  fontFamily: 'var(--font-display)', fontWeight: 500, cursor: 'pointer',
+                }}>{label}</button>
+              ))}
+            </div>
+          } />
           <GrassGraph data={grassGrid} />
         </Card>
 
@@ -366,12 +583,22 @@ function DashboardScreen({ onNav }) {
         </Card>
       </div>
 
-      {/* Interest flow */}
+      {/* Interest line chart */}
       <Card padding={22}>
         <SectionHeader eyebrow="관심사 변화" title="시기별 학습 주제 흐름" action={
-          <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>지난 6개월 · 태그 기준</span>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {[['6개월', 6], ['12개월', 12]].map(([label, m]) => (
+              <button key={m} onClick={() => setInterestMonths(m)} style={{
+                padding: '5px 10px', fontSize: 11.5, borderRadius: 7,
+                background: interestMonths === m ? 'var(--ink)' : 'transparent',
+                color: interestMonths === m ? '#fff' : 'var(--ink-2)',
+                border: interestMonths === m ? 'none' : '0.5px solid var(--rule-2)',
+                fontFamily: 'var(--font-display)', fontWeight: 500, cursor: 'pointer',
+              }}>{label}</button>
+            ))}
+          </div>
         } />
-        <InterestFlow interests={interests} />
+        <InterestLineChart interests={interests} months={interestMonths} onMonthsChange={setInterestMonths} />
       </Card>
 
     </div>

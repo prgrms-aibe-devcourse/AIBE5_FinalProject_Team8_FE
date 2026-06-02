@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getPlants } from './api/collection.js';
 import { DEX } from './data.jsx';
 import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult } from './api/ai.js';
@@ -876,7 +876,7 @@ function ProfileScreen() {
   const [imageUploading, setImageUploading] = useState(false);
   const [harvestedCount, setHarvestedCount] = useState(null);
   const [withdrawing, setWithdrawing] = useState(false);
-  const fileInputRef = useState(null);
+  const fileInputRef = useRef(null);
 
   // user가 비동기로 로드된 후 입력 상태 동기화
   useEffect(() => {
@@ -971,26 +971,24 @@ function ProfileScreen() {
     <div style={{ padding: 32, width: '100%', maxWidth: 1300, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
 
       <Card padding={28}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-          <div style={{ position: 'relative' }}>
-            {profileImageUrl ? (
-              <img
-                src={profileImageUrl}
-                alt="프로필"
-                style={{ width: 92, height: 92, borderRadius: '50%', objectFit: 'cover' }}
-              />
-            ) : (
-              <div style={{
-                width: 92, height: 92, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
-                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
-              }}>{avatarInitial}</div>
-            )}
-            {editing && (
-              <>
+        {/* 뷰 모드: 가로 배치 / 편집 모드: 아바타+폼 세로 구조 */}
+        {editing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* 아바타 행 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                {profileImageUrl ? (
+                  <img src={profileImageUrl} alt="프로필" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }} />
+                ) : (
+                  <div style={{
+                    width: 72, height: 72, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
+                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 28, fontFamily: 'var(--font-display)', fontWeight: 600,
+                  }}>{avatarInitial}</div>
+                )}
                 <input
-                  ref={fileInputRef[0]}
+                  ref={fileInputRef}
                   type="file"
                   accept="image/*"
                   style={{ display: 'none' }}
@@ -1000,74 +998,91 @@ function ProfileScreen() {
                 <button
                   style={{
                     position: 'absolute', bottom: -2, right: -2,
-                    width: 30, height: 30, borderRadius: '50%',
+                    width: 26, height: 26, borderRadius: '50%',
                     background: '#fff', border: '1px solid var(--rule-2)',
-                    fontSize: 13, cursor: imageUploading ? 'not-allowed' : 'pointer',
+                    fontSize: 12, cursor: imageUploading ? 'not-allowed' : 'pointer',
                     opacity: imageUploading ? 0.5 : 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                   disabled={imageUploading}
-                  onClick={() => {
-                    const input = document.querySelector('[data-testid="profile-image-input"]');
-                    input?.click();
-                  }}
+                  onClick={() => fileInputRef.current?.click()}
                   aria-label="프로필 이미지 변경"
                 >
                   {imageUploading ? '…' : '📷'}
                 </button>
-              </>
-            )}
-          </div>
+              </div>
+              <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>이미지를 클릭해 변경하세요</span>
+            </div>
 
-          <div style={{ flex: 1 }}>
-            {editing ? (
-              <>
-                <input value={nickname} onChange={e => setNickname(e.target.value)} style={{
-                  fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)',
-                  border: '0.5px solid var(--rule-2)', borderRadius: 8, padding: '6px 10px', width: 280, marginBottom: 8,
-                }} />
-                <textarea value={bio} onChange={e => setBio(e.target.value)} style={{
-                  width: '100%', maxWidth: 480, minHeight: 50, padding: '8px 12px',
+            {/* 닉네임 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>닉네임</label>
+              <input
+                value={nickname}
+                onChange={e => setNickname(e.target.value)}
+                style={{
+                  fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--ink)',
+                  border: '0.5px solid var(--rule-2)', borderRadius: 8, padding: '8px 12px',
+                  width: '100%', maxWidth: 400, boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {/* 소개 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>소개</label>
+              <textarea
+                value={bio}
+                onChange={e => setBio(e.target.value)}
+                style={{
+                  width: '100%', maxWidth: 600, minHeight: 64, padding: '8px 12px',
                   border: '0.5px solid var(--rule-2)', borderRadius: 8,
-                  fontSize: 13, color: 'var(--ink-2)', outline: 'none', resize: 'none',
-                  fontFamily: 'var(--font-body)',
-                }} />
-              </>
-            ) : (
-              <>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
-                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 13 }}>@{user?.handle ?? ''}</span>
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>{bio}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 8 }}>
-                  {user?.joinedAt ?? ''}부터 Rootin과 함께
-                </div>
-              </>
-            )}
-          </div>
+                  fontSize: 13, color: 'var(--ink-2)', outline: 'none', resize: 'vertical',
+                  fontFamily: 'var(--font-body)', boxSizing: 'border-box',
+                }}
+              />
+            </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-            {editing ? (
-              <>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <Btn variant="secondary" onClick={() => { setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
-                    취소
-                  </Btn>
-                  <Btn variant="green" onClick={handleSave} disabled={saving}>
-                    {saving ? '저장 중…' : '저장'}
-                  </Btn>
-                </div>
-                {saveError && (
-                  <span style={{ fontSize: 12, color: '#e05252' }}>{saveError}</span>
-                )}
-              </>
-            ) : (
-              <Btn variant="secondary" onClick={() => setEditing(true)}>
-                프로필 수정
+            {/* 버튼 행 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Btn variant="green" onClick={handleSave} disabled={saving}>
+                {saving ? '저장 중…' : '저장'}
               </Btn>
-            )}
+              <Btn variant="secondary" onClick={() => { setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
+                취소
+              </Btn>
+              {saveError && <span style={{ fontSize: 12, color: '#e05252', marginLeft: 4 }}>{saveError}</span>}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              {profileImageUrl ? (
+                <img src={profileImageUrl} alt="프로필" style={{ width: 92, height: 92, borderRadius: '50%', objectFit: 'cover' }} />
+              ) : (
+                <div style={{
+                  width: 92, height: 92, borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
+                  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
+                }}>{avatarInitial}</div>
+              )}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 13 }}>@{user?.handle ?? ''}</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>{bio}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 8 }}>
+                {user?.joinedAt ?? ''}부터 Rootin과 함께
+              </div>
+            </div>
+            <Btn variant="secondary" onClick={() => setEditing(true)}>
+              프로필 수정
+            </Btn>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginTop: 24, paddingTop: 22, borderTop: '0.5px solid var(--rule)' }}>
           {[
@@ -1110,8 +1125,7 @@ function ProfileScreen() {
         </div>
       </Card>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 4px' }}>
-        <button style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>로그아웃</button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 4px' }}>
         <button
           onClick={handleWithdraw}
           disabled={withdrawing}

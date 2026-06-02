@@ -43,3 +43,26 @@ export async function patchUserMe(data) {
   });
   return res.data ?? res;
 }
+
+/**
+ * 프로필 이미지 업로드용 Presigned URL 발급
+ * POST /api/v1/users/me/profile-image/presigned-url
+ *
+ * @param {{ filename: string, contentType: string }} param
+ * @returns {Promise<{ presignedUrl: string, fileUrl: string }>}
+ */
+export async function getProfileImagePresignedUrl({ filename, contentType }) {
+  const res = await request('/api/v1/users/me/profile-image/presigned-url', {
+    method: 'POST',
+    body: JSON.stringify({ filename, contentType }),
+  });
+  return res.data ?? res;
+}
+
+/**
+ * 회원 탈퇴
+ * DELETE /api/v1/users/me
+ */
+export async function deleteUserMe() {
+  await request('/api/v1/users/me', { method: 'DELETE' });
+}

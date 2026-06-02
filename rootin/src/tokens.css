@@ -1,28 +1,29 @@
 /* Rootin Design Tokens — new design system */
 :root {
   /* Green spectrum */
-  --moss:       oklch(0.42 0.085 145);
-  --moss-2:     oklch(0.32 0.07 145);
-  --sprout:     oklch(0.72 0.13 135);
-  --leaf:       oklch(0.88 0.05 130);
+  --moss:       oklch(0.44 0.075 148);
+  --moss-2:     oklch(0.34 0.062 148);
+  --sprout:     oklch(0.74 0.115 140);
+  --leaf:       oklch(0.905 0.04 140);
 
   /* Warm amber */
-  --amber:      oklch(0.74 0.13 70);
-  --amber-soft: oklch(0.93 0.05 80);
+  --amber:      oklch(0.76 0.115 74);
+  --amber-soft: oklch(0.945 0.038 82);
 
   /* Surfaces */
-  --paper:      oklch(0.975 0.008 90);
-  --paper-2:    oklch(0.955 0.012 90);
-  --card:       oklch(1 0 0);
+  --paper:      oklch(0.977 0.006 95);
+  --paper-2:    oklch(0.963 0.008 95);
+  --paper-3:    oklch(0.948 0.009 95);
+  --card:       oklch(0.998 0.0015 95);
 
   /* Text */
-  --ink:        oklch(0.20 0.02 150);
-  --ink-2:      oklch(0.38 0.02 150);
-  --ink-3:      oklch(0.55 0.015 140);
+  --ink:        oklch(0.21 0.016 152);
+  --ink-2:      oklch(0.40 0.016 150);
+  --ink-3:      oklch(0.52 0.012 145);
 
   /* Border */
-  --rule:       oklch(0.91 0.012 100);
-  --rule-2:     oklch(0.85 0.015 100);
+  --rule:       oklch(0.92 0.007 100);
+  --rule-2:     oklch(0.865 0.009 100);
 
   /* Danger */
   --danger:     oklch(0.58 0.16 25);
@@ -32,13 +33,13 @@
   --r-md: 10px;
   --r-lg: 14px;
   --r-xl: 20px;
-  --shadow-sm: 0 1px 2px rgba(26, 58, 92, 0.04), 0 1px 1px rgba(26, 58, 92, 0.03);
-  --shadow-md: 0 4px 16px rgba(26, 58, 92, 0.06), 0 1px 2px rgba(26, 58, 92, 0.04);
-  --shadow-lg: 0 12px 40px rgba(26, 58, 92, 0.10);
+  --shadow-sm: 0 1px 2px rgb(38 46 34 / 0.04), 0 1px 1px rgb(38 46 34 / 0.03);
+  --shadow-md: 0 4px 16px rgb(38 46 34 / 0.06), 0 1px 2px rgb(38 46 34 / 0.04);
+  --shadow-lg: 0 14px 44px rgb(38 46 34 / 0.10), 0 2px 6px rgb(38 46 34 / 0.05);
 
   /* Fonts */
-  --font-display: 'Space Grotesk', 'Noto Sans KR', sans-serif;
-  --font-body: 'Noto Sans KR', 'Space Grotesk', sans-serif;
+  --font-display: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
+  --font-body: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 

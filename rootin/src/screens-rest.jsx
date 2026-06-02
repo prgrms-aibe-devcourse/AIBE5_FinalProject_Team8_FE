@@ -970,6 +970,7 @@ function ProfileScreen() {
       clearUser();
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      window.location.reload();
     } catch {
       alert('회원 탈퇴에 실패했습니다. 다시 시도해주세요.');
     } finally {

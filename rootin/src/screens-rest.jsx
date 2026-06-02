@@ -920,19 +920,42 @@ function ProfileScreen() {
     if (!file) return;
     setImageUploading(true);
     try {
-      const { getProfileImagePresignedUrl } = await import('./api/user.js');
+      const { getProfileImagePresignedUrl, patchUserMe } = await import('./api/user.js');
       const { presignedUrl, fileUrl } = await getProfileImagePresignedUrl({
         filename: file.name,
-        contentType: file.type,
+        fileSize: file.size,
       });
-      await fetch(presignedUrl, {
+
+      // LocalStack 환경에서는 Docker 내부 호스트 → 브라우저 접근 가능한 주소로 치환
+      const localstackEndpoint = import.meta.env.VITE_LOCALSTACK_ENDPOINT;
+      const uploadUrl = localstackEndpoint
+        ? presignedUrl.replace(localstackEndpoint, 'http://localhost:4566')
+        : presignedUrl;
+
+      // fileUrl: LocalStack이면 localhost path-style URL로 변환, AWS면 그대로 사용
+      // fileUrl 형태: https://{bucket}.s3.{region}.amazonaws.com/{key}
+      // → http://localhost:4566/{bucket}/{key}
+      const displayUrl = localstackEndpoint
+        ? (() => {
+            const url = new URL(fileUrl);
+            const bucket = url.hostname.split('.')[0];
+            return `http://localhost:4566/${bucket}${url.pathname}`;
+          })()
+        : fileUrl;
+
+      await fetch(uploadUrl, {
         method: 'PUT',
         body: file,
         headers: { 'Content-Type': file.type },
       });
-      updateUser({ profileImageUrl: fileUrl });
-    } catch {
-      // 업로드 실패 시 무시 (기존 이미지 유지)
+
+      // 서버에 profileImageUrl 저장 (nickname은 @NotBlank 필수값이므로 같이 전송)
+      await patchUserMe({ nickname: user?.name ?? nickname, bio: user?.bio ?? bio, profileImageUrl: displayUrl });
+      console.log('[이미지 업로드 완료] displayUrl:', displayUrl);
+      updateUser({ profileImageUrl: displayUrl });
+    } catch (err) {
+      console.error('[이미지 업로드 실패]', err);
+      alert('이미지 업로드에 실패했습니다: ' + (err?.message ?? err));
     } finally {
       setImageUploading(false);
     }
@@ -977,16 +1000,18 @@ function ProfileScreen() {
             {/* 아바타 행 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{ position: 'relative', flexShrink: 0 }}>
-                {profileImageUrl ? (
-                  <img src={profileImageUrl} alt="프로필" style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover' }} />
-                ) : (
-                  <div style={{
-                    width: 72, height: 72, borderRadius: '50%',
-                    background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
-                    color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 28, fontFamily: 'var(--font-display)', fontWeight: 600,
-                  }}>{avatarInitial}</div>
-                )}
+                <img
+                  src={profileImageUrl || ''}
+                  alt="프로필"
+                  style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', display: profileImageUrl ? 'block' : 'none' }}
+                  onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-edit').style.display = 'flex'; }}
+                />
+                <div id="avatar-initial-edit" style={{
+                  width: 72, height: 72, borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
+                  color: '#fff', display: profileImageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 28, fontFamily: 'var(--font-display)', fontWeight: 600,
+                }}>{avatarInitial}</div>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -1057,16 +1082,18 @@ function ProfileScreen() {
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              {profileImageUrl ? (
-                <img src={profileImageUrl} alt="프로필" style={{ width: 92, height: 92, borderRadius: '50%', objectFit: 'cover' }} />
-              ) : (
-                <div style={{
-                  width: 92, height: 92, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
-                  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
-                }}>{avatarInitial}</div>
-              )}
+              <img
+                src={profileImageUrl || ''}
+                alt="프로필"
+                style={{ width: 92, height: 92, borderRadius: '50%', objectFit: 'cover', display: profileImageUrl ? 'block' : 'none' }}
+                onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-view').style.display = 'flex'; }}
+              />
+              <div id="avatar-initial-view" style={{
+                width: 92, height: 92, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
+                color: '#fff', display: profileImageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
+              }}>{avatarInitial}</div>
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>

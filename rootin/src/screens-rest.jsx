@@ -974,14 +974,8 @@ function ProfileScreen() {
     }
   }
 
-  const provider = user?.provider ?? null;
-  const isLocal = provider === 'local';
-  const providerLabel = provider === 'google' ? '구글 계정 연동됨'
-    : provider === 'kakao' ? '카카오 계정 연동됨'
-    : null;
-  const snsLabel = provider === 'google' ? '🟢 Google'
-    : provider === 'kakao' ? '🟡 Kakao'
-    : null;
+  const provider = user?.provider?.toUpperCase() ?? null;
+  const isLocal = provider === 'LOCAL';
 
   // 프로필 이미지: URL 있으면 img, 없으면 이니셜
   const avatarInitial = (user?.name ?? '?')[0];
@@ -1131,9 +1125,8 @@ function ProfileScreen() {
         <SectionHeader eyebrow="계정 관리" title="설정" />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {[
-            { label: '이메일', value: user?.email ?? '', sub: providerLabel },
+            { label: '이메일', value: user?.email ?? '' },
             isLocal ? { label: '비밀번호', value: '••••••••', action: '변경' } : null,
-            snsLabel ? { label: '연결된 SNS', value: snsLabel } : null,
           ].filter(Boolean).map((row, i, arr) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 20,

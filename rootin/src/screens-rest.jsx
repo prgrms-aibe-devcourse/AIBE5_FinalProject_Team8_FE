@@ -867,12 +867,16 @@ function SummaryResult({ pot, summary, keyPoints }) {
 // === Profile Screen ===
 
 function ProfileScreen() {
-  const { user, updateUser } = useUser();
+  const { user, updateUser, clearUser } = useUser();
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState(user?.name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [harvestedCount, setHarvestedCount] = useState(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const fileInputRef = useState(null);
 
   // user가 비동기로 로드된 후 입력 상태 동기화
   useEffect(() => {
@@ -881,6 +885,20 @@ function ProfileScreen() {
       setBio(user.bio ?? '');
     }
   }, [user]);
+
+  // 수확한 식물 수 조회
+  useEffect(() => {
+    import('./api/collection.js').then(({ getPlants }) =>
+      getPlants()
+        .then(plants => {
+          const count = Array.isArray(plants)
+            ? plants.filter(p => p.isCollected === true).length
+            : 0;
+          setHarvestedCount(count);
+        })
+        .catch(() => setHarvestedCount(0))
+    );
+  }, []);
 
   async function handleSave() {
     setSaving(true);
@@ -897,25 +915,106 @@ function ProfileScreen() {
     }
   }
 
+  async function handleImageChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageUploading(true);
+    try {
+      const { getProfileImagePresignedUrl } = await import('./api/user.js');
+      const { presignedUrl, fileUrl } = await getProfileImagePresignedUrl({
+        filename: file.name,
+        contentType: file.type,
+      });
+      await fetch(presignedUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+      updateUser({ profileImageUrl: fileUrl });
+    } catch {
+      // 업로드 실패 시 무시 (기존 이미지 유지)
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  async function handleWithdraw() {
+    if (!window.confirm('정말 탈퇴하시겠습니까? 모든 데이터가 삭제되며 복구할 수 없습니다.')) return;
+    setWithdrawing(true);
+    try {
+      const { deleteUserMe } = await import('./api/user.js');
+      await deleteUserMe();
+      clearUser();
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+    } catch {
+      alert('회원 탈퇴에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
+  const provider = user?.provider ?? null;
+  const isLocal = provider === 'local';
+  const providerLabel = provider === 'google' ? '구글 계정 연동됨'
+    : provider === 'kakao' ? '카카오 계정 연동됨'
+    : null;
+  const snsLabel = provider === 'google' ? '🟢 Google'
+    : provider === 'kakao' ? '🟡 Kakao'
+    : null;
+
+  // 프로필 이미지: URL 있으면 img, 없으면 이니셜
+  const avatarInitial = (user?.name ?? '?')[0];
+  const profileImageUrl = user?.profileImageUrl ?? null;
+
   return (
     <div style={{ padding: 32, width: '100%', maxWidth: 1300, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
 
       <Card padding={28}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
           <div style={{ position: 'relative' }}>
-            <div style={{
-              width: 92, height: 92, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
-              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
-            }}>소</div>
+            {profileImageUrl ? (
+              <img
+                src={profileImageUrl}
+                alt="프로필"
+                style={{ width: 92, height: 92, borderRadius: '50%', objectFit: 'cover' }}
+              />
+            ) : (
+              <div style={{
+                width: 92, height: 92, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
+                color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
+              }}>{avatarInitial}</div>
+            )}
             {editing && (
-              <button style={{
-                position: 'absolute', bottom: -2, right: -2,
-                width: 30, height: 30, borderRadius: '50%',
-                background: '#fff', border: '1px solid var(--rule-2)',
-                fontSize: 13,
-              }}>📷</button>
+              <>
+                <input
+                  ref={fileInputRef[0]}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleImageChange}
+                  data-testid="profile-image-input"
+                />
+                <button
+                  style={{
+                    position: 'absolute', bottom: -2, right: -2,
+                    width: 30, height: 30, borderRadius: '50%',
+                    background: '#fff', border: '1px solid var(--rule-2)',
+                    fontSize: 13, cursor: imageUploading ? 'not-allowed' : 'pointer',
+                    opacity: imageUploading ? 0.5 : 1,
+                  }}
+                  disabled={imageUploading}
+                  onClick={() => {
+                    const input = document.querySelector('[data-testid="profile-image-input"]');
+                    input?.click();
+                  }}
+                  aria-label="프로필 이미지 변경"
+                >
+                  {imageUploading ? '…' : '📷'}
+                </button>
+              </>
             )}
           </div>
 
@@ -974,7 +1073,7 @@ function ProfileScreen() {
           {[
             { label: '누적 TIL', value: (user?.totalTil ?? 0) + '개' },
             { label: '연속 기록', value: (user?.streak ?? 0) + '일' },
-            { label: '수확한 식물', value: '5종' },
+            { label: '수확한 식물', value: harvestedCount !== null ? harvestedCount + '종' : '—' },
             { label: '보유 포인트', value: (user?.points ?? 0) + 'P' },
           ].map((s, i) => (
             <div key={i} style={{
@@ -993,10 +1092,10 @@ function ProfileScreen() {
         <SectionHeader eyebrow="계정 관리" title="설정" />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {[
-            { label: '이메일', value: user?.email ?? '', sub: '구글 계정 연동됨' },
-            { label: '비밀번호', value: '••••••••', action: '변경' },
-            { label: '연결된 SNS', value: '🟢 Google' },
-          ].map((row, i, arr) => (
+            { label: '이메일', value: user?.email ?? '', sub: providerLabel },
+            isLocal ? { label: '비밀번호', value: '••••••••', action: '변경' } : null,
+            snsLabel ? { label: '연결된 SNS', value: snsLabel } : null,
+          ].filter(Boolean).map((row, i, arr) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 20,
               padding: '14px 0',
@@ -1013,7 +1112,22 @@ function ProfileScreen() {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 4px' }}>
         <button style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>로그아웃</button>
-        <button style={{ fontSize: 12.5, color: '#b8536a' }}>회원 탈퇴</button>
+        <button
+          onClick={handleWithdraw}
+          disabled={withdrawing}
+          style={{
+            fontSize: 12.5,
+            color: '#b8536a',
+            background: 'transparent',
+            border: '1px solid #b8536a',
+            borderRadius: 6,
+            padding: '4px 12px',
+            cursor: withdrawing ? 'not-allowed' : 'pointer',
+            opacity: withdrawing ? 0.6 : 1,
+          }}
+        >
+          {withdrawing ? '처리 중…' : '회원 탈퇴'}
+        </button>
       </div>
     </div>
   );

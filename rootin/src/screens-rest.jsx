@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getPlants } from './api/collection.js';
 import { DEX } from './data.jsx';
 import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult } from './api/ai.js';
@@ -867,12 +867,16 @@ function SummaryResult({ pot, summary, keyPoints }) {
 // === Profile Screen ===
 
 function ProfileScreen() {
-  const { user, updateUser } = useUser();
+  const { user, updateUser, clearUser } = useUser();
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState(user?.name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [harvestedCount, setHarvestedCount] = useState(null);
+  const [withdrawing, setWithdrawing] = useState(false);
+  const fileInputRef = useRef(null);
 
   // user가 비동기로 로드된 후 입력 상태 동기화
   useEffect(() => {
@@ -881,6 +885,20 @@ function ProfileScreen() {
       setBio(user.bio ?? '');
     }
   }, [user]);
+
+  // 수확한 식물 수 조회
+  useEffect(() => {
+    import('./api/collection.js').then(({ getPlants }) =>
+      getPlants()
+        .then(plants => {
+          const count = Array.isArray(plants)
+            ? plants.filter(p => p.isCollected === true).length
+            : 0;
+          setHarvestedCount(count);
+        })
+        .catch(() => setHarvestedCount(0))
+    );
+  }, []);
 
   async function handleSave() {
     setSaving(true);
@@ -897,84 +915,194 @@ function ProfileScreen() {
     }
   }
 
+  async function handleImageChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImageUploading(true);
+    try {
+      const { getProfileImagePresignedUrl, patchUserMe } = await import('./api/user.js');
+      const { presignedUrl, fileUrl } = await getProfileImagePresignedUrl({
+        filename: file.name,
+        fileSize: file.size,
+      });
+
+      // LocalStack 환경에서는 Docker 내부 호스트 → 브라우저 접근 가능한 주소로 치환
+      const replaceLocalstackHost = (url) => {
+        const endpoint = import.meta.env.VITE_LOCALSTACK_ENDPOINT;
+        return endpoint ? url.replace(endpoint, 'http://localhost:4566') : url;
+      };
+
+      const uploadUrl = replaceLocalstackHost(presignedUrl);
+      const displayUrl = replaceLocalstackHost(fileUrl);
+
+      await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+
+      // 서버에 profileImageUrl 저장 (nickname은 @NotBlank 필수값이므로 같이 전송)
+      await patchUserMe({ nickname, bio, profileImageUrl: displayUrl });
+      console.log('[이미지 업로드 완료] displayUrl:', displayUrl);
+      updateUser({ profileImageUrl: displayUrl });
+    } catch (err) {
+      console.error('[이미지 업로드 실패]', err);
+      alert('이미지 업로드에 실패했습니다: ' + (err?.message ?? err));
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  async function handleWithdraw() {
+    if (!window.confirm('정말 탈퇴하시겠습니까? 모든 데이터가 삭제되며 복구할 수 없습니다.')) return;
+    setWithdrawing(true);
+    try {
+      const { deleteUserMe } = await import('./api/user.js');
+      await deleteUserMe();
+      clearUser();
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.reload();
+    } catch {
+      alert('회원 탈퇴에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setWithdrawing(false);
+    }
+  }
+
+  const provider = user?.provider?.toUpperCase() ?? null;
+  const isLocal = provider === 'LOCAL';
+
+  // 프로필 이미지: URL 있으면 img, 없으면 이니셜
+  const avatarInitial = (user?.name ?? '?')[0];
+  const profileImageUrl = user?.profileImageUrl ?? null;
+
   return (
     <div style={{ padding: 32, width: '100%', maxWidth: 1300, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
 
       <Card padding={28}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{
-              width: 92, height: 92, borderRadius: '50%',
-              background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
-              color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
-            }}>소</div>
-            {editing && (
-              <button style={{
-                position: 'absolute', bottom: -2, right: -2,
-                width: 30, height: 30, borderRadius: '50%',
-                background: '#fff', border: '1px solid var(--rule-2)',
-                fontSize: 13,
-              }}>📷</button>
-            )}
-          </div>
+        {/* 뷰 모드: 가로 배치 / 편집 모드: 아바타+폼 세로 구조 */}
+        {editing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* 아바타 행 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <div style={{ position: 'relative', flexShrink: 0 }}>
+                <img
+                  src={profileImageUrl || ''}
+                  alt="프로필"
+                  style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', display: profileImageUrl ? 'block' : 'none' }}
+                  onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-edit').style.display = 'flex'; }}
+                />
+                <div id="avatar-initial-edit" style={{
+                  width: 72, height: 72, borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
+                  color: '#fff', display: profileImageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 28, fontFamily: 'var(--font-display)', fontWeight: 600,
+                }}>{avatarInitial}</div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleImageChange}
+                  data-testid="profile-image-input"
+                />
+                <button
+                  style={{
+                    position: 'absolute', bottom: -2, right: -2,
+                    width: 26, height: 26, borderRadius: '50%',
+                    background: '#fff', border: '1px solid var(--rule-2)',
+                    fontSize: 12, cursor: imageUploading ? 'not-allowed' : 'pointer',
+                    opacity: imageUploading ? 0.5 : 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}
+                  disabled={imageUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="프로필 이미지 변경"
+                >
+                  {imageUploading ? '…' : '📷'}
+                </button>
+              </div>
+              <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>이미지를 클릭해 변경하세요</span>
+            </div>
 
-          <div style={{ flex: 1 }}>
-            {editing ? (
-              <>
-                <input value={nickname} onChange={e => setNickname(e.target.value)} style={{
-                  fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)',
-                  border: '0.5px solid var(--rule-2)', borderRadius: 8, padding: '6px 10px', width: 280, marginBottom: 8,
-                }} />
-                <textarea value={bio} onChange={e => setBio(e.target.value)} style={{
-                  width: '100%', maxWidth: 480, minHeight: 50, padding: '8px 12px',
+            {/* 닉네임 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>닉네임</label>
+              <input
+                value={nickname}
+                onChange={e => setNickname(e.target.value)}
+                style={{
+                  fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--ink)',
+                  border: '0.5px solid var(--rule-2)', borderRadius: 8, padding: '8px 12px',
+                  width: '100%', maxWidth: 400, boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {/* 소개 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>소개</label>
+              <textarea
+                value={bio}
+                onChange={e => setBio(e.target.value)}
+                style={{
+                  width: '100%', maxWidth: 600, minHeight: 64, padding: '8px 12px',
                   border: '0.5px solid var(--rule-2)', borderRadius: 8,
-                  fontSize: 13, color: 'var(--ink-2)', outline: 'none', resize: 'none',
-                  fontFamily: 'var(--font-body)',
-                }} />
-              </>
-            ) : (
-              <>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
-                  <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 13 }}>@{user?.handle ?? ''}</span>
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>{bio}</div>
-                <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 8 }}>
-                  {user?.joinedAt ?? ''}부터 Rootin과 함께
-                </div>
-              </>
-            )}
-          </div>
+                  fontSize: 13, color: 'var(--ink-2)', outline: 'none', resize: 'vertical',
+                  fontFamily: 'var(--font-body)', boxSizing: 'border-box',
+                }}
+              />
+            </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-            {editing ? (
-              <>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <Btn variant="secondary" onClick={() => { setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
-                    취소
-                  </Btn>
-                  <Btn variant="green" onClick={handleSave} disabled={saving}>
-                    {saving ? '저장 중…' : '저장'}
-                  </Btn>
-                </div>
-                {saveError && (
-                  <span style={{ fontSize: 12, color: '#e05252' }}>{saveError}</span>
-                )}
-              </>
-            ) : (
-              <Btn variant="secondary" onClick={() => setEditing(true)}>
-                프로필 수정
+            {/* 버튼 행 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Btn variant="green" onClick={handleSave} disabled={saving}>
+                {saving ? '저장 중…' : '저장'}
               </Btn>
-            )}
+              <Btn variant="secondary" onClick={() => { setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
+                취소
+              </Btn>
+              {saveError && <span style={{ fontSize: 12, color: '#e05252', marginLeft: 4 }}>{saveError}</span>}
+            </div>
           </div>
-        </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
+            <div style={{ position: 'relative', flexShrink: 0 }}>
+              <img
+                src={profileImageUrl || ''}
+                alt="프로필"
+                style={{ width: 92, height: 92, borderRadius: '50%', objectFit: 'cover', display: profileImageUrl ? 'block' : 'none' }}
+                onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-view').style.display = 'flex'; }}
+              />
+              <div id="avatar-initial-view" style={{
+                width: 92, height: 92, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
+                color: '#fff', display: profileImageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
+              }}>{avatarInitial}</div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 13 }}>@{user?.handle ?? ''}</span>
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>{bio}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 8 }}>
+                {user?.joinedAt ?? ''}부터 Rootin과 함께
+              </div>
+            </div>
+            <Btn variant="secondary" onClick={() => setEditing(true)}>
+              프로필 수정
+            </Btn>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginTop: 24, paddingTop: 22, borderTop: '0.5px solid var(--rule)' }}>
           {[
             { label: '누적 TIL', value: (user?.totalTil ?? 0) + '개' },
             { label: '연속 기록', value: (user?.streak ?? 0) + '일' },
-            { label: '수확한 식물', value: '5종' },
+            { label: '수확한 식물', value: harvestedCount !== null ? harvestedCount + '종' : '—' },
             { label: '보유 포인트', value: (user?.points ?? 0) + 'P' },
           ].map((s, i) => (
             <div key={i} style={{
@@ -993,10 +1121,9 @@ function ProfileScreen() {
         <SectionHeader eyebrow="계정 관리" title="설정" />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {[
-            { label: '이메일', value: user?.email ?? '', sub: '구글 계정 연동됨' },
-            { label: '비밀번호', value: '••••••••', action: '변경' },
-            { label: '연결된 SNS', value: '🟢 Google' },
-          ].map((row, i, arr) => (
+            { label: '이메일', value: user?.email ?? '' },
+            isLocal ? { label: '비밀번호', value: '••••••••', action: '변경' } : null,
+          ].filter(Boolean).map((row, i, arr) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 20,
               padding: '14px 0',
@@ -1011,9 +1138,23 @@ function ProfileScreen() {
         </div>
       </Card>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 4px' }}>
-        <button style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>로그아웃</button>
-        <button style={{ fontSize: 12.5, color: '#b8536a' }}>회원 탈퇴</button>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 4px' }}>
+        <button
+          onClick={handleWithdraw}
+          disabled={withdrawing}
+          style={{
+            fontSize: 12.5,
+            color: '#b8536a',
+            background: 'transparent',
+            border: '1px solid #b8536a',
+            borderRadius: 6,
+            padding: '4px 12px',
+            cursor: withdrawing ? 'not-allowed' : 'pointer',
+            opacity: withdrawing ? 0.6 : 1,
+          }}
+        >
+          {withdrawing ? '처리 중…' : '회원 탈퇴'}
+        </button>
       </div>
     </div>
   );

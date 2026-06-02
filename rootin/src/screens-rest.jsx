@@ -933,14 +933,10 @@ function ProfileScreen() {
         : presignedUrl;
 
       // fileUrl: LocalStack이면 localhost path-style URL로 변환, AWS면 그대로 사용
-      // fileUrl 형태: https://{bucket}.s3.{region}.amazonaws.com/{key}
-      // → http://localhost:4566/{bucket}/{key}
+      // fileUrl 형태: http://localstack:4566/{bucket}/{key} (endpoint 설정 시 BE가 이 형태로 반환)
+      // → localstack 호스트만 localhost로 치환
       const displayUrl = localstackEndpoint
-        ? (() => {
-            const url = new URL(fileUrl);
-            const bucket = url.hostname.split('.')[0];
-            return `http://localhost:4566/${bucket}${url.pathname}`;
-          })()
+        ? fileUrl.replace(localstackEndpoint, 'http://localhost:4566')
         : fileUrl;
 
       await fetch(uploadUrl, {

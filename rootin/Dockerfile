@@ -30,8 +30,5 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 
 EXPOSE 80
 
-HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
-  CMD curl -f http://localhost/index.html || exit 1
-
 CMD ["nginx", "-g", "daemon off;"]
 

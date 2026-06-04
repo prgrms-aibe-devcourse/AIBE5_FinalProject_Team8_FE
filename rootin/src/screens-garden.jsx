@@ -183,7 +183,8 @@ function toGardenPot(apiPot) {
     totalExp: apiPot.totalExp ?? 0,
     color: '#a8d5b5',
     createdAt: '',
-    waterToday: false,
+    lastWateredAt: apiPot.lastWateredAt ?? null,
+    waterToday: isTodayDateTime(apiPot.lastWateredAt),
     plantName: apiPot.plantName,
     growthStage,
     plantGrowthPercentage: 0,
@@ -210,7 +211,7 @@ function toDashboardPot(dashboard) {
     nextLevelExpRequired: dashboard.nextLevelExpRequired ?? 0,
     streakDays: dashboard.streakDays ?? 0,
     lastWateredAt: dashboard.lastWateredAt ?? null,
-    waterToday: false,
+    waterToday: isTodayDateTime(dashboard.lastWateredAt),
     plantName: dashboard.plant?.name,
     growthStage,
     plantGrowthPercentage: dashboard.plant?.growthPercentage ?? 0,
@@ -233,6 +234,17 @@ function formatDateTime(value) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
+
+function isTodayDateTime(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+
+  const today = new Date();
+  return date.getFullYear() === today.getFullYear()
+    && date.getMonth() === today.getMonth()
+    && date.getDate() === today.getDate();
 }
 
 function formatTilDateTime(value) {
@@ -291,8 +303,38 @@ function getLayoutSlot(index) {
   };
 }
 
+function findNearestVisiblePotId(position, layout, pots, hiddenPots) {
+  if (!position || position.x == null || position.y == null) return null;
+
+  return pots
+    .filter(pot => !hiddenPots[pot.id])
+    .map(pot => {
+      const potPosition = layout[pot.id];
+      if (!potPosition) return null;
+      return {
+        id: pot.id,
+        distance: Math.hypot(position.x - potPosition.x, position.y - potPosition.y),
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => left.distance - right.distance)[0]?.id ?? null;
+}
+
+const POTTED_PLANT_ALIGNMENT = {
+  seed: { y: -2, scale: 0.96 },
+  sprout: { y: -2, scale: 0.98 },
+  leaf: { y: -1, scale: 1 },
+  bloom: { y: 0, scale: 1 },
+  full: { y: 1, scale: 1 },
+};
+
+function getPottedPlantAlignment(stage) {
+  return POTTED_PLANT_ALIGNMENT[stage] ?? POTTED_PLANT_ALIGNMENT.seed;
+}
+
 function PottedPlant({ species, stage, size = 64, locked = false, glow = false, potLevel = 1 }) {
   const tier = getPotTier(potLevel);
+  const alignment = getPottedPlantAlignment(stage);
   const potWidth = size * 0.5;
   const potHeight = size * 0.26;
   const rimHeight = size * 0.09;
@@ -314,8 +356,9 @@ function PottedPlant({ species, stage, size = 64, locked = false, glow = false, 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transform: 'translateY(-8%)',
-        zIndex: 1,
+        transform: `translateY(${alignment.y}%) scale(${alignment.scale})`,
+        transformOrigin: '50% 85%',
+        zIndex: 3,
       }}>
         <PixelPlant species={species} stage={stage} size={size} locked={locked} glow={glow} />
       </div>
@@ -326,7 +369,7 @@ function PottedPlant({ species, stage, size = 64, locked = false, glow = false, 
         width: potWidth,
         height: potHeight,
         transform: 'translateX(-50%)',
-        zIndex: 2,
+        zIndex: 1,
         pointerEvents: 'none',
       }}>
         <div style={{
@@ -414,9 +457,9 @@ function PotCard({ pot, onClick }) {
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 600, color: 'var(--ink)', marginTop: 4 }}>{pot.emoji} {pot.name}</div>
         </div>
         {pot.waterToday ? (
-          <Pill tone="green"><span style={{ display: 'inline-flex', marginRight: 2 }}>{Icon.drop}</span>오늘 물줌</Pill>
+          <Pill tone="green"><span style={{ display: 'inline-flex', marginRight: 2 }}>{Icon.drop}</span>물주기 완료</Pill>
         ) : (
-          <Pill tone="warn">물줄 시간</Pill>
+          <Pill tone="warn">물주기 전</Pill>
         )}
       </div>
 
@@ -473,7 +516,7 @@ function PixelGround({ color = '#a8d5b5', shade = '#7cb893', length = 32 }) {
 // ============================
 // Garden Scene — themed background with pixel plants
 // ============================
-function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dense = false, decorations = [], onMoveDecoration, onRemoveDecoration, hiddenPots = {}, onHidePot }) {
+function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dense = false, potDecorations = {}, selectedPotId = null, onSelectPot, hiddenPots = {}, onHidePot }) {
   const sceneRef = useRef(null);
   const [dragging, setDragging] = useState(null);
   const dragOffsetRef = useRef({ dx: 0, dy: 0 });
@@ -489,8 +532,6 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
       const y = Math.max(20, Math.min(95, rawY - dragOffsetRef.current.dy));
       if (dragging.kind === 'pot') {
         onMovePot(dragging.id, x, y);
-      } else if (dragging.kind === 'dec' && onMoveDecoration) {
-        onMoveDecoration(dragging.id, x, y);
       }
     };
     const onUp = () => setDragging(null);
@@ -500,7 +541,7 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
     };
-  }, [dragging, onMovePot, onMoveDecoration]);
+  }, [dragging, onMovePot]);
 
   const startDrag = (kind, id, e, currentPos) => {
     e.preventDefault();
@@ -616,68 +657,16 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
         </>
       )}
 
-      {/* decorations (harvested plant items placed by user) */}
-      {decorations.map(d => {
-        const pos = { x: d.x, y: d.y };
-        const isDragging = dragging?.kind === 'dec' && dragging?.id === d.id;
-        return (
-          <div
-            key={d.id}
-            style={{
-              position: 'absolute',
-              left: `${pos.x}%`, top: `${pos.y}%`,
-              transform: 'translate3d(-50%, -100%, 0)',
-              cursor: editMode ? (isDragging ? 'grabbing' : 'grab') : 'default',
-              opacity: editMode ? 1 : 0.95,
-              touchAction: 'none',
-              transition: isDragging ? 'none' : 'left 160ms ease, top 160ms ease',
-              zIndex: isDragging ? 10 : 1,
-              willChange: isDragging ? 'left, top, transform' : 'auto',
-            }}
-          >
-            <div
-              onPointerDown={editMode ? (e) => startDrag('dec', d.id, e, pos) : undefined}
-            >
-              <PixelPlant species={d.species} stage="full" size={56} glow={d.species === 'moonlight'} />
-            </div>
-            {editMode && (
-              <button
-                type="button"
-                onPointerDown={stopControlPropagation}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onRemoveDecoration && onRemoveDecoration(d.id);
-                }}
-                style={{
-                  position: 'absolute',
-                  top: -12, right: -12,
-                  width: 28, height: 28, borderRadius: '50%',
-                  background: '#fff',
-                  border: '1px solid rgba(184, 83, 106, 0.32)',
-                  color: '#b8536a',
-                  fontSize: 16, fontWeight: 700,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 6px rgba(15,42,71,0.16)',
-                  lineHeight: 1,
-                  zIndex: 30,
-                  padding: 0,
-                  touchAction: 'manipulation',
-                }}
-                title="장식 제거"
-              >×</button>
-            )}
-          </div>
-        );
-      })}
-
       {/* pots — positioned by layout[id].x / .y */}
       {pots.filter(p => !hiddenPots[p.id]).map(pot => {
         const stage = pot.stage ?? tilCountToStage(pot.tilCount ?? 0);
+        const decoration = potDecorations[pot.id];
+        const displayedSpecies = decoration?.species ?? pot.species;
+        const displayedStage = decoration ? 'full' : stage;
         const pos = layout[pot.id] || { x: 50, y: 75 };
         const size = dense ? 76 : 92;
         const isDragging = dragging?.kind === 'pot' && dragging?.id === pot.id;
+        const isSelected = editMode && selectedPotId === pot.id;
         return (
           <div
             key={pot.id}
@@ -690,21 +679,40 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
               transition: isDragging ? 'none' : 'left 200ms ease, top 200ms ease',
               touchAction: 'none',
-              zIndex: isDragging ? 10 : 2,
+              zIndex: isDragging || isSelected ? 12 : 2,
               willChange: isDragging ? 'left, top, transform' : 'auto',
             }}
           >
             <div
-              onPointerDown={editMode ? (e) => startDrag('pot', pot.id, e, pos) : undefined}
+              onPointerDown={editMode ? (e) => {
+                onSelectPot && onSelectPot(pot.id);
+                startDrag('pot', pot.id, e, pos);
+              } : undefined}
               onClick={editMode ? undefined : () => onOpenPot && onOpenPot(pot.id)}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 4,
+                filter: isSelected ? 'drop-shadow(0 0 0.35rem rgba(15, 110, 86, 0.45))' : 'none',
+              }}
             >
-              <PottedPlant species={pot.species} stage={stage} size={size} glow={pot.species === 'moonlight'} potLevel={pot.level} />
+              <PottedPlant
+                species={displayedSpecies}
+                stage={displayedStage}
+                size={size}
+                glow={displayedSpecies === 'moonlight'}
+                potLevel={pot.level}
+              />
               <div style={{
-                fontSize: 10.5, color: isDark ? '#e8f4ec' : 'var(--ink)',
+                fontSize: 10.5,
+                color: isSelected ? 'var(--ink)' : isDark ? '#e8f4ec' : 'var(--ink)',
                 fontFamily: 'var(--font-display)', fontWeight: 600,
                 padding: '2px 7px', borderRadius: 4,
-                background: isDark ? 'rgba(15, 42, 71, 0.6)' : 'rgba(255, 255, 255, 0.75)',
+                background: isSelected
+                  ? 'rgba(235, 245, 239, 0.95)'
+                  : isDark ? 'rgba(15, 42, 71, 0.6)' : 'rgba(255, 255, 255, 0.75)',
+                border: isSelected ? '1px solid var(--leaf)' : 'none',
                 whiteSpace: 'nowrap',
                 imageRendering: 'pixelated',
               }}>
@@ -784,6 +792,7 @@ function GardenScreen({ onOpenPot }) {
   const [themeId, setThemeId] = useState('meadow');
   const [layout, setLayout] = useState(DEFAULT_GARDEN_LAYOUT);
   const [decorations, setDecorations] = useState([]);
+  const [selectedGardenPotId, setSelectedGardenPotId] = useState(null);
   const [hiddenPots, setHiddenPots] = useState({}); // { potId: true }
   const [pots, setPots] = useState([]);
   const [potsLoading, setPotsLoading] = useState(true);
@@ -797,43 +806,70 @@ function GardenScreen({ onOpenPot }) {
 
   const theme = GARDEN_THEMES.find(t => t.id === themeId);
   const movePot = (id, x, y) => setLayout(L => ({ ...L, [id]: { x, y } }));
-  const moveDecoration = (id, x, y) => setDecorations(D => D.map(d => d.id === id ? { ...d, x, y } : d));
 
-  // 인벤토리에서 수확 완료 식물을 선택하여 정원에 배치할 때 호출되는 함수입니다.
-  const addDecoration = (harvestedPlant) => {
+  // 수확 완료 식물은 독립 오브젝트가 아니라, 선택한 화분 위의 꾸미기용 식물로 적용합니다.
+  const applyHarvestedPlantToPot = (harvestedPlant) => {
+    const visiblePotList = pots.filter(p => !hiddenPots[p.id]);
+    const targetPotId = selectedGardenPotId ?? visiblePotList[0]?.id;
+    if (!targetPotId) return;
+    if (harvestedPlant.potId !== targetPotId) return;
+
     const species = inferSpecies(harvestedPlant.name);
+    setSelectedGardenPotId(targetPotId);
     setDecorations(D => [
-      ...D,
+      ...D.filter(d => d.id !== harvestedPlant.id && d.potId !== targetPotId),
       {
         id: harvestedPlant.id, // 백엔드의 수확식물 고유 ID를 그대로 활용합니다.
+        potId: targetPotId,
         species,
         name: harvestedPlant.name,
-        x: 50,
-        y: 55
       }
     ]);
   };
-  const removeDecoration = (id) => setDecorations(D => D.filter(d => d.id !== id));
+  const removeSelectedPotDecoration = () => {
+    if (!selectedGardenPotId) return;
+    setDecorations(D => D.filter(d => d.potId !== selectedGardenPotId));
+  };
   const clearDecorations = () => setDecorations([]);
-  const hidePot = (id) => setHiddenPots(H => ({ ...H, [id]: true }));
+  const hidePot = (id) => {
+    setHiddenPots(H => ({ ...H, [id]: true }));
+    setDecorations(D => D.filter(d => d.potId !== id));
+    setSelectedGardenPotId(current => current === id ? null : current);
+  };
   const showPot = (id) => {
     const index = pots.findIndex(p => p.id === id);
     setLayout(L => ({ ...L, [id]: L[id] ?? getLayoutSlot(Math.max(0, index)) }));
     setHiddenPots(H => { const N = { ...H }; delete N[id]; return N; });
+    setSelectedGardenPotId(id);
   };
   const resetGarden = () => {
     setLayout({});
     setHiddenPots(Object.fromEntries(pots.map(p => [p.id, true])));
     setDecorations([]);
+    setSelectedGardenPotId(null);
   };
 
-  // 정원에 아직 배치되지 않은 수확 식물들만 필터링하여 인벤토리에 나타냅니다.
+  // 정원에 아직 적용되지 않은 수확 식물들만 필터링하여 인벤토리에 나타냅니다.
   const unplacedHarvestedPlants = allHarvestedPlants.filter(
     hp => !decorations.some(d => d.id === hp.id)
   );
 
   const visiblePots = pots.filter(p => !hiddenPots[p.id]);
+  const selectedGardenPot = visiblePots.find(p => p.id === selectedGardenPotId) ?? visiblePots[0] ?? null;
+  const selectedPotDecoration = selectedGardenPot
+    ? decorations.find(d => d.potId === selectedGardenPot.id)
+    : null;
+  const selectedPotAvailableHarvestedPlants = selectedGardenPot
+    ? unplacedHarvestedPlants.filter(hp => hp.potId === selectedGardenPot.id)
+    : [];
+  const potDecorations = decorations.reduce((acc, decoration) => {
+    if (decoration.potId) {
+      acc[decoration.potId] = decoration;
+    }
+    return acc;
+  }, {});
   const wateredCount = pots.filter(p => p.waterToday).length;
+  const allPotsWatered = pots.length > 0 && wateredCount === pots.length;
   const attentionPot = pots.find(p => !p.waterToday) ?? pots[0] ?? null;
 
   // 신규 화분이 만들어졌을 때 화면에 즉시 배치하기 위한 콜백입니다.
@@ -924,13 +960,30 @@ function GardenScreen({ onOpenPot }) {
       // 5. 수확 식물 중 정원에 배치 표시된 항목들만 추려서 장식물 상태로 변환합니다.
       const activeDecs = harvestList
         .filter(hp => hp.isDisplayed && hp.positionX !== null && hp.positionY !== null)
-        .map(hp => ({
-          id: hp.id,
-          species: inferSpecies(hp.name),
-          name: hp.name,
-          x: hp.positionX,
-          y: hp.positionY,
-        }));
+        .map(hp => {
+          const sourcePotExists = potList.some(pot => pot.id === hp.potId && !newHiddenPots[pot.id]);
+          const potId = hp.potId != null
+            ? (sourcePotExists ? hp.potId : null)
+            : findNearestVisiblePotId(
+                { x: hp.positionX, y: hp.positionY },
+                newLayout,
+                potList,
+                newHiddenPots
+              );
+          return potId ? {
+            id: hp.id,
+            potId,
+            species: inferSpecies(hp.name),
+            name: hp.name,
+          } : null;
+        })
+        .filter(Boolean)
+        .reduce((uniqueByPot, decoration) => {
+          if (!uniqueByPot.some(item => item.potId === decoration.potId)) {
+            uniqueByPot.push(decoration);
+          }
+          return uniqueByPot;
+        }, []);
       setDecorations(activeDecs);
 
     } catch (err) {
@@ -978,12 +1031,13 @@ function GardenScreen({ onOpenPot }) {
       // 3. 수확 식물 배치 목록 가공
       const harvestedPlantsPayload = allHarvestedPlants.map(hp => {
         const dec = decorations.find(d => d.id === hp.id);
-        const isDisplayed = !!dec;
+        const pos = dec?.potId ? layout[dec.potId] : null;
+        const isDisplayed = Boolean(dec && pos && !hiddenPots[dec.potId]);
         return {
           id: hp.id,
           isDisplayed,
-          positionX: isDisplayed ? Math.max(0, Math.round(dec.x)) : null,
-          positionY: isDisplayed ? Math.max(0, Math.round(dec.y)) : null,
+          positionX: isDisplayed && pos ? Math.max(0, Math.round(pos.x)) : null,
+          positionY: isDisplayed && pos ? Math.max(0, Math.round(pos.y)) : null,
         };
       });
 
@@ -1004,7 +1058,7 @@ function GardenScreen({ onOpenPot }) {
   };
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
+    <div className="pot-detail-page" style={{ padding: 32, width: '100%', maxWidth: 1220, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
 
       {/* Hero with scene */}
       <Card padding={0} style={{
@@ -1032,7 +1086,16 @@ function GardenScreen({ onOpenPot }) {
                 {layoutSaving ? '저장 중...' : '꾸미기 완료'}
               </Btn>
             ) : (
-              <Btn variant="primary" size="md" onClick={() => setEditMode(true)}>🎨 정원 꾸미기</Btn>
+              <Btn
+                variant="primary"
+                size="md"
+                onClick={() => {
+                  setEditMode(true);
+                  setSelectedGardenPotId(visiblePots[0]?.id ?? null);
+                }}
+              >
+                🎨 정원 꾸미기
+              </Btn>
             )}
           </div>
         </div>
@@ -1046,9 +1109,9 @@ function GardenScreen({ onOpenPot }) {
             editMode={editMode}
             onMovePot={movePot}
             onOpenPot={onOpenPot}
-            decorations={decorations}
-            onMoveDecoration={moveDecoration}
-            onRemoveDecoration={removeDecoration}
+            potDecorations={potDecorations}
+            selectedPotId={selectedGardenPot?.id ?? null}
+            onSelectPot={setSelectedGardenPotId}
             hiddenPots={hiddenPots}
             onHidePot={hidePot}
           />
@@ -1100,42 +1163,75 @@ function GardenScreen({ onOpenPot }) {
               {/* Inventory: harvested plants */}
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div className="eyebrow">수확한 식물 · 인벤토리 ({unplacedHarvestedPlants.length})</div>
+                  <div className="eyebrow">수확한 식물 · 화분 위 꾸미기 ({selectedPotAvailableHarvestedPlants.length})</div>
                   {decorations.length > 0 && (
                     <button onClick={clearDecorations} style={{
                       fontSize: 11, color: 'var(--ink-3)',
                       fontFamily: 'var(--font-display)',
-                    }}>장식 모두 제거 ({decorations.length})</button>
+                    }}>꾸미기 모두 해제 ({decorations.length})</button>
                   )}
                 </div>
-                {unplacedHarvestedPlants.length === 0 ? (
+                <div style={{
+                  fontSize: 12,
+                  color: selectedGardenPot ? 'var(--ink-2)' : '#8a5a12',
+                  lineHeight: 1.6,
+                  padding: '10px 12px',
+                  background: selectedGardenPot ? '#fff' : '#fff7ed',
+                  border: `0.5px solid ${selectedGardenPot ? 'var(--rule-2)' : '#f5d3a2'}`,
+                  borderRadius: 8,
+                  marginBottom: 10,
+                }}>
+                  {selectedGardenPot
+                    ? <>선택된 화분: <b style={{ color: 'var(--moss-2)' }}>{selectedGardenPot.name}</b>{selectedPotDecoration ? ` · 적용 중: ${selectedPotDecoration.name}` : ' · 기본 식물 표시 중'}</>
+                    : '먼저 정원에 배치된 화분을 선택해 주세요.'}
+                  {selectedPotDecoration && (
+                    <button
+                      type="button"
+                      onClick={removeSelectedPotDecoration}
+                      style={{
+                        marginLeft: 8,
+                        fontSize: 11,
+                        color: '#b8536a',
+                        fontWeight: 700,
+                        fontFamily: 'var(--font-display)',
+                      }}
+                    >
+                      적용 해제
+                    </button>
+                  )}
+                </div>
+                {selectedPotAvailableHarvestedPlants.length === 0 ? (
                   <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '12px 14px', background: '#fff', border: '0.5px dashed var(--rule-2)', borderRadius: 8 }}>
-                    아직 수확한 식물이 없거나 정원에 모두 배치했어요. 만개 단계 식물을 수확하면 여기에 추가됩니다.
+                    {selectedGardenPot
+                      ? '이 화분에서 수확한 식물이 없거나 이미 적용했어요. 해당 화분의 식물을 만개까지 키워 수확하면 여기에 추가됩니다.'
+                      : '먼저 화분을 선택해 주세요.'}
                   </div>
                 ) : (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {unplacedHarvestedPlants.map(h => {
+                    {selectedPotAvailableHarvestedPlants.map(h => {
                       const species = inferSpecies(h.name);
                       const monName = PIXEL_SPECIES[species]?.stages?.full?.name ?? h.name;
                       const isRare = species === 'moonlight';
                       return (
                         <button
                           key={h.id}
-                          onClick={() => addDecoration(h)}
+                          onClick={() => applyHarvestedPlantToPot(h)}
+                          disabled={!selectedGardenPot}
                           style={{
                             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                             padding: '10px 10px 8px',
                             borderRadius: 10,
                             background: '#fff',
                             border: '0.5px solid ' + (isRare ? '#ccc9f0' : 'var(--rule-2)'),
-                            cursor: 'pointer',
+                            cursor: selectedGardenPot ? 'pointer' : 'not-allowed',
                             position: 'relative',
                             transition: 'transform 100ms ease',
                             minWidth: 92,
+                            opacity: selectedGardenPot ? 1 : 0.55,
                           }}
                           onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
                           onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                          title={`${monName} 추가하기`}
+                          title={selectedGardenPot ? `${selectedGardenPot.name} 화분 위에 ${monName} 적용` : '화분을 먼저 선택해 주세요'}
                         >
                           {isRare && (
                             <span style={{
@@ -1145,6 +1241,7 @@ function GardenScreen({ onOpenPot }) {
                           )}
                           <PixelPlant species={species} stage="full" size={44} />
                           <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{monName}</div>
+                          <div style={{ fontSize: 9, color: 'var(--moss-2)', fontFamily: 'var(--font-display)', fontWeight: 700 }}>+ 적용</div>
                           {h.harvestedAt && (
                             <div style={{ fontSize: 9, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{h.harvestedAt.slice(5)}</div>
                           )}
@@ -1247,18 +1344,32 @@ function GardenScreen({ onOpenPot }) {
         </Card>
       </div>
 
-      {!potsLoading && !potsError && attentionPot && (
+      {!potsLoading && !potsError && pots.length > 0 && (
         <div style={{
           marginTop: 28, padding: '16px 22px',
           background: '#fff', border: '0.5px solid var(--rule)',
           borderRadius: 12,
           display: 'flex', alignItems: 'center', gap: 18,
         }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--paper-2)', color: 'var(--moss-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🌱</div>
-          <div style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
-            <b style={{ color: 'var(--ink)' }}>{attentionPot.name} 화분</b>에 오늘의 TIL을 남기면 경험치가 쌓이고 식물이 자라요.
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--paper-2)', color: 'var(--moss-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {allPotsWatered ? '✨' : '🌱'}
           </div>
-          <Btn variant="secondary" size="sm" onClick={() => onOpenPot(attentionPot.id)}>화분으로 이동</Btn>
+          <div style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
+            {allPotsWatered ? (
+              <>
+                오늘 모든 화분에 물주기를 마쳤어요. <b style={{ color: 'var(--ink)' }}>꾸준한 기록이 정원을 더 깊게 자라게 하고 있어요.</b>
+              </>
+            ) : (
+              <>
+                <b style={{ color: 'var(--ink)' }}>{attentionPot.name} 화분</b>에 오늘의 TIL을 남기면 경험치가 쌓이고 식물이 자라요.
+              </>
+            )}
+          </div>
+          {allPotsWatered ? (
+            <Pill tone="green">오늘 루틴 완료</Pill>
+          ) : (
+            <Btn variant="secondary" size="sm" onClick={() => onOpenPot(attentionPot.id)}>화분으로 이동</Btn>
+          )}
         </div>
       )}
       {showCreatePot && (
@@ -1649,7 +1760,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
         <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
       </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(320px, 380px) 1fr', gap: 24 }}>
+      <div className="pot-detail-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(350px, 400px) minmax(0, 760px)', gap: 24, alignItems: 'start' }}>
 
         {/* Left — plant card */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1664,9 +1775,8 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
             }}>
               <div style={{
                 position: 'absolute', top: 14, left: 14, right: 14,
-                display: 'flex', justifyContent: 'space-between',
+                display: 'flex', justifyContent: 'flex-end',
               }}>
-                <Pill tone={isRare ? 'navy' : 'green'}>{isRare && '✦ '}#{String(pot.id).padStart(3, '0')}</Pill>
                 <Pill>{pot.tilCount} TIL</Pill>
               </div>
               <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
@@ -1679,44 +1789,48 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
               )}
             </div>
             <div style={{ padding: '20px 24px 22px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
                   {pot.emoji} {pot.name}
                 </div>
-                <span style={{
-                  padding: '2px 7px',
-                  borderRadius: 999,
-                  background: 'var(--paper-2)',
-                  border: '0.5px solid var(--rule)',
-                  color: 'var(--moss-2)',
-                  fontSize: 11,
-                  fontWeight: 700,
-                  fontFamily: 'var(--font-mono)',
-                  lineHeight: 1.5,
-                  whiteSpace: 'nowrap',
-                }}>
-                  Lv. {pot.level}
-                </span>
-                <Pill tone="green">{potTier.label}</Pill>
-                <Pill tone={isRare ? 'navy' : 'default'}>{isRare ? '✦ 희귀종' : '일반종'}</Pill>
-                {dashboard && (
-                  <button
-                    type="button"
-                    onClick={() => setShowEditPot(true)}
-                    style={{
-                      marginLeft: 'auto',
-                      padding: '4px 8px',
-                      borderRadius: 8,
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
+                    <span style={{
+                      padding: '2px 7px',
+                      borderRadius: 999,
+                      background: 'var(--paper-2)',
                       border: '0.5px solid var(--rule)',
-                      color: 'var(--ink-3)',
+                      color: 'var(--moss-2)',
                       fontSize: 11,
-                      fontFamily: 'var(--font-display)',
-                      background: '#fff',
-                    }}
-                  >
-                    정보 수정
-                  </button>
-                )}
+                      fontWeight: 700,
+                      fontFamily: 'var(--font-mono)',
+                      lineHeight: 1.5,
+                      whiteSpace: 'nowrap',
+                    }}>
+                      Lv. {pot.level}
+                    </span>
+                    <Pill tone="green">{potTier.label}</Pill>
+                    <Pill tone={isRare ? 'navy' : 'default'}>{isRare ? '✦ 희귀종' : '일반종'}</Pill>
+                  </div>
+                  {dashboard && (
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPot(true)}
+                      style={{
+                        flexShrink: 0,
+                        padding: '4px 8px',
+                        borderRadius: 8,
+                        border: '0.5px solid var(--rule)',
+                        color: 'var(--ink-3)',
+                        fontSize: 11,
+                        fontFamily: 'var(--font-display)',
+                        background: '#fff',
+                      }}
+                    >
+                      정보 수정
+                    </button>
+                  )}
+                </div>
               </div>
               <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 10, lineHeight: 1.6 }}>{pot.intro}</div>
               <div style={{
@@ -1821,7 +1935,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
         </div>
 
         {/* Right — TIL list */}
-        <div>
+        <div className="pot-detail-records" style={{ minWidth: 0 }}>
           <SectionHeader eyebrow="이 화분의 기록" title={`TIL ${displayedTilCount}개`} action={
             <div style={{ position: 'relative', width: 300, maxWidth: '42vw' }}>
               <span style={{

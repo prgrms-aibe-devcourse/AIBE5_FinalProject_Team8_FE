@@ -238,6 +238,48 @@
 }
 
 /* ---------------------------------------------------------------- */
+/* Garden pot detail responsive layout                               */
+/* ---------------------------------------------------------------- */
+.pot-detail-layout {
+  justify-content: center;
+}
+
+.pot-detail-records {
+  width: 100%;
+  max-width: 760px;
+}
+
+@media (max-width: 1180px) {
+  .pot-detail-page {
+    max-width: 920px !important;
+  }
+
+  .pot-detail-layout {
+    grid-template-columns: minmax(340px, 380px) minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 920px) {
+  .pot-detail-page {
+    padding: 24px !important;
+  }
+
+  .pot-detail-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .pot-detail-records {
+    max-width: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .pot-detail-page {
+    padding: 18px !important;
+  }
+}
+
+/* ---------------------------------------------------------------- */
 /* Tiptap / ProseMirror editor content                              */
 /* ---------------------------------------------------------------- */
 .til-prose .ProseMirror {

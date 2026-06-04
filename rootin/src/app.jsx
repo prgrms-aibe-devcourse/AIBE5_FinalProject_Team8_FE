@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { POTS, DEX } from './data.jsx';
 import { Icon } from './ui.jsx';
 import { Plant, RootinLogo } from './plants.jsx';
@@ -6,6 +6,7 @@ import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
 import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens-rest.jsx';
+import { LandingScreen } from './screens-landing.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb';
@@ -31,6 +32,7 @@ function AppShell() {
   const { setUserFromApi, clearUser } = useUser();
   const [screen, setScreen] = useState('dashboard');
   const [authed, setAuthed] = useState(!!localStorage.getItem('accessToken'));
+  const [showLanding, setShowLanding] = useState(!localStorage.getItem('accessToken'));
   const [potFocus, setPotFocus] = useState(null);
   const [editorInitialPotId, setEditorInitialPotId] = useState(null);
   const [editorInitialTil, setEditorInitialTil] = useState(null);
@@ -68,6 +70,8 @@ function AppShell() {
     }
   };
 
+  const unlockedDEXCount = useMemo(() => DEX.filter(d => d.state !== 'locked').length, [DEX]);
+
   const titles = {
     dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
     editor:     { title: '오늘의 TIL 작성', subtitle: 'New entry' },
@@ -78,10 +82,14 @@ function AppShell() {
         : '화분',
       subtitle: 'Garden / Detail',
     },
-    collection: { title: '식물 도감', subtitle: 'Collection · ' + DEX.filter(d => d.state !== 'locked').length + ' / ' + DEX.length + ' 종 해금' },
+    collection: { title: '식물 도감', subtitle: `Collection · ${unlockedDEXCount} / ${DEX.length} 종 해금` },
     ai:         { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
     profile:    { title: '내 계정', subtitle: 'Account' },
   };
+
+  if (!authed && showLanding) return (
+    <LandingScreen onStart={() => setShowLanding(false)} />
+  );
 
   if (!authed) return (
     <AuthScreen onAuth={(userData) => {

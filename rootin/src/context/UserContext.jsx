@@ -44,10 +44,16 @@ export function UserProvider({ children, initialUser = null, onAuthExpired }) {
     }
     import('../api/user.js').then(({ getMe }) =>
       getMe()
-        .then(data => {
+        .then(async data => {
           if (data?.userId != null) {
             localStorage.setItem('userId', data.userId);
           }
+          try {
+            const { getSummary } = await import('../api/dashboard.js');
+            const summary = await getSummary();
+            data.streak     = summary.currentStreak;
+            data.bestStreak = summary.longestStreak;
+          } catch (_) {}
           setUser(normalizeUser(data));
           setLoading(false);
         })

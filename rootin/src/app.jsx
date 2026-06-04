@@ -32,6 +32,28 @@ function AppShell() {
   const [screen, setScreen] = useState('dashboard');
   const [authed, setAuthed] = useState(!!localStorage.getItem('accessToken'));
   const [potFocus, setPotFocus] = useState(null);
+  const [editorInitialPotId, setEditorInitialPotId] = useState(null);
+  const [editorInitialTil, setEditorInitialTil] = useState(null);
+
+  const handleNav = (nextScreen) => {
+    if (nextScreen === 'editor') {
+      setEditorInitialPotId(null);
+      setEditorInitialTil(null);
+    }
+    setScreen(nextScreen);
+  };
+
+  const openEditorForPot = (potId) => {
+    setEditorInitialPotId(potId);
+    setEditorInitialTil(null);
+    setScreen('editor');
+  };
+
+  const openEditorForTil = (til) => {
+    setEditorInitialPotId(til?.potId ?? null);
+    setEditorInitialTil(til);
+    setScreen('editor');
+  };
 
   const titles = {
     dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
@@ -65,7 +87,7 @@ function AppShell() {
     >
       <RootinSidebarLeft
         current={screen.startsWith('pot') ? 'garden' : screen}
-        onNav={s => setScreen(s)}
+        onNav={handleNav}
         onLogout={() => {
           import('./api/auth.js').then(({ logout }) => logout().catch(() => {}));
           clearUser();
@@ -80,7 +102,7 @@ function AppShell() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); setScreen('dashboard'); }}>
+                  <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); handleNav('dashboard'); }}>
                     Rootin
                   </BreadcrumbLink>
                 </BreadcrumbItem>
@@ -93,10 +115,10 @@ function AppShell() {
           </header>
         )}
         <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-          {screen === 'dashboard'  && <DashboardScreen onNav={setScreen} />}
-          {screen === 'editor'     && <EditorScreen onNav={setScreen} />}
+          {screen === 'dashboard'  && <DashboardScreen onNav={handleNav} />}
+          {screen === 'editor'     && <EditorScreen onNav={handleNav} initialSelectedPotId={editorInitialPotId} initialTil={editorInitialTil} />}
           {screen === 'garden'     && <GardenScreen onOpenPot={(id) => { setPotFocus(id); setScreen('pot-detail'); }} />}
-          {screen === 'pot-detail' && <PotDetailScreen potId={potFocus} onBack={() => setScreen('garden')} />}
+          {screen === 'pot-detail' && <PotDetailScreen potId={potFocus} onBack={() => setScreen('garden')} onStartTil={openEditorForPot} onEditTil={openEditorForTil} />}
           {screen === 'collection' && <CollectionScreen />}
           {screen === 'ai'         && <AIScreen />}
           {screen === 'profile'    && <ProfileScreen />}

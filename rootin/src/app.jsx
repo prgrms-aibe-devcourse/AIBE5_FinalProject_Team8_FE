@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { POTS, DEX } from './data.jsx';
 import { Icon } from './ui.jsx';
 import { Plant, RootinLogo } from './plants.jsx';
@@ -6,6 +6,7 @@ import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
 import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens-rest.jsx';
+import { LandingScreen } from './screens-landing.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb';
@@ -31,7 +32,45 @@ function AppShell() {
   const { setUserFromApi, clearUser } = useUser();
   const [screen, setScreen] = useState('dashboard');
   const [authed, setAuthed] = useState(!!localStorage.getItem('accessToken'));
+  const [showLanding, setShowLanding] = useState(!localStorage.getItem('accessToken'));
   const [potFocus, setPotFocus] = useState(null);
+  const [editorInitialPotId, setEditorInitialPotId] = useState(null);
+  const [editorInitialTil, setEditorInitialTil] = useState(null);
+  const [editorReturnScreen, setEditorReturnScreen] = useState(null);
+  const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
+
+  const handleNav = (nextScreen) => {
+    if (nextScreen === 'editor') {
+      setEditorInitialPotId(null);
+      setEditorInitialTil(null);
+      setEditorReturnScreen(null);
+    }
+    setScreen(nextScreen);
+  };
+
+  const openEditorForPot = (potId) => {
+    setPotFocus(potId);
+    setEditorInitialPotId(potId);
+    setEditorInitialTil(null);
+    setEditorReturnScreen('pot-detail');
+    setScreen('editor');
+  };
+
+  const openEditorForTil = (til) => {
+    setEditorInitialPotId(til?.potId ?? null);
+    setEditorInitialTil(til);
+    setEditorReturnScreen('pot-detail');
+    setScreen('editor');
+  };
+
+  const handleTilPublished = (publishedPotId) => {
+    if (editorReturnScreen === 'pot-detail') {
+      setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
+      setPotDetailRefreshKey(key => key + 1);
+    }
+  };
+
+  const unlockedDEXCount = useMemo(() => DEX.filter(d => d.state !== 'locked').length, [DEX]);
 
   const titles = {
     dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
@@ -43,10 +82,14 @@ function AppShell() {
         : '화분',
       subtitle: 'Garden / Detail',
     },
-    collection: { title: '식물 도감', subtitle: 'Collection · ' + DEX.filter(d => d.state !== 'locked').length + ' / ' + DEX.length + ' 종 해금' },
+    collection: { title: '식물 도감', subtitle: `Collection · ${unlockedDEXCount} / ${DEX.length} 종 해금` },
     ai:         { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
     profile:    { title: '내 계정', subtitle: 'Account' },
   };
+
+  if (!authed && showLanding) return (
+    <LandingScreen onStart={() => setShowLanding(false)} />
+  );
 
   if (!authed) return (
     <AuthScreen onAuth={(userData) => {
@@ -65,7 +108,7 @@ function AppShell() {
     >
       <RootinSidebarLeft
         current={screen.startsWith('pot') ? 'garden' : screen}
-        onNav={s => setScreen(s)}
+        onNav={handleNav}
         onLogout={() => {
           import('./api/auth.js').then(({ logout }) => logout().catch(() => {}));
           clearUser();
@@ -80,7 +123,7 @@ function AppShell() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); setScreen('dashboard'); }}>
+                  <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); handleNav('dashboard'); }}>
                     Rootin
                   </BreadcrumbLink>
                 </BreadcrumbItem>
@@ -93,10 +136,26 @@ function AppShell() {
           </header>
         )}
         <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-          {screen === 'dashboard'  && <DashboardScreen onNav={setScreen} />}
-          {screen === 'editor'     && <EditorScreen onNav={setScreen} />}
+          {screen === 'dashboard'  && <DashboardScreen onNav={handleNav} />}
+          {screen === 'editor'     && (
+            <EditorScreen
+              onNav={handleNav}
+              initialSelectedPotId={editorInitialPotId}
+              initialTil={editorInitialTil}
+              afterPublishScreen={editorReturnScreen ?? 'dashboard'}
+              onPublished={handleTilPublished}
+            />
+          )}
           {screen === 'garden'     && <GardenScreen onOpenPot={(id) => { setPotFocus(id); setScreen('pot-detail'); }} />}
-          {screen === 'pot-detail' && <PotDetailScreen potId={potFocus} onBack={() => setScreen('garden')} />}
+          {screen === 'pot-detail' && (
+            <PotDetailScreen
+              potId={potFocus}
+              refreshKey={potDetailRefreshKey}
+              onBack={() => setScreen('garden')}
+              onStartTil={openEditorForPot}
+              onEditTil={openEditorForTil}
+            />
+          )}
           {screen === 'collection' && <CollectionScreen />}
           {screen === 'ai'         && <AIScreen />}
           {screen === 'profile'    && <ProfileScreen />}

@@ -14,6 +14,9 @@ export function TilStatusIsland({
   publishing,
   canPublish,
   stats,
+  saveLabel = '임시저장',
+  publishLabel = '발행',
+  publishingLabel = '발행 중…',
 }: {
   saved: boolean
   onSave: () => void
@@ -21,6 +24,9 @@ export function TilStatusIsland({
   publishing: boolean
   canPublish: boolean
   stats: Stats
+  saveLabel?: string
+  publishLabel?: string
+  publishingLabel?: string
 }) {
   const [hidden, setHidden] = useState(false)
   const idleTimer = useRef<ReturnType<typeof setTimeout>>()
@@ -81,7 +87,7 @@ export function TilStatusIsland({
           onClick={onSave}
           className="h-7 rounded-full text-xs text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
         >
-          임시저장
+          {saveLabel}
         </Button>
         <Button
           size="sm"
@@ -90,7 +96,7 @@ export function TilStatusIsland({
           disabled={!canPublish || publishing}
         >
           <Send className="size-3.5" />
-          {publishing ? '발행 중…' : '발행'}
+          {publishing ? publishingLabel : publishLabel}
         </Button>
       </div>
     </div>

@@ -277,12 +277,20 @@ function CollectionScreen() {
 
 // === AI Screen ===
 
+// plantName → PixelPlant species 매핑
+const PLANT_NAME_TO_SPECIES = {
+  '기본 씨앗': 'seed',
+  '달빛씨앗': 'moonlight',
+  '버섯씨앗': 'mushroom',
+};
+// growthStage → PixelPlant stage 매핑
+const GROWTH_STAGE_TO_STAGE = {
+  SEED: 'seed', SPROUT: 'sprout', MATURE: 'leaf', BLOOM: 'bloom', FULL_BLOOM: 'full',
+};
+
 function PotCard({ pot, selected, onClick }) {
-  // BE 응답에 emoji 필드가 없으므로 growthStage 기반 폴백 사용
-  const GROWTH_EMOJI = {
-    SEED: '🌱', SPROUT: '🌿', MATURE: '🍃', BLOOM: '🌸', FULL_BLOOM: '🌺',
-  };
-  const emoji = pot.emoji ?? GROWTH_EMOJI[pot.growthStage] ?? '🌱';
+  const species = PLANT_NAME_TO_SPECIES[pot.plantName] ?? 'seed';
+  const stage = GROWTH_STAGE_TO_STAGE[pot.growthStage] ?? 'seed';
 
   // levelProgress: BE는 totalExp만 제공하므로 없을 경우 0 폴백
   const levelProgress = pot.levelProgress ?? 0;
@@ -302,15 +310,14 @@ function PotCard({ pot, selected, onClick }) {
         transition: 'border-color 0.12s, background 0.12s',
       }}
     >
-      {/* 이모지 + 배경 */}
+      {/* 식물 이미지 */}
       <div style={{
         width: 44, height: 44, borderRadius: 10, flexShrink: 0,
         background: selected ? 'var(--paper)' : '#f7f9f7',
         border: '0.5px solid var(--rule)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 22,
       }}>
-        {emoji}
+        <PixelPlant species={species} stage={stage} size={36} />
       </div>
 
       {/* 텍스트 */}

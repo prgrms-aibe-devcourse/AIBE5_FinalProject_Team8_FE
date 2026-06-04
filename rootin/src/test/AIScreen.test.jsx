@@ -12,7 +12,7 @@ vi.mock('../plants.jsx', () => ({
 }));
 
 vi.mock('../pixel-plants.jsx', () => ({
-  PixelPlant: () => null,
+  PixelPlant: ({ species, stage }) => <div data-testid={`pixel-plant-${species}-${stage}`} />,
   PIXEL_SPECIES: {},
 }));
 
@@ -51,7 +51,7 @@ import { useUser } from '../context/UserContext.jsx';
 const MOCK_POTS = [
   { id: 1, title: '코딩', level: 7, totalExp: 1250, growthStage: 'BLOOM',   isDisplayed: true,  plantName: '기본 씨앗', description: '' },
   { id: 2, title: '영어', level: 3, totalExp: 450,  growthStage: 'SPROUT',  isDisplayed: false, plantName: '달빛씨앗',  description: '' },
-  { id: 3, title: '독서', level: 2, totalExp: 300,  growthStage: 'SPROUT',  isDisplayed: false, plantName: '버섯몬',    description: '' },
+  { id: 3, title: '독서', level: 2, totalExp: 300,  growthStage: 'SPROUT',  isDisplayed: false, plantName: '버섯씨앗',  description: '' },
 ];
 
 const MOCK_ME = {
@@ -195,6 +195,28 @@ describe('API 연동 — 화분 목록 및 포인트', () => {
     render(<AIScreen />);
     await waitFor(() => {
       expect(screen.getByText('코딩')).toBeInTheDocument();
+    });
+  });
+
+  it('PotCard에 plantName, growthStage 기반 PixelPlant가 렌더링된다', async () => {
+    render(<AIScreen />);
+    await waitFor(() => {
+      // 기본 씨앗 + BLOOM → species=seed, stage=bloom
+      expect(screen.getByTestId('pixel-plant-seed-bloom')).toBeInTheDocument();
+      // 달빛씨앗 + SPROUT → species=moonlight, stage=sprout
+      expect(screen.getByTestId('pixel-plant-moonlight-sprout')).toBeInTheDocument();
+      // 버섯씨앗 + SPROUT → species=mushroom, stage=sprout
+      expect(screen.getByTestId('pixel-plant-mushroom-sprout')).toBeInTheDocument();
+    });
+  });
+
+  it('plantName이 없는 화분은 기본 species(seed)로 폴백 렌더링된다', async () => {
+    getPots.mockResolvedValue([
+      { id: 1, title: '테스트', level: 1, totalExp: 0, growthStage: 'SEED', isDisplayed: false, plantName: null, description: '' },
+    ]);
+    render(<AIScreen />);
+    await waitFor(() => {
+      expect(screen.getByTestId('pixel-plant-seed-seed')).toBeInTheDocument();
     });
   });
 
@@ -366,7 +388,8 @@ describe('생성 전/후 화면', () => {
 describe('API 호출', () => {
   it('퀴즈 생성 시 generateQuiz에 potId(숫자)와 count가 전달된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
 
     await waitFor(() => expect(generateQuiz).toHaveBeenCalledWith(MOCK_POTS[0].id, 5));
@@ -465,7 +488,8 @@ describe('결과 저장 및 보관함', () => {
     render(<AIScreen />);
     await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '결과 저장' })).toBeInTheDocument());
+    // generated=true가 되면 '다시 생성' 버튼이 함께 나타남 → 이걸 먼저 기다려 상태 안정 확인
+    await waitFor(() => expect(screen.getByRole('button', { name: '다시 생성' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: '결과 저장' }));
 

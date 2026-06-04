@@ -16,6 +16,7 @@ import { request } from './client.js';
  *   isDisplayed: boolean,
  *   plantName: string,
  *   growthStage: 'SEED' | 'SPROUT' | 'MATURE' | 'BLOOM' | 'FULL_BLOOM',
+ *   lastWateredAt: string | null,
  * }>>}
  */
 export function getPots() {

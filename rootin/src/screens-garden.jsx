@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, DEX, TILS } from './data.jsx';
+import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, DEX } from './data.jsx';
 import { harvestPot } from './api/garden.js';
+import { getTilsByPot } from './api/til.js';
 import { createPot, getGardenDashboard, getPots } from './api/pot.js';
 import { useUser } from './context/UserContext.jsx';
 import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
@@ -1152,6 +1153,31 @@ function PotDetailScreen({ potId, onBack }) {
   const [dashboard, setDashboard] = useState(null);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState(null);
+  const [tilList, setTilList] = useState([]);
+  const [tilLoading, setTilLoading] = useState(true);
+  const [tilError, setTilError] = useState(null);
+
+  useEffect(() => {
+    if (!potId) return;
+    let active = true;
+    setTilLoading(true);
+    setTilError(null);
+
+    getTilsByPot(potId)
+      .then(page => {
+        if (!active) return;
+        setTilList(page?.content ?? []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setTilError('TIL 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      })
+      .finally(() => {
+        if (active) setTilLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [potId]);
 
   useEffect(() => {
     if (!potId) return;
@@ -1213,7 +1239,6 @@ function PotDetailScreen({ potId, onBack }) {
     );
   }
   const stage = pot.stage ?? tilCountToStage(pot.tilCount ?? 0);
-  const tils = fallbackPot ? TILS.filter(t => t.potId === potId) : [];
   const speciesInfo = PIXEL_SPECIES[pot.species];
   const monName = speciesInfo?.stages[stage]?.name;
   const isRare = pot.species === 'moonlight';
@@ -1385,44 +1410,59 @@ function PotDetailScreen({ potId, onBack }) {
 
         {/* Right — TIL list */}
         <div>
-          <SectionHeader eyebrow="이 화분의 기록" title={`TIL ${tils.length}개`} action={
+          <SectionHeader eyebrow="이 화분의 기록" title={tilLoading ? 'TIL 로딩 중…' : `TIL ${tilList.length}개`} action={
             <div style={{ display: 'flex', gap: 8 }}>
               <Btn variant="secondary" size="sm">최신순 ↓</Btn>
               <Btn variant="primary" size="sm" icon={Icon.plus}>TIL 작성</Btn>
             </div>
           } />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {dashboard && tils.length === 0 && (
-              <Card padding={22} style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6 }}>
-                이 화분의 TIL 목록은 아직 별도 API가 연결되지 않았어요.<br />
-                현재 대시보드 API로는 총 TIL 개수와 성장 정보까지만 표시합니다.
+            {tilLoading && (
+              <Card padding={22} style={{ color: 'var(--ink-3)', fontSize: 13 }}>
+                TIL 목록을 불러오는 중이에요…
               </Card>
             )}
-            {tils.map(t => (
-              <Card key={t.id} padding={20} hoverable>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
-                      {t.date} · {t.chars}자
-                    </div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>
-                      {t.title}
-                    </div>
-                    <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>{t.excerpt}</div>
-                    <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
-                      {t.tags.map(tag => (
-                        <span key={tag} style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 999, background: 'var(--paper-2)', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div style={{ width: 56, height: 56, borderRadius: 10, background: isRare ? '#eef2fa' : 'var(--paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <PottedPlant species={pot.species} stage={stage} size={44} />
-                  </div>
-                </div>
+            {!tilLoading && tilError && (
+              <Card padding={22} style={{ color: 'var(--ink-3)', fontSize: 13 }}>
+                {tilError}
               </Card>
-            ))}
+            )}
+            {!tilLoading && !tilError && tilList.length === 0 && (
+              <Card padding={22} style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6 }}>
+                아직 작성된 TIL이 없어요.<br />
+                첫 번째 TIL을 작성해 화분에 물을 줘 보세요.
+              </Card>
+            )}
+            {tilList.map(t => {
+              const dateStr = (t.createdAt ?? '').slice(0, 10);
+              const chars = t.content?.length ?? 0;
+              const excerpt = t.content ? t.content.slice(0, 120) + (t.content.length > 120 ? '…' : '') : '';
+              return (
+                <Card key={t.tilId} padding={20} hoverable>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
+                        {dateStr} · {chars}자
+                      </div>
+                      <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 600, color: 'var(--ink)' }}>
+                        {t.title}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 6 }}>{excerpt}</div>
+                      <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
+                        {(t.tags ?? []).map(tag => (
+                          <span key={tag} style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 999, background: 'var(--paper-2)', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{ width: 56, height: 56, borderRadius: 10, background: isRare ? '#eef2fa' : 'var(--paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <PottedPlant species={pot.species} stage={stage} size={44} />
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </div>

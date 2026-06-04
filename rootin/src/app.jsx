@@ -34,25 +34,38 @@ function AppShell() {
   const [potFocus, setPotFocus] = useState(null);
   const [editorInitialPotId, setEditorInitialPotId] = useState(null);
   const [editorInitialTil, setEditorInitialTil] = useState(null);
+  const [editorReturnScreen, setEditorReturnScreen] = useState(null);
+  const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
 
   const handleNav = (nextScreen) => {
     if (nextScreen === 'editor') {
       setEditorInitialPotId(null);
       setEditorInitialTil(null);
+      setEditorReturnScreen(null);
     }
     setScreen(nextScreen);
   };
 
   const openEditorForPot = (potId) => {
+    setPotFocus(potId);
     setEditorInitialPotId(potId);
     setEditorInitialTil(null);
+    setEditorReturnScreen('pot-detail');
     setScreen('editor');
   };
 
   const openEditorForTil = (til) => {
     setEditorInitialPotId(til?.potId ?? null);
     setEditorInitialTil(til);
+    setEditorReturnScreen('pot-detail');
     setScreen('editor');
+  };
+
+  const handleTilPublished = (publishedPotId) => {
+    if (editorReturnScreen === 'pot-detail') {
+      setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
+      setPotDetailRefreshKey(key => key + 1);
+    }
   };
 
   const titles = {
@@ -116,9 +129,25 @@ function AppShell() {
         )}
         <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
           {screen === 'dashboard'  && <DashboardScreen onNav={handleNav} />}
-          {screen === 'editor'     && <EditorScreen onNav={handleNav} initialSelectedPotId={editorInitialPotId} initialTil={editorInitialTil} />}
+          {screen === 'editor'     && (
+            <EditorScreen
+              onNav={handleNav}
+              initialSelectedPotId={editorInitialPotId}
+              initialTil={editorInitialTil}
+              afterPublishScreen={editorReturnScreen ?? 'dashboard'}
+              onPublished={handleTilPublished}
+            />
+          )}
           {screen === 'garden'     && <GardenScreen onOpenPot={(id) => { setPotFocus(id); setScreen('pot-detail'); }} />}
-          {screen === 'pot-detail' && <PotDetailScreen potId={potFocus} onBack={() => setScreen('garden')} onStartTil={openEditorForPot} onEditTil={openEditorForTil} />}
+          {screen === 'pot-detail' && (
+            <PotDetailScreen
+              potId={potFocus}
+              refreshKey={potDetailRefreshKey}
+              onBack={() => setScreen('garden')}
+              onStartTil={openEditorForPot}
+              onEditTil={openEditorForTil}
+            />
+          )}
           {screen === 'collection' && <CollectionScreen />}
           {screen === 'ai'         && <AIScreen />}
           {screen === 'profile'    && <ProfileScreen />}

@@ -36,9 +36,13 @@ export function TilEditorPage({
   onNav,
   initialSelectedPotId,
   initialTil,
+  afterPublishScreen = 'dashboard',
+  onPublished,
 }: {
   onNav?: (screen: string) => void
   initialSelectedPotId?: number | string | null
+  afterPublishScreen?: string
+  onPublished?: (potId: number | string | null) => void
   initialTil?: {
     id?: number | string
     tilId?: number | string
@@ -236,7 +240,8 @@ export function TilEditorPage({
     }
     try {
       await publish()
-      onNav?.('dashboard')
+      onPublished?.(selectedPotId)
+      onNav?.(afterPublishScreen)
     } catch {
       window.alert('발행에 실패했습니다. 잠시 후 다시 시도해주세요.')
     }

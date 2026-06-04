@@ -1,6 +1,19 @@
 import { request } from './client.js';
 
 // =====================================================================
+// TIL 목록 조회
+// =====================================================================
+
+// GET /api/v1/tils/me?potId=&page=&size=
+// 내 TIL 목록 조회 (화분별 필터링, 페이지네이션)
+// 반환: Spring Page { content: TilResponse[], totalElements, totalPages, last, ... }
+export async function getTilsByPot(potId, page = 0, size = 20) {
+  const params = new URLSearchParams({ potId, page, size });
+  const res = await request(`/api/v1/tils/me?${params}`);
+  return res.data; // Page<TilResponse>
+}
+
+// =====================================================================
 // TIL 발행
 // =====================================================================
 

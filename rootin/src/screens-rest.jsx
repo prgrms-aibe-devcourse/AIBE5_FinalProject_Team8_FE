@@ -292,9 +292,6 @@ function PotCard({ pot, selected, onClick }) {
   const species = PLANT_NAME_TO_SPECIES[pot.plantName] ?? 'seed';
   const stage = GROWTH_STAGE_TO_STAGE[pot.growthStage] ?? 'seed';
 
-  // levelProgress: BE는 totalExp만 제공하므로 없을 경우 0 폴백
-  const levelProgress = pot.levelProgress ?? 0;
-
   // TIL 개수: BE 응답의 tilCount 필드 사용, 없으면 미표시
   const tilCount = pot.tilCount ?? null;
 
@@ -326,16 +323,11 @@ function PotCard({ pot, selected, onClick }) {
           <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{pot.title}</span>
           <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Lv.{pot.level}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
-          {tilCount !== null && (
+        {tilCount !== null && (
+          <div style={{ marginTop: 4 }}>
             <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>TIL {tilCount}개</span>
-          )}
-          {/* 레벨 진행 바 */}
-          <div style={{ flex: 1, height: 3, borderRadius: 2, background: 'var(--rule)', overflow: 'hidden' }}>
-            <div style={{ width: `${levelProgress * 100}%`, height: '100%', background: selected ? 'var(--moss)' : 'var(--leaf)', borderRadius: 2, transition: 'width 0.2s' }} />
           </div>
-          <span style={{ fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{Math.round(levelProgress * 100)}%</span>
-        </div>
+        )}
       </div>
 
       {/* 선택 체크 배지 */}

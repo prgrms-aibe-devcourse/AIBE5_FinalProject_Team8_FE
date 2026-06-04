@@ -103,6 +103,15 @@ function tilCountToStage(n) {
   return 'seed';
 }
 
+const GROWTH_STAGE_TO_PIXEL_STAGE = {
+  SEED: 'seed', SPROUT: 'sprout', MATURE: 'leaf', LEAF: 'leaf', BLOOM: 'bloom', FULL_BLOOM: 'full',
+};
+
+// 백엔드 성장 단계 enum → 픽셀 식물 stage
+function growthStageToPixelStage(growthStage) {
+  return GROWTH_STAGE_TO_PIXEL_STAGE[growthStage] ?? 'seed';
+}
+
 function Plant({ stage, size = 72, color = '#ff9eb5', showRoots = false, species = 'seed', locked = false, glow = false }) {
   // Now delegates to PixelPlant for consistent pixel-art look.
   return <PixelPlant species={species} stage={stage} size={size} locked={locked} glow={glow} />;
@@ -133,4 +142,4 @@ function RootinLogo({ size = 36 }) {
   );
 }
 
-export { Plant, PotIcon, RootinLogo, STAGE_META, tilCountToStage };
+export { Plant, PotIcon, RootinLogo, STAGE_META, tilCountToStage, growthStageToPixelStage };

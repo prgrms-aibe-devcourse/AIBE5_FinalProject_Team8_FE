@@ -66,6 +66,8 @@ export function TilEditorPage({
     loadDraft,
     publish,
     publishing,
+    setCurrentTilId,
+    setDirty,
   } = useTilEditor()
 
   const restoredPotIdRef = useRef<string | null>(null)
@@ -119,6 +121,21 @@ export function TilEditorPage({
     setEditor(editor)
     return () => setEditor(null)
   }, [editor, setEditor])
+
+  // 사이드바가 현재 편집 중인 TIL을 알 수 있도록 context에 동기화 (신규 작성 시 null)
+  // 수정 모드를 벗어나면(임시저장 이어쓰기/신규 전환) 하이드레이션 가드를 풀어,
+  // 같은 TIL을 다시 열었을 때 재하이드레이션되도록 한다.
+  useEffect(() => {
+    setCurrentTilId(editTilId)
+    if (editTilId == null) {
+      hydratedTilIdRef.current = null
+    }
+  }, [editTilId, setCurrentTilId])
+
+  // 저장 안 된 변경 여부를 context에 동기화 (saved 값이 바뀔 때만 실행 → 키 입력마다 갱신 안 함)
+  useEffect(() => {
+    setDirty(!saved)
+  }, [saved, setDirty])
 
   useEffect(() => {
     if (!normalizedInitialPotId) return
@@ -307,6 +324,7 @@ export function TilEditorPage({
         saveLabel={isEditMode ? '변경 저장' : '임시저장'}
         publishLabel={isEditMode ? '수정 완료' : '발행'}
         publishingLabel={isEditMode ? '저장 중…' : '발행 중…'}
+        isEditMode={isEditMode}
       />
     </div>
   )

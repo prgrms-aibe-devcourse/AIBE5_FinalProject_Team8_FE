@@ -63,6 +63,13 @@ function AppShell() {
     setScreen('editor');
   };
 
+  // 사이드바에서 임시저장본 "이어쓰기" — 수정 모드를 해제해 신규 작성 상태로 되돌림
+  // (에디터 본문 적용은 context.resumeDraft가 담당)
+  const resumeEditorDraft = (potId) => {
+    setEditorInitialPotId(potId ?? null);
+    setEditorInitialTil(null);
+  };
+
   const handleTilPublished = (publishedPotId) => {
     if (editorReturnScreen === 'pot-detail') {
       setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
@@ -161,7 +168,7 @@ function AppShell() {
           {screen === 'profile'    && <ProfileScreen />}
         </div>
       </SidebarInset>
-      {screen === 'editor' && <RootinSidebarRight />}
+      {screen === 'editor' && <RootinSidebarRight onEditTil={openEditorForTil} onResumeDraft={resumeEditorDraft} />}
     </SidebarProvider>
     </TilEditorProvider>
   );

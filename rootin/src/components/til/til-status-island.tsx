@@ -47,7 +47,7 @@ export function TilStatusIsland({
         hidden ? 'translate-y-6 opacity-0' : 'translate-y-0 opacity-100',
       )}
     >
-      <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-border/70 bg-background/80 px-4 py-2 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-2.5 shadow-[var(--shadow-lg)] backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{stats.words.toLocaleString()} 단어</span>
           <span className="size-1 rounded-full bg-border" />
@@ -79,13 +79,13 @@ export function TilStatusIsland({
           variant="ghost"
           size="sm"
           onClick={onSave}
-          className="h-7 text-xs text-muted-foreground hover:text-foreground"
+          className="h-7 rounded-full text-xs text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
         >
           임시저장
         </Button>
         <Button
           size="sm"
-          className="h-7 gap-1.5 text-xs font-medium"
+          className="til-publish-btn h-7 gap-1.5 text-xs font-medium text-primary-foreground"
           onClick={onPublish}
           disabled={!canPublish || publishing}
         >

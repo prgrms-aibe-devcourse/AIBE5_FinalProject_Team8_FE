@@ -57,7 +57,7 @@ function Swatch({
           onClick={onClick}
           className={cn(
             'relative size-7 rounded-full border border-border/60 transition-transform duration-150 ease-out',
-            'hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+            'hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
             active && 'ring-2 ring-primary ring-offset-2 ring-offset-popover',
           )}
           style={{
@@ -90,7 +90,7 @@ export function TextColorPopover({ editor }: { editor: Editor }) {
               className={cn(
                 'inline-flex h-8 items-center justify-center gap-0.5 rounded-md px-1.5',
                 'text-muted-foreground transition-all duration-200',
-                'hover:bg-accent hover:text-accent-foreground',
+                'hover:bg-card hover:text-foreground hover:shadow-sm active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
                 current && 'text-accent-foreground',
               )}
@@ -151,9 +151,9 @@ export function HighlightPopover({ editor }: { editor: Editor }) {
               className={cn(
                 'inline-flex h-8 items-center justify-center gap-0.5 rounded-md px-1.5',
                 'text-muted-foreground transition-all duration-200',
-                'hover:bg-accent hover:text-accent-foreground',
+                'hover:bg-card hover:text-foreground hover:shadow-sm active:scale-95',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
-                'data-[active]:bg-primary/15 data-[active]:text-primary',
+                'data-[active]:bg-card data-[active]:text-primary data-[active]:shadow-sm data-[active]:ring-1 data-[active]:ring-inset data-[active]:ring-primary/20',
               )}
             >
               <Highlighter className="size-4" />

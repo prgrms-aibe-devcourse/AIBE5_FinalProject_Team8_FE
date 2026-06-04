@@ -49,7 +49,7 @@ export function TilMeta() {
         >
           <SelectTrigger
             aria-label="화분 선택"
-            className="h-7 w-auto gap-1.5 rounded-full border-border bg-card px-3 text-xs"
+            className="h-7 w-auto gap-1.5 rounded-full border-border bg-card px-3 text-xs transition-all hover:border-primary/40 hover:shadow-sm data-[state=open]:border-primary/50 data-[state=open]:shadow-sm"
             disabled={potsLoading}
           >
             <Sprout className="size-3.5 text-primary/70" />
@@ -93,7 +93,7 @@ export function TilMeta() {
         {tags.map((tag) => (
           <span
             key={tag}
-            className="group inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40"
+            className="group inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
           >
             <Hash className="size-3 text-primary/70" />
             {tag}
@@ -131,7 +131,7 @@ export function TilMeta() {
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+              className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-xs text-muted-foreground transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-foreground active:scale-95"
             >
               <Plus className="size-3" />
               태그

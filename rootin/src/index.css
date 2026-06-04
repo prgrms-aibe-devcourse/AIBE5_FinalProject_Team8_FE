@@ -368,10 +368,16 @@
 /* Blockquote */
 .til-prose .ProseMirror blockquote {
   border-left: 2px solid var(--primary);
-  padding: 0.15em 0 0.15em 1.15em;
+  padding: 0.5em 0 0.5em 1.15em;
   margin-left: 0;
   color: var(--muted-foreground);
   font-style: italic;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--primary) 5%, transparent),
+    transparent 70%
+  );
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 
 /* Horizontal rule */
@@ -593,6 +599,52 @@
   }
   .rootin-sidebar-left [data-sidebar="header"] [data-sidebar="menu-button"]:hover .rootin-badge-moss,
   .rootin-sidebar-left [data-sidebar="footer"] [data-sidebar="menu-button"]:hover .rootin-badge-amber {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* 3단계: 에디터 버블 메뉴 등장 모션 (선택 시 부드럽게 떠오름)        */
+/* ---------------------------------------------------------------- */
+@keyframes til-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.til-bubble-menu {
+  animation: til-bubble-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .til-bubble-menu {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* 4단계: 작성 페이지 — 발행 버튼 moss 그라데이션 + 호버 글로우       */
+/* ---------------------------------------------------------------- */
+.til-publish-btn {
+  background-image: var(--grad-moss);
+  box-shadow: var(--shadow-md);
+  transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+.til-publish-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg), var(--glow-moss);
+}
+.til-publish-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .til-publish-btn {
+    transition: none;
+  }
+  .til-publish-btn:hover:not(:disabled) {
     transform: none;
   }
 }

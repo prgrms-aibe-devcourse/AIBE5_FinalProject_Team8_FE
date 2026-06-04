@@ -6,6 +6,7 @@ import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
 import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens-rest.jsx';
+import { LandingScreen } from './screens-landing.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb';
@@ -31,6 +32,7 @@ function AppShell() {
   const { setUserFromApi, clearUser } = useUser();
   const [screen, setScreen] = useState('dashboard');
   const [authed, setAuthed] = useState(!!localStorage.getItem('accessToken'));
+  const [showLanding, setShowLanding] = useState(!localStorage.getItem('accessToken'));
   const [potFocus, setPotFocus] = useState(null);
 
   const titles = {
@@ -47,6 +49,10 @@ function AppShell() {
     ai:         { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
     profile:    { title: '내 계정', subtitle: 'Account' },
   };
+
+  if (!authed && showLanding) return (
+    <LandingScreen onStart={() => setShowLanding(false)} />
+  );
 
   if (!authed) return (
     <AuthScreen onAuth={(userData) => {

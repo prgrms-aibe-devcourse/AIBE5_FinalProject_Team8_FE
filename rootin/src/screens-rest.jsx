@@ -322,7 +322,7 @@ function PotCard({ pot, selected, onClick }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{pot.title}</span>
           <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Lv.{pot.level}</span>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>· TIL {tilCount}</span>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>· TIL {tilCount}개</span>
         </div>
       </div>
 

@@ -293,7 +293,7 @@ function PotCard({ pot, selected, onClick }) {
   const stage = GROWTH_STAGE_TO_STAGE[pot.growthStage] ?? 'seed';
 
   // TIL 개수: BE 응답의 tilCount 필드 사용, 없으면 미표시
-  const tilCount = pot.tilCount ?? null;
+  const tilCount = pot.tilCount ?? 0;
 
   return (
     <button
@@ -322,12 +322,8 @@ function PotCard({ pot, selected, onClick }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{pot.title}</span>
           <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Lv.{pot.level}</span>
+          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>· TIL {tilCount}</span>
         </div>
-        {tilCount !== null && (
-          <div style={{ marginTop: 4 }}>
-            <span style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>TIL {tilCount}개</span>
-          </div>
-        )}
       </div>
 
       {/* 선택 체크 배지 */}

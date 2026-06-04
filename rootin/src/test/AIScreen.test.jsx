@@ -12,7 +12,7 @@ vi.mock('../plants.jsx', () => ({
 }));
 
 vi.mock('../pixel-plants.jsx', () => ({
-  PixelPlant: () => null,
+  PixelPlant: ({ species, stage }) => <div data-testid={`pixel-plant-${species}-${stage}`} />,
   PIXEL_SPECIES: {},
 }));
 
@@ -51,7 +51,7 @@ import { useUser } from '../context/UserContext.jsx';
 const MOCK_POTS = [
   { id: 1, title: '코딩', level: 7, totalExp: 1250, growthStage: 'BLOOM',   isDisplayed: true,  plantName: '기본 씨앗', description: '' },
   { id: 2, title: '영어', level: 3, totalExp: 450,  growthStage: 'SPROUT',  isDisplayed: false, plantName: '달빛씨앗',  description: '' },
-  { id: 3, title: '독서', level: 2, totalExp: 300,  growthStage: 'SPROUT',  isDisplayed: false, plantName: '버섯몬',    description: '' },
+  { id: 3, title: '독서', level: 2, totalExp: 300,  growthStage: 'SPROUT',  isDisplayed: false, plantName: '버섯씨앗',  description: '' },
 ];
 
 const MOCK_ME = {
@@ -195,6 +195,28 @@ describe('API 연동 — 화분 목록 및 포인트', () => {
     render(<AIScreen />);
     await waitFor(() => {
       expect(screen.getByText('코딩')).toBeInTheDocument();
+    });
+  });
+
+  it('PotCard에 plantName, growthStage 기반 PixelPlant가 렌더링된다', async () => {
+    render(<AIScreen />);
+    await waitFor(() => {
+      // 기본 씨앗 + BLOOM → species=seed, stage=bloom
+      expect(screen.getByTestId('pixel-plant-seed-bloom')).toBeInTheDocument();
+      // 달빛씨앗 + SPROUT → species=moonlight, stage=sprout
+      expect(screen.getByTestId('pixel-plant-moonlight-sprout')).toBeInTheDocument();
+      // 버섯씨앗 + SPROUT → species=mushroom, stage=sprout
+      expect(screen.getByTestId('pixel-plant-mushroom-sprout')).toBeInTheDocument();
+    });
+  });
+
+  it('plantName이 없는 화분은 기본 species(seed)로 폴백 렌더링된다', async () => {
+    getPots.mockResolvedValue([
+      { id: 1, title: '테스트', level: 1, totalExp: 0, growthStage: 'SEED', isDisplayed: false, plantName: null, description: '' },
+    ]);
+    render(<AIScreen />);
+    await waitFor(() => {
+      expect(screen.getByTestId('pixel-plant-seed-seed')).toBeInTheDocument();
     });
   });
 

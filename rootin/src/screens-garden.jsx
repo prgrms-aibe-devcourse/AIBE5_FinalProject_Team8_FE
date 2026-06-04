@@ -321,11 +321,11 @@ function findNearestVisiblePotId(position, layout, pots, hiddenPots) {
 }
 
 const POTTED_PLANT_ALIGNMENT = {
-  seed: { y: -2, scale: 0.96 },
-  sprout: { y: -2, scale: 0.98 },
-  leaf: { y: -1, scale: 1 },
-  bloom: { y: 0, scale: 1 },
-  full: { y: 1, scale: 1 },
+  seed: { scale: 0.92 },
+  sprout: { scale: 0.96 },
+  leaf: { scale: 1 },
+  bloom: { scale: 1 },
+  full: { scale: 1.02 },
 };
 
 function getPottedPlantAlignment(stage) {
@@ -339,6 +339,8 @@ function PottedPlant({ species, stage, size = 64, locked = false, glow = false, 
   const potHeight = size * 0.26;
   const rimHeight = size * 0.09;
   const pixel = Math.max(2, size * 0.025);
+  const plantSize = size * alignment.scale;
+  const potTopFromBottom = size * 0.02 + potHeight;
 
   return (
     <div style={{
@@ -352,15 +354,18 @@ function PottedPlant({ species, stage, size = 64, locked = false, glow = false, 
     }}>
       <div style={{
         position: 'absolute',
-        inset: 0,
+        left: '50%',
+        bottom: potTopFromBottom,
+        width: plantSize,
+        height: plantSize,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        transform: `translateY(${alignment.y}%) scale(${alignment.scale})`,
-        transformOrigin: '50% 85%',
+        transform: 'translateX(-50%)',
+        transformOrigin: '50% 100%',
         zIndex: 3,
       }}>
-        <PixelPlant species={species} stage={stage} size={size} locked={locked} glow={glow} />
+        <PixelPlant species={species} stage={stage} size={plantSize} locked={locked} glow={glow} />
       </div>
       <div style={{
         position: 'absolute',

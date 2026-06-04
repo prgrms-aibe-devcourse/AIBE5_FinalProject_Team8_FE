@@ -11,7 +11,7 @@ import {
   type SetStateAction,
 } from 'react'
 import type { Editor } from '@tiptap/react'
-import { getPots } from '@/api/pot.js'
+import { getGardenDashboard, getPots } from '@/api/pot.js'
 import { useUser } from '@/context/UserContext.jsx'
 import {
   createTil,
@@ -27,6 +27,24 @@ export type Pot = {
   id: number
   title: string
   [key: string]: unknown
+}
+
+export type PotDashboard = {
+  potId: number
+  title: string
+  level: number
+  totalExp: number
+  currentLevelExp: number
+  nextLevelExpRequired: number
+  progressPercentage: number
+  totalTilCount: number
+  streakDays: number
+  plant?: {
+    name?: string
+    growthStage?: 'SEED' | 'SPROUT' | 'MATURE' | 'LEAF' | 'BLOOM' | 'FULL_BLOOM'
+    growthPercentage?: number
+    canHarvest?: boolean
+  } | null
 }
 
 export type Template = {
@@ -54,6 +72,8 @@ type TilEditorContextValue = {
   setSelectedPotId: (v: string | null) => void
   pots: Pot[]
   potsLoading: boolean
+  selectedPotDashboard: PotDashboard | null
+  selectedPotDashboardLoading: boolean
   templates: Template[]
   applyTemplate: (content: string) => void
   saveCustomTemplate: (name: string) => Promise<void>
@@ -88,6 +108,8 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
   const [selectedPotId, setSelectedPotId] = useState<string | null>(null)
   const [pots, setPots] = useState<Pot[]>([])
   const [potsLoading, setPotsLoading] = useState(true)
+  const [selectedPotDashboard, setSelectedPotDashboard] = useState<PotDashboard | null>(null)
+  const [selectedPotDashboardLoading, setSelectedPotDashboardLoading] = useState(false)
   const [templates, setTemplates] = useState<Template[]>([])
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [publishing, setPublishing] = useState(false)
@@ -111,6 +133,33 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
       .catch(() => setPots([]))
       .finally(() => setPotsLoading(false))
   }, [user?.userId])
+
+  // 화분을 선택했을 때만 상세 대시보드를 1회 조회합니다.
+  // 글 작성 중 예상 경험치는 프론트에서 계산하므로, 타이핑할 때마다 서버를 호출하지 않습니다.
+  useEffect(() => {
+    if (!selectedPotId) {
+      setSelectedPotDashboard(null)
+      setSelectedPotDashboardLoading(false)
+      return
+    }
+
+    let cancelled = false
+    setSelectedPotDashboardLoading(true)
+    getGardenDashboard(selectedPotId)
+      .then((data) => {
+        if (!cancelled) setSelectedPotDashboard(data as PotDashboard)
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedPotDashboard(null)
+      })
+      .finally(() => {
+        if (!cancelled) setSelectedPotDashboardLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedPotId])
 
   // 진입 시 템플릿 목록 로딩 (사용자 + 기본 제공)
   const refreshTemplates = useCallback(async () => {
@@ -233,6 +282,8 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     setSelectedPotId,
     pots,
     potsLoading,
+    selectedPotDashboard,
+    selectedPotDashboardLoading,
     templates,
     applyTemplate,
     saveCustomTemplate,

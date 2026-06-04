@@ -388,7 +388,8 @@ describe('생성 전/후 화면', () => {
 describe('API 호출', () => {
   it('퀴즈 생성 시 generateQuiz에 potId(숫자)와 count가 전달된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
 
     await waitFor(() => expect(generateQuiz).toHaveBeenCalledWith(MOCK_POTS[0].id, 5));

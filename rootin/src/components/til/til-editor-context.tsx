@@ -80,10 +80,15 @@ type TilEditorContextValue = {
   deleteCustomTemplate: (id: number) => Promise<void>
   saveDraft: () => Promise<boolean>
   loadDraft: (potId: number) => Promise<DraftData | null>
+  resumeDraft: (draft: { title?: string; content?: string; tags?: string[] } | null) => void
   clearDraft: () => Promise<void>
   publish: () => Promise<unknown>
   publishing: boolean
   draftSavedAt: number | null
+  currentTilId: string | null
+  setCurrentTilId: (v: string | null) => void
+  dirty: boolean
+  setDirty: (v: boolean) => void
 }
 
 const TilEditorContext = createContext<TilEditorContextValue | null>(null)
@@ -108,6 +113,9 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
   const [templates, setTemplates] = useState<Template[]>([])
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [publishing, setPublishing] = useState(false)
+  // 사이드바가 현재 편집 중인 TIL 강조 + 저장 안 된 변경 여부를 알 수 있도록 노출
+  const [currentTilId, setCurrentTilId] = useState<string | null>(null)
+  const [dirty, setDirty] = useState(false)
   const { user } = useUser()
 
   // 진입 시 화분 목록 로딩
@@ -227,6 +235,18 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     setDraftSavedAt(null)
   }, [selectedPotId])
 
+  // 임시저장본을 에디터로 불러와 "신규 작성" 상태로 이어쓰기 (수정 모드 해제는 호출부에서 별도 처리)
+  const resumeDraft = useCallback(
+    (draft: { title?: string; content?: string; tags?: string[] } | null) => {
+      if (!editor) return
+      editor.chain().focus().setContent(draft?.content || '').run()
+      setTitle(draft?.title || '')
+      setTags(draft?.tags || [])
+      setCurrentTilId(null)
+    },
+    [editor],
+  )
+
   // 발행 — 성공 시 해당 화분의 임시저장 삭제 후 에디터 초기화
   const publish = useCallback(async () => {
     if (!editor || !selectedPotId) return
@@ -270,10 +290,15 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     deleteCustomTemplate,
     saveDraft,
     loadDraft,
+    resumeDraft,
     clearDraft,
     publish,
     publishing,
     draftSavedAt,
+    currentTilId,
+    setCurrentTilId,
+    dirty,
+    setDirty,
   }
 
   return (

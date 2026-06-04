@@ -35,10 +35,10 @@ export function ToolbarButton({
           className={cn(
             'group relative inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-md px-1.5',
             'text-muted-foreground transition-all duration-200 ease-out',
-            'hover:bg-accent hover:text-accent-foreground',
+            'hover:bg-card hover:text-foreground hover:shadow-sm active:scale-95',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
             'disabled:pointer-events-none disabled:opacity-40',
-            'data-[active]:bg-primary/15 data-[active]:text-primary',
+            'data-[active]:bg-card data-[active]:text-primary data-[active]:shadow-sm data-[active]:ring-1 data-[active]:ring-inset data-[active]:ring-primary/20',
             className,
           )}
           {...props}

@@ -2,33 +2,33 @@
 @import 'tw-animate-css';
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Rootin Design System Light Theme */
-  --paper: oklch(0.975 0.008 90);
-  --paper-2: oklch(0.955 0.012 90);
-  --ink: oklch(0.20 0.02 150);
-  --ink-2: oklch(0.38 0.02 150);
-  --ink-3: oklch(0.55 0.015 140);
-  --moss: oklch(0.42 0.085 145);
-  --moss-2: oklch(0.32 0.07 145);
-  --sprout: oklch(0.72 0.13 135);
-  --leaf: oklch(0.88 0.05 130);
-  --amber: oklch(0.74 0.13 70);
-  --amber-soft: oklch(0.93 0.05 80);
-  --rule: oklch(0.91 0.012 100);
-  --rule-2: oklch(0.85 0.015 100);
+  /* Rootin Design System Light Theme — 정제된 moss + paper 팔레트 (채도↓, 위계↑) */
+  --paper: oklch(0.977 0.006 95);
+  --paper-2: oklch(0.963 0.008 95);
+  --paper-3: oklch(0.948 0.009 95);   /* inset/track 등 한 단계 더 깊은 표면 */
+  --ink: oklch(0.21 0.016 152);
+  --ink-2: oklch(0.40 0.016 150);
+  --ink-3: oklch(0.52 0.012 145);
+  --moss: oklch(0.44 0.075 148);
+  --moss-2: oklch(0.34 0.062 148);
+  --sprout: oklch(0.74 0.115 140);
+  --leaf: oklch(0.905 0.04 140);
+  --amber: oklch(0.76 0.115 74);
+  --amber-soft: oklch(0.945 0.038 82);
+  --rule: oklch(0.92 0.007 100);
+  --rule-2: oklch(0.865 0.009 100);
   --danger: oklch(0.58 0.16 25);
   
   /* shadcn semantic tokens mapped to Rootin design tokens */
   --background: var(--paper);
   --foreground: var(--ink);
-  --card: oklch(1 0 0); /* white */
+  --card: oklch(0.998 0.0015 95); /* 종이 위 카드 — 순백 대신 미세한 온기 */
   --card-foreground: var(--ink);
-  --popover: oklch(1 0 0);
+  --popover: oklch(0.998 0.0015 95);
   --popover-foreground: var(--ink);
   --primary: var(--moss);
   --primary-foreground: oklch(1 0 0);
@@ -59,16 +59,24 @@
   --sidebar-ring: var(--moss);
 
   /* Restored missing legacy variables for other pages */
-  --font-display: 'Space Grotesk', 'Noto Sans KR', sans-serif;
-  --font-body: 'Noto Sans KR', 'Space Grotesk', sans-serif;
+  --font-display: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
+  --font-body: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;
   --r-xl: 20px;
-  --shadow-sm: 0 1px 2px rgba(26, 58, 92, 0.04), 0 1px 1px rgba(26, 58, 92, 0.03);
-  --shadow-md: 0 4px 16px rgba(26, 58, 92, 0.06), 0 1px 2px rgba(26, 58, 92, 0.04);
-  --shadow-lg: 0 12px 40px rgba(26, 58, 92, 0.10);
+  /* 그림자 색조를 차가운 네이비 → moss 계열 따뜻한 중성으로 정제, 위계를 부드럽게 */
+  --shadow-sm: 0 1px 2px rgb(38 46 34 / 0.04), 0 1px 1px rgb(38 46 34 / 0.03);
+  --shadow-md: 0 4px 16px rgb(38 46 34 / 0.06), 0 1px 2px rgb(38 46 34 / 0.04);
+  --shadow-lg: 0 14px 44px rgb(38 46 34 / 0.10), 0 2px 6px rgb(38 46 34 / 0.05);
+
+  /* 역동적 강조용 — moss 글로우/포커스 링 + 은은한 그라데이션 표면 (var() 참조라 모드 자동 적응) */
+  --glow-moss: 0 0 0 3px color-mix(in oklch, var(--moss) 14%, transparent);
+  --ring-moss: color-mix(in oklch, var(--moss) 45%, transparent);
+  --grad-paper: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+  --grad-moss: linear-gradient(135deg, var(--moss) 0%, var(--moss-2) 100%);
+  --grad-sheen: linear-gradient(180deg, color-mix(in oklch, var(--card) 90%, var(--paper)) 0%, var(--card) 100%);
 }
 
 .dark {
@@ -122,13 +130,14 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --font-serif: 'Newsreader', Georgia, serif;
   
   /* Rootin specific variables */
   --color-paper: var(--paper);
   --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
@@ -401,10 +410,16 @@
 /* Blockquote */
 .til-prose .ProseMirror blockquote {
   border-left: 2px solid var(--primary);
-  padding: 0.15em 0 0.15em 1.15em;
+  padding: 0.5em 0 0.5em 1.15em;
   margin-left: 0;
   color: var(--muted-foreground);
   font-style: italic;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--primary) 5%, transparent),
+    transparent 70%
+  );
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 
 /* Horizontal rule */
@@ -540,4 +555,138 @@
 }
 .til-prose .ProseMirror pre .hljs-strong {
   font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- */
+/* 2단계: 좌측 사이드바 비주얼 정제 (라이트, 역동적 강조)             */
+/* RootinSidebarLeft 의 .rootin-sidebar-left 로 스코프 — 구조 불변   */
+/* ---------------------------------------------------------------- */
+
+/* 그룹 라벨 "Menu" → eyebrow 타이포 */
+.rootin-sidebar-left [data-sidebar="group-label"] {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* 브랜드 워드마크 — display 폰트 + moss 그라데이션 텍스트 */
+.rootin-brand {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+  background: var(--grad-moss);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.rootin-slogan {
+  color: var(--ink-3);
+  letter-spacing: 0.01em;
+}
+
+/* 로고/연속달성 배지 — 그라데이션 + 부드러운 글로우 */
+.rootin-badge-moss,
+.rootin-badge-amber {
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+}
+.rootin-badge-moss {
+  background: var(--grad-moss);
+  box-shadow: var(--shadow-md),
+    inset 0 1px 0 color-mix(in oklch, white 22%, transparent);
+}
+.rootin-badge-amber {
+  background: linear-gradient(135deg, var(--amber) 0%,
+    color-mix(in oklch, var(--amber) 72%, var(--moss-2)) 100%);
+  box-shadow: 0 4px 14px color-mix(in oklch, var(--amber) 30%, transparent),
+    inset 0 1px 0 color-mix(in oklch, white 24%, transparent);
+}
+.rootin-sidebar-left [data-sidebar="header"] [data-sidebar="menu-button"]:hover .rootin-badge-moss,
+.rootin-sidebar-left [data-sidebar="footer"] [data-sidebar="menu-button"]:hover .rootin-badge-amber {
+  transform: scale(1.05);
+}
+
+/* 메뉴 아이템 — 마이크로 인터랙션 + 정제된 활성 상태 */
+.rootin-sidebar-left [data-sidebar="menu-button"] {
+  position: relative;
+  transition: background-color 160ms ease-out, color 160ms ease-out,
+    transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+.rootin-sidebar-left [data-sidebar="content"] [data-sidebar="menu-button"]:hover {
+  background: color-mix(in oklch, var(--moss) 8%, transparent);
+  color: var(--moss-2);
+  transform: translateX(2px);
+}
+/* 활성: moss 좌측 액센트 바 + 은은한 그라데이션 틴트 (solid leaf 대체) */
+.rootin-sidebar-left [data-sidebar="content"] [data-sidebar="menu-button"][data-active] {
+  background: linear-gradient(90deg,
+    color-mix(in oklch, var(--moss) 15%, transparent) 0%,
+    color-mix(in oklch, var(--moss) 4%, transparent) 100%);
+  color: var(--moss-2);
+  box-shadow: inset 2.5px 0 0 var(--moss);
+}
+.rootin-sidebar-left [data-sidebar="content"] [data-sidebar="menu-button"][data-active] svg {
+  color: var(--moss);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rootin-sidebar-left [data-sidebar="menu-button"],
+  .rootin-badge-moss,
+  .rootin-badge-amber {
+    transition: none;
+  }
+  .rootin-sidebar-left [data-sidebar="content"] [data-sidebar="menu-button"]:hover {
+    transform: none;
+  }
+  .rootin-sidebar-left [data-sidebar="header"] [data-sidebar="menu-button"]:hover .rootin-badge-moss,
+  .rootin-sidebar-left [data-sidebar="footer"] [data-sidebar="menu-button"]:hover .rootin-badge-amber {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* 3단계: 에디터 버블 메뉴 등장 모션 (선택 시 부드럽게 떠오름)        */
+/* ---------------------------------------------------------------- */
+@keyframes til-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.til-bubble-menu {
+  animation: til-bubble-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .til-bubble-menu {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* 4단계: 작성 페이지 — 발행 버튼 moss 그라데이션 + 호버 글로우       */
+/* ---------------------------------------------------------------- */
+.til-publish-btn {
+  background-image: var(--grad-moss);
+  box-shadow: var(--shadow-md);
+  transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+.til-publish-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg), var(--glow-moss);
+}
+.til-publish-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .til-publish-btn {
+    transition: none;
+  }
+  .til-publish-btn:hover:not(:disabled) {
+    transform: none;
+  }
 }

@@ -27,17 +27,17 @@ export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
   ];
 
   return (
-    <Sidebar className="border-r-0" {...props}>
+    <Sidebar className="border-r-0 rootin-sidebar-left" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              <div className="rootin-badge-moss flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <RootinLogo size={20} />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Rootin</span>
-                <span className="truncate text-xs">매일의 학습이 자라는 곳</span>
+                <span className="rootin-brand truncate font-semibold">Rootin</span>
+                <span className="rootin-slogan truncate text-xs">매일의 학습이 자라는 곳</span>
               </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -48,14 +48,14 @@ export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
         <NavMain items={navMainItems} />
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border/70 mt-1">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+              <div className="rootin-badge-amber flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <Plant stage="leaf" size={20} />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">

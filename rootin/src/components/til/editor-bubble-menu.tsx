@@ -32,8 +32,8 @@ function MiniButton({
       data-active={active ? '' : undefined}
       onClick={onClick}
       className={cn(
-        'inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors',
-        'hover:bg-accent hover:text-accent-foreground',
+        'inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-all duration-150 ease-out',
+        'hover:bg-accent hover:text-accent-foreground active:scale-95',
         'data-[active]:bg-primary/15 data-[active]:text-primary',
       )}
     >
@@ -50,7 +50,7 @@ export function EditorBubbleMenu({ editor }: { editor: Editor }) {
       shouldShow={({ editor: e, from, to }) =>
         from !== to && !e.isActive('codeBlock')
       }
-      className="flex items-center gap-0.5 rounded-xl border border-border bg-popover/95 p-1 shadow-xl shadow-black/40 backdrop-blur supports-[backdrop-filter]:bg-popover/80"
+      className="til-bubble-menu flex items-center gap-0.5 rounded-xl border border-border/80 bg-popover/95 p-1 shadow-[var(--shadow-lg)] backdrop-blur supports-[backdrop-filter]:bg-popover/80"
     >
       <MiniButton
         label="굵게"

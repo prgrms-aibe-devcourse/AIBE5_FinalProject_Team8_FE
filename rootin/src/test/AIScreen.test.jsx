@@ -247,7 +247,8 @@ describe('화분 선택', () => {
 
   it('화분을 변경해도 AI생성 버튼을 다시 누르기 전까지 생성 결과가 유지된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     await waitFor(() => expect(screen.getByRole('button', { name: '결과 저장' })).toBeInTheDocument());
@@ -336,6 +337,8 @@ describe('생성 전/후 화면', () => {
   it('summary 모드 생성 완료 후 요약 결과가 표시된다', async () => {
     render(<AIScreen />);
     fireEvent.click(screen.getByRole('button', { name: /TIL 요약/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
 
     await waitFor(() => screen.getByRole('button', { name: /요약 생성하기/i }));
     fireEvent.click(screen.getByRole('button', { name: /요약 생성하기/i }));
@@ -347,7 +350,8 @@ describe('생성 전/후 화면', () => {
 
   it('모드를 변경해도 AI생성 버튼을 다시 누르기 전까지 생성 결과가 유지된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     await waitFor(() => expect(screen.getByRole('button', { name: '결과 저장' })).toBeInTheDocument());
 
@@ -358,7 +362,8 @@ describe('생성 전/후 화면', () => {
 
   it('퀴즈 생성 후 TIL 요약 탭으로 전환해도 SectionHeader 타이틀이 복습 문제로 유지된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     await waitFor(() => expect(screen.getByRole('button', { name: '결과 저장' })).toBeInTheDocument());
 
@@ -370,7 +375,8 @@ describe('생성 전/후 화면', () => {
 
   it('퀴즈 생성 후 TIL 요약 탭으로 전환해도 퀴즈 결과 컴포넌트가 유지된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     await waitFor(() =>
       expect(screen.getByText('CSS Container Queries에서 필수 속성은?')).toBeInTheDocument()
@@ -398,6 +404,8 @@ describe('API 호출', () => {
   it('요약 생성 시 generateSummary에 potId(숫자)가 전달된다', async () => {
     render(<AIScreen />);
     fireEvent.click(screen.getByRole('button', { name: /TIL 요약/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
 
     await waitFor(() => screen.getByRole('button', { name: /요약 생성하기/i }));
     fireEvent.click(screen.getByRole('button', { name: /요약 생성하기/i }));
@@ -407,7 +415,8 @@ describe('API 호출', () => {
 
   it('생성 완료 후 포인트가 remainPoint로 갱신된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
 
     await waitFor(() => expect(screen.getByText(/1190P/)).toBeInTheDocument());
@@ -415,7 +424,8 @@ describe('API 호출', () => {
 
   it('다시 생성 버튼 클릭 시 동일한 potId와 count로 재호출된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     await waitFor(() => expect(screen.getByRole('button', { name: '다시 생성' })).toBeInTheDocument());
 
@@ -436,7 +446,8 @@ describe('에러 처리', () => {
     generateQuiz.mockRejectedValue(err);
 
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
 
     await waitFor(() =>
@@ -461,7 +472,8 @@ describe('에러 처리', () => {
     generateQuiz.mockRejectedValue(new Error('fail'));
 
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
 
     await waitFor(() =>
@@ -486,7 +498,8 @@ describe('결과 저장 및 보관함', () => {
 
   it('결과 저장 버튼을 누르면 saveResult API가 호출된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     // generated=true가 되면 '다시 생성' 버튼이 함께 나타남 → 이걸 먼저 기다려 상태 안정 확인
     await waitFor(() => expect(screen.getByRole('button', { name: '다시 생성' })).toBeInTheDocument());
@@ -501,7 +514,8 @@ describe('결과 저장 및 보관함', () => {
 
   it('결과 저장 후 저장됨 피드백이 표시된다', async () => {
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     await waitFor(() => expect(screen.getByRole('button', { name: '결과 저장' })).toBeInTheDocument());
 
@@ -545,7 +559,8 @@ describe('결과 저장 및 보관함', () => {
     saveResult.mockRejectedValue(new Error('Network Error'));
 
     render(<AIScreen />);
-    await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
+    // 화분 목록 로딩 완료를 기다려 potId 설정 보장
+    await waitFor(() => expect(screen.getByText('코딩')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
     await waitFor(() => expect(screen.getByRole('button', { name: '결과 저장' })).toBeInTheDocument());
 

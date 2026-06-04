@@ -28,11 +28,32 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 import { TilStatusIsland } from './til-status-island'
 import { TilMeta } from './til-meta'
 import { useTilEditor } from './til-editor-context'
+import { updateTil } from '@/api/til.js'
 
 const lowlight = createLowlight(common)
 
-export function TilEditorPage({ onNav }: { onNav?: (screen: string) => void }) {
+export function TilEditorPage({
+  onNav,
+  initialSelectedPotId,
+  initialTil,
+  afterPublishScreen = 'dashboard',
+  onPublished,
+}: {
+  onNav?: (screen: string) => void
+  initialSelectedPotId?: number | string | null
+  afterPublishScreen?: string
+  onPublished?: (potId: number | string | null) => void
+  initialTil?: {
+    id?: number | string
+    tilId?: number | string
+    potId?: number | string | null
+    title?: string
+    content?: string
+    tags?: string[]
+  } | null
+}) {
   const [saved, setSaved] = useState(false)
+  const [updating, setUpdating] = useState(false)
   const {
     setEditor,
     title,
@@ -40,14 +61,22 @@ export function TilEditorPage({ onNav }: { onNav?: (screen: string) => void }) {
     selectedPotId,
     setTitle,
     setTags,
+    setSelectedPotId,
     saveDraft,
     loadDraft,
     publish,
     publishing,
   } = useTilEditor()
 
-  const restoredRef = useRef(false)
-  const settledRef = useRef(false)
+  const restoredPotIdRef = useRef<string | null>(null)
+  const settledPotIdRef = useRef<string | null>(null)
+  const hydratedTilIdRef = useRef<string | null>(null)
+  const normalizedInitialPotId = initialSelectedPotId == null
+    ? null
+    : String(initialSelectedPotId)
+  const normalizedInitialTilId = initialTil?.id ?? initialTil?.tilId ?? null
+  const editTilId = normalizedInitialTilId == null ? null : String(normalizedInitialTilId)
+  const isEditMode = Boolean(editTilId)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -91,10 +120,29 @@ export function TilEditorPage({ onNav }: { onNav?: (screen: string) => void }) {
     return () => setEditor(null)
   }, [editor, setEditor])
 
+  useEffect(() => {
+    if (!normalizedInitialPotId) return
+    setSelectedPotId(normalizedInitialPotId)
+  }, [normalizedInitialPotId, setSelectedPotId])
+
+  useEffect(() => {
+    if (!editor || !initialTil || !editTilId || hydratedTilIdRef.current === editTilId) return
+
+    hydratedTilIdRef.current = editTilId
+    const targetPotId = initialTil.potId ?? normalizedInitialPotId
+    if (targetPotId != null) {
+      setSelectedPotId(String(targetPotId))
+    }
+    setTitle(initialTil.title ?? '')
+    setTags(Array.isArray(initialTil.tags) ? initialTil.tags : [])
+    editor.commands.setContent(initialTil.content ?? '')
+    setSaved(true)
+  }, [editor, initialTil, editTilId, normalizedInitialPotId, setSelectedPotId, setTitle, setTags])
+
   // 화분 선택 시, 해당 화분의 서버 임시저장을 1회 복원
   useEffect(() => {
-    if (!editor || !selectedPotId || restoredRef.current) return
-    restoredRef.current = true
+    if (isEditMode || !editor || !selectedPotId || restoredPotIdRef.current === selectedPotId) return
+    restoredPotIdRef.current = selectedPotId
     let cancelled = false
     loadDraft(Number(selectedPotId))
       .then((draft) => {
@@ -108,13 +156,13 @@ export function TilEditorPage({ onNav }: { onNav?: (screen: string) => void }) {
     return () => {
       cancelled = true
     }
-  }, [editor, selectedPotId, loadDraft, setTitle, setTags])
+  }, [isEditMode, editor, selectedPotId, loadDraft, setTitle, setTags])
 
   // 본문/제목/태그 변경 시 디바운스 자동 임시저장 (화분 선택 시에만, 최초 1회는 건너뜀)
   useEffect(() => {
-    if (!editor || !selectedPotId) return
-    if (!settledRef.current) {
-      settledRef.current = true
+    if (isEditMode || !editor || !selectedPotId) return
+    if (settledPotIdRef.current !== selectedPotId) {
+      settledPotIdRef.current = selectedPotId
       return
     }
     const t = setTimeout(() => {
@@ -124,9 +172,54 @@ export function TilEditorPage({ onNav }: { onNav?: (screen: string) => void }) {
     }, 1500)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editor?.state, title, tags, selectedPotId])
+  }, [isEditMode, editor?.state, title, tags, selectedPotId])
+
+  const validateBeforeSubmit = () => {
+    if (!selectedPotId) {
+      window.alert('화분을 먼저 선택해주세요.')
+      return false
+    }
+    if (!title.trim()) {
+      window.alert('제목을 입력해주세요.')
+      return false
+    }
+    if (!editor?.getText().trim()) {
+      window.alert('본문을 입력해주세요.')
+      return false
+    }
+    return true
+  }
+
+  const handleUpdateTil = async (moveAfterSave: boolean) => {
+    if (!editor || !editTilId || !validateBeforeSubmit()) return
+
+    setUpdating(true)
+    try {
+      await updateTil(Number(editTilId), {
+        title,
+        content: editor.getHTML(),
+        tags,
+      })
+      setSaved(true)
+      if (moveAfterSave) {
+        editor.commands.clearContent()
+        setTitle('')
+        setTags([])
+        setSelectedPotId(null)
+        onNav?.('pot-detail')
+      }
+    } catch {
+      window.alert('TIL 수정에 실패했습니다. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setUpdating(false)
+    }
+  }
 
   const handleSaveDraft = () => {
+    if (isEditMode) {
+      handleUpdateTil(false)
+      return
+    }
     if (!selectedPotId) {
       window.alert('화분을 먼저 선택해주세요.')
       return
@@ -138,21 +231,17 @@ export function TilEditorPage({ onNav }: { onNav?: (screen: string) => void }) {
 
   const handlePublish = async () => {
     if (!editor) return
-    if (!selectedPotId) {
-      window.alert('화분을 먼저 선택해주세요.')
+    if (!validateBeforeSubmit()) {
       return
     }
-    if (!title.trim()) {
-      window.alert('제목을 입력해주세요.')
-      return
-    }
-    if (!editor.getText().trim()) {
-      window.alert('본문을 입력해주세요.')
+    if (isEditMode) {
+      await handleUpdateTil(true)
       return
     }
     try {
       await publish()
-      onNav?.('dashboard')
+      onPublished?.(selectedPotId)
+      onNav?.(afterPublishScreen)
     } catch {
       window.alert('발행에 실패했습니다. 잠시 후 다시 시도해주세요.')
     }
@@ -212,9 +301,12 @@ export function TilEditorPage({ onNav }: { onNav?: (screen: string) => void }) {
         saved={saved}
         onSave={handleSaveDraft}
         onPublish={handlePublish}
-        publishing={publishing}
+        publishing={publishing || updating}
         canPublish={canPublish}
         stats={stats}
+        saveLabel={isEditMode ? '변경 저장' : '임시저장'}
+        publishLabel={isEditMode ? '수정 완료' : '발행'}
+        publishingLabel={isEditMode ? '저장 중…' : '발행 중…'}
       />
     </div>
   )

@@ -1,27 +1,12 @@
 import { request } from './client.js';
 
-const TEMP_GARDEN_USER_ID = 1;
-
-function resolveTemporaryUserId(userId) {
-  if (userId) return userId;
-  if (typeof localStorage !== 'undefined') {
-    return localStorage.getItem('rootinUserId') ?? TEMP_GARDEN_USER_ID;
-  }
-  return TEMP_GARDEN_USER_ID;
-}
-
-function gardenHeaders(userId) {
-  return {
-    'X-USER-ID': String(resolveTemporaryUserId(userId)),
-  };
-}
+// 기존에 사용하던 임시 유저 식별용 헬퍼 함수들과 헤더 세팅 로직을 모두 제거하였습니다.
+// 이제 백엔드 API 서버는 로그인 후 헤더에 포함되는 JWT(accessToken)로 유저를 판별합니다.
 
 /**
  * 화분 목록 조회
  * GET /api/v1/pots
- * Auth 임시 정책: X-USER-ID 헤더 필요
  *
- * @param {number|string} [userId]
  * @returns {Promise<Array<{
  *   id: number,
  *   title: string,
@@ -33,19 +18,16 @@ function gardenHeaders(userId) {
  *   growthStage: 'SEED' | 'SPROUT' | 'MATURE' | 'BLOOM' | 'FULL_BLOOM',
  * }>>}
  */
-export function getPots(userId) {
-  return request('/api/v1/pots', {
-    headers: gardenHeaders(userId),
-  });
+export function getPots() {
+  // headers 옵션을 제거하여 client.js의 Bearer 토큰 인증 헤더를 그대로 활용합니다.
+  return request('/api/v1/pots');
 }
 
 /**
  * 화분 생성
  * POST /api/v1/pots
- * Auth 임시 정책: X-USER-ID 헤더 필요
  *
  * @param {{ title: string, description?: string }} payload
- * @param {number|string} [userId]
  * @returns {Promise<{
  *   id: number,
  *   title: string,
@@ -58,10 +40,23 @@ export function getPots(userId) {
  *   createdAt: string,
  * }>}
  */
-export function createPot(payload, userId) {
+export function createPot(payload) {
   return request('/api/v1/pots', {
     method: 'POST',
-    headers: gardenHeaders(userId),
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * 화분 정보 수정
+ * PATCH /api/v1/pots/{potId}
+ *
+ * @param {number|string} potId
+ * @param {{ title: string, description?: string }} payload
+ */
+export function updatePot(potId, payload) {
+  return request(`/api/v1/pots/${potId}`, {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }
@@ -69,10 +64,8 @@ export function createPot(payload, userId) {
 /**
  * 특정 화분 기본 상세 조회
  * GET /api/v1/pots/{potId}
- * Auth 임시 정책: X-USER-ID 헤더 필요
  *
  * @param {number|string} potId
- * @param {number|string} [userId]
  * @returns {Promise<{
  *   id: number,
  *   title: string,
@@ -85,19 +78,15 @@ export function createPot(payload, userId) {
  *   createdAt: string,
  * }>}
  */
-export function getPot(potId, userId) {
-  return request(`/api/v1/pots/${potId}`, {
-    headers: gardenHeaders(userId),
-  });
+export function getPot(potId) {
+  return request(`/api/v1/pots/${potId}`);
 }
 
 /**
  * 화분 대시보드 조회
  * GET /api/v1/pots/{potId}/dashboard
- * Auth 임시 정책: X-USER-ID 헤더 필요
  *
  * @param {number|string} potId
- * @param {number|string} [userId]
  * @returns {Promise<{
  *   potId: number,
  *   title: string,
@@ -120,8 +109,6 @@ export function getPot(potId, userId) {
  *   },
  * }>}
  */
-export function getGardenDashboard(potId, userId) {
-  return request(`/api/v1/pots/${potId}/dashboard`, {
-    headers: gardenHeaders(userId),
-  });
+export function getGardenDashboard(potId) {
+  return request(`/api/v1/pots/${potId}/dashboard`);
 }

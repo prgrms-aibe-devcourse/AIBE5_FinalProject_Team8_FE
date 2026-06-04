@@ -12,8 +12,10 @@ RUN npm ci
 # 빌드 타임 환경변수 (Vite는 빌드 시점에 번들에 포함됨)
 ARG VITE_API_BASE_URL
 ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_LOCALSTACK_ENDPOINT
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ENV VITE_LOCALSTACK_ENDPOINT=$VITE_LOCALSTACK_ENDPOINT
 
 # 소스 복사 후 빌드
 COPY . .
@@ -26,7 +28,7 @@ FROM nginx:alpine
 
 # 기본 nginx 설정 제거
 RUN rm /etc/nginx/conf.d/default.conf \
-    && apk add --no-cache curl
+    && apk add --no-cache curl wget
 
 # FE 전용 nginx 설정 복사
 COPY nginx.conf /etc/nginx/conf.d/default.conf

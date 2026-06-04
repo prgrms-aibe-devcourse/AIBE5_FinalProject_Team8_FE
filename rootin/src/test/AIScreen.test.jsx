@@ -488,7 +488,8 @@ describe('결과 저장 및 보관함', () => {
     render(<AIScreen />);
     await waitFor(() => screen.getByRole('button', { name: /만들기/i }));
     fireEvent.click(screen.getByRole('button', { name: /만들기/i }));
-    await waitFor(() => expect(screen.getByRole('button', { name: '결과 저장' })).toBeInTheDocument());
+    // generated=true가 되면 '다시 생성' 버튼이 함께 나타남 → 이걸 먼저 기다려 상태 안정 확인
+    await waitFor(() => expect(screen.getByRole('button', { name: '다시 생성' })).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: '결과 저장' }));
 

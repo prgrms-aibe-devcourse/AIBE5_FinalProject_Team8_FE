@@ -1432,6 +1432,51 @@ function PotDetailScreen({ potId, onBack }) {
   );
 }
 
+const HARVEST_SPECIES_MAP = { '기본 씨앗': 'seed', '달빛씨앗': 'moonlight', '버섯씨앗': 'mushroom' };
+
+function HarvestResult({ result, onClose }) {
+  const nextSpecies = HARVEST_SPECIES_MAP[result.nextPlantName] ?? 'seed';
+  const isNextRare  = result.nextRarity === '희귀';
+  return (
+    <>
+      <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+      <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>수확 완료</div>
+      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+        {result.harvestedPlantName} 수확!
+      </h2>
+      <div style={{
+        margin: '20px 0', padding: '16px', background: 'var(--paper-2)',
+        borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 10,
+        fontSize: 13, color: 'var(--ink-2)', textAlign: 'left',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>수확한 식물</span>
+          <b style={{ color: 'var(--ink)' }}>
+            {result.harvestedPlantName}
+            <span style={{ fontSize: 11, marginLeft: 6, color: result.harvestedRarity === '희귀' ? '#534ab7' : 'var(--moss-2)' }}>
+              {result.harvestedRarity === '희귀' ? '✦ 희귀종' : '일반종'}
+            </span>
+          </b>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <span>수확 레벨</span>
+          <b style={{ color: 'var(--ink)' }}>Lv.{result.harvestedLevel}</b>
+        </div>
+        <div style={{ borderTop: '0.5px solid var(--rule)', paddingTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>새로 심어진 씨앗</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <PottedPlant species={nextSpecies} stage="seed" size={36} glow={isNextRare} />
+            <b style={{ color: isNextRare ? '#534ab7' : 'var(--moss-2)' }}>
+              {isNextRare ? '✦ ' : ''}{result.nextPlantName}
+            </b>
+          </div>
+        </div>
+      </div>
+      <Btn variant="green" size="lg" style={{ width: '100%' }} onClick={onClose}>확인</Btn>
+    </>
+  );
+}
+
 function HarvestModal({ pot, onClose }) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -1467,45 +1512,7 @@ function HarvestModal({ pot, onClose }) {
       }}>
 
         {result ? (
-          /* 수확 완료 결과 화면 */
-          <>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
-            <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>수확 완료</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
-              {result.harvestedPlantName} 수확!
-            </h2>
-            <div style={{
-              margin: '20px 0',
-              padding: '16px',
-              background: 'var(--paper-2)',
-              borderRadius: 12,
-              display: 'flex', flexDirection: 'column', gap: 10,
-              fontSize: 13, color: 'var(--ink-2)', textAlign: 'left',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>수확한 식물</span>
-                <b style={{ color: 'var(--ink)' }}>
-                  {result.harvestedPlantName}
-                  <span style={{ fontSize: 11, marginLeft: 6, color: result.harvestedRarity === '희귀' ? '#534ab7' : 'var(--moss-2)' }}>
-                    {result.harvestedRarity === '희귀' ? '✦ 희귀종' : '일반종'}
-                  </span>
-                </b>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>수확 레벨</span>
-                <b style={{ color: 'var(--ink)' }}>Lv.{result.harvestedLevel}</b>
-              </div>
-              <div style={{ borderTop: '0.5px solid var(--rule)', paddingTop: 10, display: 'flex', justifyContent: 'space-between' }}>
-                <span>새로 심어진 씨앗</span>
-                <b style={{ color: result.nextRarity === '희귀' ? '#534ab7' : 'var(--moss-2)' }}>
-                  {result.nextRarity === '희귀' ? '✦ ' : ''}{result.nextPlantName}
-                </b>
-              </div>
-            </div>
-            <Btn variant="green" size="lg" style={{ width: '100%' }} onClick={onClose}>
-              확인
-            </Btn>
-          </>
+          <HarvestResult result={result} onClose={onClose} />
         ) : (
           /* 수확 확인 화면 */
           <>

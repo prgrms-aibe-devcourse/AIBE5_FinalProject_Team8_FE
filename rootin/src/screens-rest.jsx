@@ -277,18 +277,18 @@ function CollectionScreen() {
 
 // === AI Screen ===
 
-function PotCard({ pot, selected, onClick }) {
-  // plantName → PixelPlant species 매핑
-  const PLANT_NAME_TO_SPECIES = {
-    '기본 씨앗': 'seed',
-    '달빛씨앗': 'moonlight',
-    '버섯씨앗': 'mushroom',
-  };
-  // growthStage → PixelPlant stage 매핑
-  const GROWTH_STAGE_TO_STAGE = {
-    SEED: 'seed', SPROUT: 'sprout', MATURE: 'leaf', BLOOM: 'bloom', FULL_BLOOM: 'full',
-  };
+// plantName → PixelPlant species 매핑
+const PLANT_NAME_TO_SPECIES = {
+  '기본 씨앗': 'seed',
+  '달빛씨앗': 'moonlight',
+  '버섯씨앗': 'mushroom',
+};
+// growthStage → PixelPlant stage 매핑
+const GROWTH_STAGE_TO_STAGE = {
+  SEED: 'seed', SPROUT: 'sprout', MATURE: 'leaf', BLOOM: 'bloom', FULL_BLOOM: 'full',
+};
 
+function PotCard({ pot, selected, onClick }) {
   const species = PLANT_NAME_TO_SPECIES[pot.plantName] ?? 'seed';
   const stage = GROWTH_STAGE_TO_STAGE[pot.growthStage] ?? 'seed';
 

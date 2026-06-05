@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { POTS, DEX } from './data.jsx';
 import { Icon } from './ui.jsx';
 import { Plant, RootinLogo } from './plants.jsx';
@@ -15,7 +16,7 @@ import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
 import { TilEditorProvider } from '@/components/til/til-editor-context';
 
-// App shell — sidebar + topbar + screen routing
+// App shell — sidebar + topbar + route-based screen routing
 
 const NAV = [
   { id: 'dashboard', label: '대시보드', icon: Icon.home },
@@ -30,7 +31,8 @@ const NAV = [
 
 function AppShell() {
   const { setUserFromApi, clearUser } = useUser();
-  const [screen, setScreen] = useState('dashboard');
+  const location = useLocation();
+  const navigate = useNavigate();
   const [authed, setAuthed] = useState(!!localStorage.getItem('accessToken'));
   const [showLanding, setShowLanding] = useState(!localStorage.getItem('accessToken'));
   const [potFocus, setPotFocus] = useState(null);
@@ -39,28 +41,36 @@ function AppShell() {
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
 
+  const screen = getScreenFromPath(location.pathname);
+  const routePotId = getPotIdFromPath(location.pathname);
+
   const handleNav = (nextScreen) => {
+    if (nextScreen?.startsWith?.('/')) {
+      navigate(nextScreen);
+      return;
+    }
     if (nextScreen === 'editor') {
       setEditorInitialPotId(null);
       setEditorInitialTil(null);
       setEditorReturnScreen(null);
     }
-    setScreen(nextScreen);
+    navigate(screenToPath(nextScreen, potFocus));
   };
 
   const openEditorForPot = (potId) => {
     setPotFocus(potId);
     setEditorInitialPotId(potId);
     setEditorInitialTil(null);
-    setEditorReturnScreen('pot-detail');
-    setScreen('editor');
+    setEditorReturnScreen(`/garden/pots/${potId}`);
+    navigate('/editor');
   };
 
   const openEditorForTil = (til) => {
-    setEditorInitialPotId(til?.potId ?? null);
+    const returnPotId = til?.potId ?? potFocus ?? routePotId;
+    setEditorInitialPotId(returnPotId ?? null);
     setEditorInitialTil(til);
-    setEditorReturnScreen('pot-detail');
-    setScreen('editor');
+    setEditorReturnScreen(returnPotId ? `/garden/pots/${returnPotId}` : '/garden');
+    navigate('/editor');
   };
 
   // 사이드바에서 임시저장본 "이어쓰기" — 수정 모드를 해제해 신규 작성 상태로 되돌림
@@ -71,7 +81,7 @@ function AppShell() {
   };
 
   const handleTilPublished = (publishedPotId) => {
-    if (editorReturnScreen === 'pot-detail') {
+    if (editorReturnScreen?.startsWith?.('/garden/pots/')) {
       setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
       setPotDetailRefreshKey(key => key + 1);
     }
@@ -84,8 +94,8 @@ function AppShell() {
     editor:     { title: '오늘의 TIL 작성', subtitle: 'New entry' },
     garden:     { title: '나의 정원', subtitle: 'Garden · 4개의 화분' },
     'pot-detail': {
-      title: potFocus
-        ? `${POTS.find(p => p.id === potFocus)?.emoji ?? '🌱'} ${POTS.find(p => p.id === potFocus)?.name ?? '화분 상세'}`
+      title: (routePotId ?? potFocus)
+        ? `${POTS.find(p => p.id === (routePotId ?? potFocus))?.emoji ?? '🌱'} ${POTS.find(p => p.id === (routePotId ?? potFocus))?.name ?? '화분 상세'}`
         : '화분',
       subtitle: 'Garden / Detail',
     },
@@ -130,7 +140,7 @@ function AppShell() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); handleNav('dashboard'); }}>
+                  <BreadcrumbLink href="/dashboard" onClick={(e) => { e.preventDefault(); handleNav('dashboard'); }}>
                     Rootin
                   </BreadcrumbLink>
                 </BreadcrumbItem>
@@ -143,29 +153,32 @@ function AppShell() {
           </header>
         )}
         <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-          {screen === 'dashboard'  && <DashboardScreen onNav={handleNav} />}
-          {screen === 'editor'     && (
-            <EditorScreen
-              onNav={handleNav}
-              initialSelectedPotId={editorInitialPotId}
-              initialTil={editorInitialTil}
-              afterPublishScreen={editorReturnScreen ?? 'dashboard'}
-              onPublished={handleTilPublished}
-            />
-          )}
-          {screen === 'garden'     && <GardenScreen onOpenPot={(id) => { setPotFocus(id); setScreen('pot-detail'); }} />}
-          {screen === 'pot-detail' && (
-            <PotDetailScreen
-              potId={potFocus}
-              refreshKey={potDetailRefreshKey}
-              onBack={() => setScreen('garden')}
-              onStartTil={openEditorForPot}
-              onEditTil={openEditorForTil}
-            />
-          )}
-          {screen === 'collection' && <CollectionScreen />}
-          {screen === 'ai'         && <AIScreen />}
-          {screen === 'profile'    && <ProfileScreen />}
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<DashboardScreen onNav={handleNav} />} />
+            <Route path="/editor" element={(
+              <EditorScreen
+                onNav={handleNav}
+                initialSelectedPotId={editorInitialPotId}
+                initialTil={editorInitialTil}
+                afterPublishScreen={editorReturnScreen ?? '/dashboard'}
+                onPublished={handleTilPublished}
+              />
+            )} />
+            <Route path="/garden" element={<GardenScreen onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
+            <Route path="/garden/pots/:potId" element={(
+              <PotDetailRoute
+                refreshKey={potDetailRefreshKey}
+                onBack={() => navigate('/garden')}
+                onStartTil={openEditorForPot}
+                onEditTil={openEditorForTil}
+              />
+            )} />
+            <Route path="/collection" element={<CollectionScreen />} />
+            <Route path="/ai" element={<AIScreen />} />
+            <Route path="/profile" element={<ProfileScreen />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
         </div>
       </SidebarInset>
       {screen === 'editor' && <RootinSidebarRight onEditTil={openEditorForTil} onResumeDraft={resumeEditorDraft} />}
@@ -174,14 +187,61 @@ function AppShell() {
   );
 }
 
+function PotDetailRoute({ refreshKey, onBack, onStartTil, onEditTil }) {
+  const { potId } = useParams();
+  const numericPotId = Number(potId);
+
+  return (
+    <PotDetailScreen
+      potId={Number.isFinite(numericPotId) ? numericPotId : potId}
+      refreshKey={refreshKey}
+      onBack={onBack}
+      onStartTil={onStartTil}
+      onEditTil={onEditTil}
+    />
+  );
+}
+
+function getScreenFromPath(pathname) {
+  if (pathname.startsWith('/garden/pots/')) return 'pot-detail';
+  if (pathname.startsWith('/editor')) return 'editor';
+  if (pathname.startsWith('/garden')) return 'garden';
+  if (pathname.startsWith('/collection')) return 'collection';
+  if (pathname.startsWith('/ai')) return 'ai';
+  if (pathname.startsWith('/profile')) return 'profile';
+  return 'dashboard';
+}
+
+function getPotIdFromPath(pathname) {
+  const match = pathname.match(/^\/garden\/pots\/([^/]+)/);
+  if (!match) return null;
+  const numericPotId = Number(match[1]);
+  return Number.isFinite(numericPotId) ? numericPotId : null;
+}
+
+function screenToPath(screen, potId) {
+  if (screen === 'pot-detail') return potId ? `/garden/pots/${potId}` : '/garden';
+  const paths = {
+    dashboard: '/dashboard',
+    editor: '/editor',
+    garden: '/garden',
+    collection: '/collection',
+    ai: '/ai',
+    profile: '/profile',
+  };
+  return paths[screen] ?? '/dashboard';
+}
+
 function App() {
   return (
-    <UserProvider onAuthExpired={() => {
-      // 토큰 만료 시 페이지 리로드로 로그아웃 처리
-      window.location.reload();
-    }}>
-      <AppShell />
-    </UserProvider>
+    <BrowserRouter>
+      <UserProvider onAuthExpired={() => {
+        // 토큰 만료 시 페이지 리로드로 로그아웃 처리
+        window.location.reload();
+      }}>
+        <AppShell />
+      </UserProvider>
+    </BrowserRouter>
   );
 }
 

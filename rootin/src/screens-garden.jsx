@@ -27,6 +27,17 @@ const STAGE_REPRESENTATIVE_TIL_COUNT = {
   full: 40,
 };
 
+const POT_TITLE_MAX_LENGTH = 10;
+const POT_DESCRIPTION_MAX_LENGTH = 25;
+const POT_DESCRIPTION_PREVIEW_STYLE = {
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
+  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
+};
+
 const POT_LAYOUT_SLOTS = [
   { x: 18, y: 78 },
   { x: 40, y: 72 },
@@ -484,7 +495,18 @@ function PotCard({ pot, onClick }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6, minHeight: 36 }}>{pot.intro}</div>
+      <div
+        title={pot.intro}
+        style={{
+          fontSize: 12.5,
+          color: 'var(--ink-2)',
+          lineHeight: 1.6,
+          minHeight: 36,
+          ...POT_DESCRIPTION_PREVIEW_STYLE,
+        }}
+      >
+        {pot.intro}
+      </div>
 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>
@@ -1396,8 +1418,8 @@ function CreatePotModal({ userId, onClose, onCreated }) {
 
   const titleLength = title.trim().length;
   const descriptionLength = description.length;
-  const titleInvalid = titleLength === 0 || title.length > 100;
-  const descriptionInvalid = descriptionLength > 255;
+  const titleInvalid = titleLength === 0 || title.length > POT_TITLE_MAX_LENGTH;
+  const descriptionInvalid = descriptionLength > POT_DESCRIPTION_MAX_LENGTH;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -1407,12 +1429,12 @@ function CreatePotModal({ userId, onClose, onCreated }) {
       setError('화분 제목을 입력해 주세요.');
       return;
     }
-    if (title.length > 100) {
-      setError('화분 제목은 최대 100자까지 입력할 수 있어요.');
+    if (title.length > POT_TITLE_MAX_LENGTH) {
+      setError(`화분 제목은 최대 ${POT_TITLE_MAX_LENGTH}자까지 입력할 수 있어요.`);
       return;
     }
-    if (description.length > 255) {
-      setError('화분 소개글은 최대 255자까지 입력할 수 있어요.');
+    if (description.length > POT_DESCRIPTION_MAX_LENGTH) {
+      setError(`화분 소개글은 최대 ${POT_DESCRIPTION_MAX_LENGTH}자까지 입력할 수 있어요.`);
       return;
     }
 
@@ -1480,11 +1502,12 @@ function CreatePotModal({ userId, onClose, onCreated }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span>화분 제목</span>
-              <span style={{ color: title.length > 100 ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/100</span>
+              <span style={{ color: title.length > POT_TITLE_MAX_LENGTH ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/{POT_TITLE_MAX_LENGTH}</span>
             </span>
             <input
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value.slice(0, POT_TITLE_MAX_LENGTH))}
+              maxLength={POT_TITLE_MAX_LENGTH}
               placeholder="예: Spring 공부"
               disabled={loading}
               autoFocus
@@ -1503,17 +1526,17 @@ function CreatePotModal({ userId, onClose, onCreated }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span>소개글</span>
-              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{descriptionLength}/255</span>
+              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{descriptionLength}/{POT_DESCRIPTION_MAX_LENGTH}</span>
             </span>
             <textarea
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={e => setDescription(e.target.value.slice(0, POT_DESCRIPTION_MAX_LENGTH))}
+              maxLength={POT_DESCRIPTION_MAX_LENGTH}
               placeholder="이 화분에 어떤 기록을 모을지 적어보세요."
               disabled={loading}
-              rows={4}
               style={{
-                minHeight: 96,
-                resize: 'vertical',
+                height: 82,
+                resize: 'none',
                 borderRadius: 10,
                 border: `0.5px solid ${descriptionInvalid ? '#f0c4cc' : 'var(--rule-2)'}`,
                 background: 'var(--paper)',
@@ -1837,7 +1860,18 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
                   )}
                 </div>
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 10, lineHeight: 1.6 }}>{pot.intro}</div>
+              <div
+                title={pot.intro}
+                style={{
+                  fontSize: 12.5,
+                  color: 'var(--ink-2)',
+                  marginTop: 10,
+                  lineHeight: 1.6,
+                  ...POT_DESCRIPTION_PREVIEW_STYLE,
+                }}
+              >
+                {pot.intro}
+              </div>
               <div style={{
                 marginTop: 18,
                 background: '#fff',
@@ -2305,8 +2339,8 @@ function EditPotModal({ pot, onClose, onUpdated }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const titleInvalid = title.trim().length === 0 || title.length > 100;
-  const descriptionInvalid = description.length > 255;
+  const titleInvalid = title.trim().length === 0 || title.length > POT_TITLE_MAX_LENGTH;
+  const descriptionInvalid = description.length > POT_DESCRIPTION_MAX_LENGTH;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -2316,12 +2350,12 @@ function EditPotModal({ pot, onClose, onUpdated }) {
       setError('화분 제목을 입력해 주세요.');
       return;
     }
-    if (title.length > 100) {
-      setError('화분 제목은 최대 100자까지 입력할 수 있어요.');
+    if (title.length > POT_TITLE_MAX_LENGTH) {
+      setError(`화분 제목은 최대 ${POT_TITLE_MAX_LENGTH}자까지 입력할 수 있어요.`);
       return;
     }
-    if (description.length > 255) {
-      setError('화분 소개글은 최대 255자까지 입력할 수 있어요.');
+    if (description.length > POT_DESCRIPTION_MAX_LENGTH) {
+      setError(`화분 소개글은 최대 ${POT_DESCRIPTION_MAX_LENGTH}자까지 입력할 수 있어요.`);
       return;
     }
 
@@ -2393,11 +2427,12 @@ function EditPotModal({ pot, onClose, onUpdated }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span>화분 제목</span>
-              <span style={{ color: title.length > 100 ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/100</span>
+              <span style={{ color: title.length > POT_TITLE_MAX_LENGTH ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/{POT_TITLE_MAX_LENGTH}</span>
             </span>
             <input
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value.slice(0, POT_TITLE_MAX_LENGTH))}
+              maxLength={POT_TITLE_MAX_LENGTH}
               disabled={loading}
               autoFocus
               style={{
@@ -2415,16 +2450,16 @@ function EditPotModal({ pot, onClose, onUpdated }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span>소개글</span>
-              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{description.length}/255</span>
+              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{description.length}/{POT_DESCRIPTION_MAX_LENGTH}</span>
             </span>
             <textarea
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={e => setDescription(e.target.value.slice(0, POT_DESCRIPTION_MAX_LENGTH))}
+              maxLength={POT_DESCRIPTION_MAX_LENGTH}
               disabled={loading}
-              rows={4}
               style={{
-                minHeight: 96,
-                resize: 'vertical',
+                height: 82,
+                resize: 'none',
                 borderRadius: 10,
                 border: `0.5px solid ${descriptionInvalid ? '#f0c4cc' : 'var(--rule-2)'}`,
                 background: 'var(--paper)',

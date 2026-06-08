@@ -29,6 +29,13 @@ const STAGE_REPRESENTATIVE_TIL_COUNT = {
 
 const POT_TITLE_MAX_LENGTH = 10;
 const POT_DESCRIPTION_MAX_LENGTH = 25;
+const EMPTY_POT_INTRO = '아직 소개글이 없는 화분이에요.';
+const POT_TITLE_PREVIEW_STYLE = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
 const POT_DESCRIPTION_PREVIEW_STYLE = {
   display: '-webkit-box',
   WebkitLineClamp: 2,
@@ -187,7 +194,7 @@ function toGardenPot(apiPot) {
     name: apiPot.title,
     emoji: getStageEmoji(stage),
     species: inferSpecies(apiPot.plantName),
-    intro: apiPot.description || '아직 소개글이 없는 화분이에요.',
+    intro: apiPot.description || EMPTY_POT_INTRO,
     tilCount: STAGE_REPRESENTATIVE_TIL_COUNT[stage],
     level,
     levelProgress,
@@ -213,7 +220,7 @@ function toDashboardPot(dashboard) {
     name: dashboard.title,
     emoji: getStageEmoji(stage),
     species: inferSpecies(dashboard.plant?.name),
-    intro: dashboard.description || '아직 소개글이 없는 화분이에요.',
+    intro: dashboard.description || EMPTY_POT_INTRO,
     tilCount: dashboard.totalTilCount ?? STAGE_REPRESENTATIVE_TIL_COUNT[stage],
     level: dashboard.level ?? 1,
     levelProgress,
@@ -467,10 +474,22 @@ function PotCard({ pot, onClick }) {
         : 'linear-gradient(180deg, #ffffff 0%, #f9faf7 100%)',
       borderColor: rare ? '#ccd6ec' : undefined,
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>Lv.{pot.level} · {potTier.shortLabel} 화분 · {stageMeta.label}</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 600, color: 'var(--ink)', marginTop: 4 }}>{pot.emoji} {pot.name}</div>
+          <div
+            title={`${pot.emoji} ${pot.name}`}
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 17,
+              fontWeight: 600,
+              color: 'var(--ink)',
+              marginTop: 4,
+              ...POT_TITLE_PREVIEW_STYLE,
+            }}
+          >
+            {pot.emoji} {pot.name}
+          </div>
         </div>
         {pot.waterToday ? (
           <Pill tone="green"><span style={{ display: 'inline-flex', marginRight: 2 }}>{Icon.drop}</span>물주기 완료</Pill>
@@ -740,9 +759,10 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
                   ? 'rgba(235, 245, 239, 0.95)'
                   : isDark ? 'rgba(15, 42, 71, 0.6)' : 'rgba(255, 255, 255, 0.75)',
                 border: isSelected ? '1px solid var(--leaf)' : 'none',
-                whiteSpace: 'nowrap',
+                maxWidth: 132,
                 imageRendering: 'pixelated',
-              }}>
+                ...POT_TITLE_PREVIEW_STYLE,
+              }} title={`${pot.emoji} ${pot.name}`}>
                 {pot.emoji} {pot.name}
               </div>
             </div>
@@ -1818,7 +1838,17 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
             </div>
             <div style={{ padding: '20px 24px 22px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+                <div
+                  title={`${pot.emoji} ${pot.name}`}
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: 'var(--ink)',
+                    letterSpacing: '-0.01em',
+                    ...POT_TITLE_PREVIEW_STYLE,
+                  }}
+                >
                   {pot.emoji} {pot.name}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
@@ -2335,7 +2365,7 @@ function TilDetailModal({ til, loading, onClose, onEdit }) {
 
 function EditPotModal({ pot, onClose, onUpdated }) {
   const [title, setTitle] = useState(pot.name ?? '');
-  const [description, setDescription] = useState(pot.intro === '아직 소개글이 없는 화분이에요.' ? '' : (pot.intro ?? ''));
+  const [description, setDescription] = useState(pot.intro === EMPTY_POT_INTRO ? '' : (pot.intro ?? ''));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 

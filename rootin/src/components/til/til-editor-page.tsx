@@ -16,12 +16,21 @@ import TaskItem from '@tiptap/extension-task-item'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Placeholder from '@tiptap/extension-placeholder'
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { Mathematics } from '@tiptap/extension-mathematics'
 import Image from '@tiptap/extension-image'
+import Youtube from '@tiptap/extension-youtube'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableHeader from '@tiptap/extension-table-header'
+import TableCell from '@tiptap/extension-table-cell'
 import { createLowlight, common } from 'lowlight'
 
-import { EditorToolbar } from './editor-toolbar'
+import { Minimize2 } from 'lucide-react'
+
+import { createCodeBlock } from './extensions/code-block'
+import { FontSize } from './extensions/font-size'
+import { Callout } from './extensions/callout'
+import { EditorToolbarIsland } from './editor-toolbar-island'
 import { EditorBubbleMenu } from './editor-bubble-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 
@@ -38,11 +47,15 @@ export function TilEditorPage({
   initialTil,
   afterPublishScreen = 'dashboard',
   onPublished,
+  focusMode = false,
+  onToggleFocus,
 }: {
   onNav?: (screen: string) => void
   initialSelectedPotId?: number | string | null
   afterPublishScreen?: string
   onPublished?: (potId: number | string | null) => void
+  focusMode?: boolean
+  onToggleFocus?: () => void
   initialTil?: {
     id?: number | string
     tilId?: number | string
@@ -92,15 +105,22 @@ export function TilEditorPage({
       }),
       TextStyle,
       Color,
+      FontSize,
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Subscript,
       Superscript,
-      CodeBlockLowlight.configure({ lowlight }),
+      createCodeBlock(lowlight),
+      Callout,
       Mathematics,
       Image.configure({ HTMLAttributes: { class: 'til-image' } }),
+      Youtube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
+      Table.configure({ resizable: true, HTMLAttributes: { class: 'til-table' } }),
+      TableRow,
+      TableHeader,
+      TableCell,
       Placeholder.configure({
         placeholder: '오늘 배운 것을 자유롭게 기록해보세요. “/” 없이 위 도구 모음을 사용하세요…',
       }),
@@ -281,23 +301,35 @@ export function TilEditorPage({
 
   return (
     <div className="flex h-screen flex-col overflow-y-auto bg-background">
-      {/* Sticky toolbar (헤더 제거 — 사이드바 토글을 툴바 좌측에 통합) */}
-      <div className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 py-1.5 md:px-6">
-          <SidebarTrigger className="size-8 shrink-0 text-muted-foreground" />
-          <span className="h-5 w-px shrink-0 bg-border/70" />
-          {editor ? (
-            <div className="scrollbar-subtle min-w-0 flex-1 overflow-x-auto">
-              <EditorToolbar editor={editor} />
-            </div>
-          ) : (
-            <div className="h-9 flex-1" />
-          )}
+      {/* 좌상단 떠있는 사이드바 토글 (집중 모드에선 숨김) */}
+      {!focusMode && (
+        <div className="pointer-events-none fixed left-4 top-4 z-30">
+          <SidebarTrigger
+            aria-label="사이드바 토글"
+            className="til-pulltab pointer-events-auto size-9 rounded-full text-muted-foreground"
+          />
         </div>
-      </div>
+      )}
+
+      {/* 떠있는 툴바 아일랜드 (집중 모드에선 숨김) */}
+      {!focusMode && editor ? (
+        <EditorToolbarIsland editor={editor} onToggleFocus={onToggleFocus} />
+      ) : null}
+
+      {/* 집중 모드 종료 버튼 */}
+      {focusMode && (
+        <button
+          type="button"
+          onClick={onToggleFocus}
+          className="til-pulltab fixed right-4 top-4 z-30 flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-medium text-muted-foreground"
+        >
+          <Minimize2 className="size-4" />
+          집중 모드 종료
+        </button>
+      )}
 
       {/* Writing canvas */}
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pb-40 pt-10 md:px-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pb-40 pt-24 md:px-6">
         <TilMeta />
         <div className="til-prose mt-8">
           {editor ? (
@@ -314,18 +346,20 @@ export function TilEditorPage({
         </div>
       </main>
 
-      <TilStatusIsland
-        saved={saved}
-        onSave={handleSaveDraft}
-        onPublish={handlePublish}
-        publishing={publishing || updating}
-        canPublish={canPublish}
-        stats={stats}
-        saveLabel={isEditMode ? '변경 저장' : '임시저장'}
-        publishLabel={isEditMode ? '수정 완료' : '발행'}
-        publishingLabel={isEditMode ? '저장 중…' : '발행 중…'}
-        isEditMode={isEditMode}
-      />
+      {!focusMode && (
+        <TilStatusIsland
+          saved={saved}
+          onSave={handleSaveDraft}
+          onPublish={handlePublish}
+          publishing={publishing || updating}
+          canPublish={canPublish}
+          stats={stats}
+          saveLabel={isEditMode ? '변경 저장' : '임시저장'}
+          publishLabel={isEditMode ? '수정 완료' : '발행'}
+          publishingLabel={isEditMode ? '저장 중…' : '발행 중…'}
+          isEditMode={isEditMode}
+        />
+      )}
     </div>
   )
 }

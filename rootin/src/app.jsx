@@ -38,8 +38,23 @@ function AppShell() {
   const [editorInitialTil, setEditorInitialTil] = useState(null);
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
+  // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(() => {
+    const v = typeof localStorage !== 'undefined' ? localStorage.getItem('rootin.tilRightOpen') : null;
+    return v === null ? true : v === 'true';
+  });
+  const [focusMode, setFocusMode] = useState(false);
+
+  const toggleRightPanel = () => setRightOpen((o) => {
+    const next = !o;
+    try { localStorage.setItem('rootin.tilRightOpen', String(next)); } catch { /* noop */ }
+    return next;
+  });
+  const toggleFocusMode = () => setFocusMode((f) => !f);
 
   const handleNav = (nextScreen) => {
+    setFocusMode(false);
     if (nextScreen === 'editor') {
       setEditorInitialPotId(null);
       setEditorInitialTil(null);
@@ -110,6 +125,8 @@ function AppShell() {
   return (
     <TilEditorProvider>
     <SidebarProvider
+      open={focusMode ? false : leftOpen}
+      onOpenChange={setLeftOpen}
       style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper)', minWidth: 1180 }}
       data-screen-label={screen}
     >
@@ -151,6 +168,8 @@ function AppShell() {
               initialTil={editorInitialTil}
               afterPublishScreen={editorReturnScreen ?? 'dashboard'}
               onPublished={handleTilPublished}
+              focusMode={focusMode}
+              onToggleFocus={toggleFocusMode}
             />
           )}
           {screen === 'garden'     && <GardenScreen onOpenPot={(id) => { setPotFocus(id); setScreen('pot-detail'); }} />}
@@ -168,7 +187,14 @@ function AppShell() {
           {screen === 'profile'    && <ProfileScreen />}
         </div>
       </SidebarInset>
-      {screen === 'editor' && <RootinSidebarRight onEditTil={openEditorForTil} onResumeDraft={resumeEditorDraft} />}
+      {screen === 'editor' && !focusMode && (
+        <RootinSidebarRight
+          onEditTil={openEditorForTil}
+          onResumeDraft={resumeEditorDraft}
+          open={rightOpen}
+          onToggle={toggleRightPanel}
+        />
+      )}
     </SidebarProvider>
     </TilEditorProvider>
   );

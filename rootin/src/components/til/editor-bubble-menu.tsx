@@ -32,9 +32,9 @@ function MiniButton({
       data-active={active ? '' : undefined}
       onClick={onClick}
       className={cn(
-        'inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-all duration-150 ease-out',
-        'hover:bg-accent hover:text-accent-foreground active:scale-95',
-        'data-[active]:bg-primary/15 data-[active]:text-primary',
+        'inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors duration-150 ease-out',
+        'hover:bg-primary/10 hover:text-foreground active:scale-[0.97]',
+        'data-[active]:bg-primary/10 data-[active]:text-primary',
       )}
     >
       {children}
@@ -50,7 +50,7 @@ export function EditorBubbleMenu({ editor }: { editor: Editor }) {
       shouldShow={({ editor: e, from, to }) =>
         from !== to && !e.isActive('codeBlock')
       }
-      className="til-bubble-menu flex items-center gap-0.5 rounded-xl border border-border/80 bg-popover/95 p-1 shadow-[var(--shadow-lg)] backdrop-blur supports-[backdrop-filter]:bg-popover/80"
+      className="til-bubble-menu flex items-center gap-0.5 rounded-xl border border-primary/10 bg-secondary/95 p-1 shadow-[var(--shadow-lg)] backdrop-blur-xl"
     >
       <MiniButton
         label="굵게"
@@ -100,7 +100,7 @@ export function EditorBubbleMenu({ editor }: { editor: Editor }) {
       >
         <Highlighter className="size-4" />
       </MiniButton>
-      <span className="mx-0.5 h-5 w-px bg-border" aria-hidden />
+      <span className="mx-0.5 h-6 w-px bg-border/70" aria-hidden />
       <LinkPopover editor={editor} />
     </BubbleMenu>
   )

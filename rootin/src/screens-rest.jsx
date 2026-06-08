@@ -1177,7 +1177,7 @@ function parseApiError(err) {
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 
-function AuthScreen({ onAuth }) {
+function AuthScreen({ onAuth, onBackToLanding }) {
   const [mode, setMode] = useState('login'); // login | signup
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1309,6 +1309,24 @@ function AuthScreen({ onAuth }) {
 
       {/* Right form */}
       <div style={{ padding: '60px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        {onBackToLanding && (
+          <button
+            type="button"
+            onClick={onBackToLanding}
+            style={{
+              alignSelf: 'flex-start',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              marginBottom: 24,
+              color: 'var(--ink-3)',
+              fontSize: 12.5,
+              fontFamily: 'var(--font-display)',
+            }}
+          >
+            ← 처음으로
+          </button>
+        )}
         <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>{mode === 'login' ? 'Welcome back' : 'Start growing'}</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: 'var(--ink)', marginTop: 8, letterSpacing: '-0.02em' }}>
           {mode === 'login' ? '다시 만나서 반가워요' : '새로운 정원 시작하기'}

@@ -1600,6 +1600,33 @@ function CreatePotModal({ userId, onClose, onCreated }) {
 // ============================
 // Pot Detail Screen
 // ============================
+function PotDetailBackButton({ onBack, style }) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 7,
+        padding: '8px 12px',
+        borderRadius: 999,
+        border: '0.5px solid #c9dccd',
+        background: '#fff',
+        color: 'var(--moss-2)',
+        fontSize: 12.5,
+        fontWeight: 700,
+        fontFamily: 'var(--font-display)',
+        boxShadow: '0 4px 12px rgba(40, 84, 57, 0.08)',
+        ...style,
+      }}
+    >
+      <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span>
+      정원으로 돌아가기
+    </button>
+  );
+}
+
 function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil }) {
   const { user } = useUser();
   const fallbackPot = POTS.find(p => p.id === potId);
@@ -1686,9 +1713,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   if (dashboardLoading && !pot) {
     return (
       <div style={{ padding: 32, maxWidth: 960, margin: '0 auto' }}>
-        <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14 }}>
-          <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
-        </button>
+        <PotDetailBackButton onBack={onBack} style={{ marginBottom: 16 }} />
         <Card padding={28} style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
           화분 대시보드를 불러오는 중이에요.
         </Card>
@@ -1699,9 +1724,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   if (!pot) {
     return (
       <div style={{ padding: 32, maxWidth: 960, margin: '0 auto' }}>
-        <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14 }}>
-          <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
-        </button>
+        <PotDetailBackButton onBack={onBack} style={{ marginBottom: 16 }} />
         <Card padding={28} style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>🌱</div>
           <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>Garden Detail</div>
@@ -1804,14 +1827,13 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
 
   return (
     <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
-      <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14 }}>
-        <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
-      </button>
-
       <div className="pot-detail-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(350px, 400px) minmax(0, 760px)', gap: 24, alignItems: 'start' }}>
 
         {/* Left — plant card */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <PotDetailBackButton onBack={onBack} />
+          </div>
           <Card padding={0} style={{ overflow: 'hidden' }}>
             <div style={{
               padding: '34px 24px 24px',
@@ -2144,46 +2166,41 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
                 onClick={() => handleOpenTilDetail(t)}
                 style={{ cursor: 'pointer' }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
-                      {t.date} · {t.chars}자
-                    </div>
-                    <div style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 16,
-                      fontWeight: 600,
-                      color: 'var(--ink)',
-                      lineHeight: 1.45,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}>
-                      {t.title}
-                    </div>
-                    <div style={{
-                      fontSize: 13,
-                      color: 'var(--ink-2)',
-                      lineHeight: 1.6,
-                      marginTop: 6,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}>
-                      {t.excerpt}
-                    </div>
-                    <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
-                      {t.tags.map(tag => (
-                        <span key={tag} style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 999, background: 'var(--paper-2)', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
+                    {t.date} · {t.chars}자
                   </div>
-                  <div style={{ width: 56, height: 56, borderRadius: 10, background: isRare ? '#eef2fa' : 'var(--paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <PottedPlant species={pot.species} stage={stage} size={44} potLevel={pot.level} />
+                  <div style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: 'var(--ink)',
+                    lineHeight: 1.45,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}>
+                    {t.title}
+                  </div>
+                  <div style={{
+                    fontSize: 13,
+                    color: 'var(--ink-2)',
+                    lineHeight: 1.6,
+                    marginTop: 6,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}>
+                    {t.excerpt}
+                  </div>
+                  <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
+                    {t.tags.map(tag => (
+                      <span key={tag} style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 999, background: 'var(--paper-2)', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </Card>

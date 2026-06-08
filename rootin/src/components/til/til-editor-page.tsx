@@ -38,11 +38,13 @@ export function TilEditorPage({
   initialTil,
   afterPublishScreen = 'dashboard',
   onPublished,
+  onSelectedPotChange,
 }: {
   onNav?: (screen: string) => void
   initialSelectedPotId?: number | string | null
   afterPublishScreen?: string
   onPublished?: (potId: number | string | null) => void
+  onSelectedPotChange?: (potId: string | null) => void
   initialTil?: {
     id?: number | string
     tilId?: number | string
@@ -73,6 +75,7 @@ export function TilEditorPage({
   const restoredPotIdRef = useRef<string | null>(null)
   const settledPotIdRef = useRef<string | null>(null)
   const hydratedTilIdRef = useRef<string | null>(null)
+  const initialPotReadyRef = useRef(false)
   const normalizedInitialPotId = initialSelectedPotId == null
     ? null
     : String(initialSelectedPotId)
@@ -138,9 +141,19 @@ export function TilEditorPage({
   }, [saved, setDirty])
 
   useEffect(() => {
-    if (!normalizedInitialPotId) return
+    if (!normalizedInitialPotId) {
+      initialPotReadyRef.current = true
+      return
+    }
     setSelectedPotId(normalizedInitialPotId)
+    initialPotReadyRef.current = true
   }, [normalizedInitialPotId, setSelectedPotId])
+
+  useEffect(() => {
+    if (!initialPotReadyRef.current) return
+    if (normalizedInitialPotId && selectedPotId == null) return
+    onSelectedPotChange?.(selectedPotId)
+  }, [normalizedInitialPotId, onSelectedPotChange, selectedPotId])
 
   useEffect(() => {
     if (!editor || !initialTil || !editTilId || hydratedTilIdRef.current === editTilId) return

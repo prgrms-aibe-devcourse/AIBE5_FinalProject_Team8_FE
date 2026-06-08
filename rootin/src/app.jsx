@@ -1,8 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { POTS, DEX } from './data.jsx';
-import { Icon } from './ui.jsx';
-import { Plant, RootinLogo } from './plants.jsx';
 import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
@@ -18,15 +16,6 @@ import { TilEditorProvider } from '@/components/til/til-editor-context';
 
 // App shell — sidebar + topbar + route-based screen routing
 
-const NAV = [
-  { id: 'dashboard', label: '대시보드', icon: Icon.home },
-  { id: 'editor',    label: 'TIL 작성',  icon: Icon.edit },
-  { id: 'garden',    label: '정원',      icon: Icon.garden },
-  { id: 'collection',label: '식물도감',  icon: Icon.book },
-  { id: 'ai',        label: 'AI 학습',   icon: Icon.sparkles },
-  { id: 'profile',   label: '프로필',    icon: Icon.user },
-];
-
 // Old custom Sidebar and TopBar removed and replaced by Shadcn UI
 
 function AppShell() {
@@ -34,7 +23,6 @@ function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const [authed, setAuthed] = useState(!!localStorage.getItem('accessToken'));
-  const [showLanding, setShowLanding] = useState(!localStorage.getItem('accessToken'));
   const [potFocus, setPotFocus] = useState(null);
   const [editorInitialPotId, setEditorInitialPotId] = useState(null);
   const [editorInitialTil, setEditorInitialTil] = useState(null);
@@ -43,6 +31,8 @@ function AppShell() {
 
   const screen = getScreenFromPath(location.pathname);
   const routePotId = getPotIdFromPath(location.pathname);
+  const editorQueryPotId = getEditorPotIdFromSearch(location.search);
+  const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
 
   const handleNav = (nextScreen) => {
     if (nextScreen?.startsWith?.('/')) {
@@ -62,7 +52,7 @@ function AppShell() {
     setEditorInitialPotId(potId);
     setEditorInitialTil(null);
     setEditorReturnScreen(`/garden/pots/${potId}`);
-    navigate('/editor');
+    navigate(`/editor?potId=${potId}`);
   };
 
   const openEditorForTil = (til) => {
@@ -70,7 +60,7 @@ function AppShell() {
     setEditorInitialPotId(returnPotId ?? null);
     setEditorInitialTil(til);
     setEditorReturnScreen(returnPotId ? `/garden/pots/${returnPotId}` : '/garden');
-    navigate('/editor');
+    navigate(returnPotId ? `/editor?potId=${returnPotId}` : '/editor');
   };
 
   // 사이드바에서 임시저장본 "이어쓰기" — 수정 모드를 해제해 신규 작성 상태로 되돌림
@@ -78,6 +68,7 @@ function AppShell() {
   const resumeEditorDraft = (potId) => {
     setEditorInitialPotId(potId ?? null);
     setEditorInitialTil(null);
+    navigate(potId ? `/editor?potId=${potId}` : '/editor', { replace: true });
   };
 
   const handleTilPublished = (publishedPotId) => {
@@ -87,7 +78,18 @@ function AppShell() {
     }
   };
 
-  const unlockedDEXCount = useMemo(() => DEX.filter(d => d.state !== 'locked').length, [DEX]);
+  const syncEditorPotQuery = (selectedPotId) => {
+    if (!isRoutePath(location.pathname, 'editor')) return;
+    const numericPotId = parseRoutePotId(selectedPotId);
+    setEditorInitialPotId(numericPotId ?? null);
+    const nextPath = numericPotId ? `/editor?potId=${numericPotId}` : '/editor';
+    const currentPath = `${location.pathname}${location.search}`;
+    if (currentPath !== nextPath) {
+      navigate(nextPath, { replace: true });
+    }
+  };
+
+  const unlockedDEXCount = DEX.filter(d => d.state !== 'locked').length;
 
   const titles = {
     dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
@@ -104,16 +106,24 @@ function AppShell() {
     profile:    { title: '내 계정', subtitle: 'Account' },
   };
 
-  if (!authed && showLanding) return (
-    <LandingScreen onStart={() => setShowLanding(false)} />
-  );
-
-  if (!authed) return (
-    <AuthScreen onAuth={(userData) => {
-      setUserFromApi(userData);
-      setAuthed(true);
-    }} />
-  );
+  if (!authed) {
+    return (
+      <Routes>
+        <Route path="/landing" element={<LandingScreen onStart={() => navigate('/login')} />} />
+        <Route path="/login" element={(
+          <AuthScreen
+            onBackToLanding={() => navigate('/landing')}
+            onAuth={(userData) => {
+              setUserFromApi(userData);
+              setAuthed(true);
+              navigate('/dashboard', { replace: true });
+            }}
+          />
+        )} />
+        <Route path="*" element={<Navigate to="/landing" replace />} />
+      </Routes>
+    );
+  }
 
   const meta = titles[screen] || { title: '', subtitle: '' };
 
@@ -130,6 +140,7 @@ function AppShell() {
           import('./api/auth.js').then(({ logout }) => logout().catch(() => {}));
           clearUser();
           setAuthed(false);
+          navigate('/landing', { replace: true });
         }}
       />
       <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
@@ -159,10 +170,11 @@ function AppShell() {
             <Route path="/editor" element={(
               <EditorScreen
                 onNav={handleNav}
-                initialSelectedPotId={editorInitialPotId}
+                initialSelectedPotId={activeEditorPotId}
                 initialTil={editorInitialTil}
-                afterPublishScreen={editorReturnScreen ?? '/dashboard'}
+                afterPublishScreen={editorReturnScreen ?? (activeEditorPotId ? `/garden/pots/${activeEditorPotId}` : '/dashboard')}
                 onPublished={handleTilPublished}
+                onSelectedPotChange={syncEditorPotQuery}
               />
             )} />
             <Route path="/garden" element={<GardenScreen onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
@@ -189,11 +201,15 @@ function AppShell() {
 
 function PotDetailRoute({ refreshKey, onBack, onStartTil, onEditTil }) {
   const { potId } = useParams();
-  const numericPotId = Number(potId);
+  const numericPotId = parseRoutePotId(potId);
+
+  if (numericPotId == null) {
+    return <Navigate to="/garden" replace />;
+  }
 
   return (
     <PotDetailScreen
-      potId={Number.isFinite(numericPotId) ? numericPotId : potId}
+      potId={numericPotId}
       refreshKey={refreshKey}
       onBack={onBack}
       onStartTil={onStartTil}
@@ -203,20 +219,24 @@ function PotDetailRoute({ refreshKey, onBack, onStartTil, onEditTil }) {
 }
 
 function getScreenFromPath(pathname) {
-  if (pathname.startsWith('/garden/pots/')) return 'pot-detail';
-  if (pathname.startsWith('/editor')) return 'editor';
-  if (pathname.startsWith('/garden')) return 'garden';
-  if (pathname.startsWith('/collection')) return 'collection';
-  if (pathname.startsWith('/ai')) return 'ai';
-  if (pathname.startsWith('/profile')) return 'profile';
+  if (/^\/garden\/pots\/[^/]+$/.test(pathname)) return 'pot-detail';
+  if (isRoutePath(pathname, 'editor')) return 'editor';
+  if (isRoutePath(pathname, 'garden')) return 'garden';
+  if (isRoutePath(pathname, 'collection')) return 'collection';
+  if (isRoutePath(pathname, 'ai')) return 'ai';
+  if (isRoutePath(pathname, 'profile')) return 'profile';
   return 'dashboard';
 }
 
 function getPotIdFromPath(pathname) {
-  const match = pathname.match(/^\/garden\/pots\/([^/]+)/);
+  const match = pathname.match(/^\/garden\/pots\/([^/]+)$/);
   if (!match) return null;
-  const numericPotId = Number(match[1]);
-  return Number.isFinite(numericPotId) ? numericPotId : null;
+  return parseRoutePotId(match[1]);
+}
+
+function getEditorPotIdFromSearch(search) {
+  const params = new URLSearchParams(search);
+  return parseRoutePotId(params.get('potId'));
 }
 
 function screenToPath(screen, potId) {
@@ -230,6 +250,16 @@ function screenToPath(screen, potId) {
     profile: '/profile',
   };
   return paths[screen] ?? '/dashboard';
+}
+
+function parseRoutePotId(potId) {
+  if (!/^[1-9]\d*$/.test(String(potId ?? ''))) return null;
+  const numericPotId = Number(potId);
+  return Number.isSafeInteger(numericPotId) ? numericPotId : null;
+}
+
+function isRoutePath(pathname, route) {
+  return pathname === `/${route}` || pathname.startsWith(`/${route}/`);
 }
 
 function App() {

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { getPlants } from './api/collection.js';
-import { DEX } from './data.jsx';
 import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult } from './api/ai.js';
 import { getPots } from './api/pot.js';
 import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
@@ -256,9 +255,14 @@ function CollectionScreen() {
 
 // plantName → PixelPlant species 매핑
 const PLANT_NAME_TO_SPECIES = {
-  '기본 씨앗': 'seed',
-  '달빛씨앗': 'moonlight',
-  '버섯씨앗': 'mushroom',
+  '기본 씨앗':  'seed',
+  '버섯씨앗':   'mushroom',
+  '선인장씨앗': 'cactus',
+  '불꽃씨앗':   'fire',
+  '얼음씨앗':   'ice',
+  '달빛씨앗':   'moonlight',
+  '번개씨앗':   'bolt',
+  '흑장미씨앗': 'rose',
 };
 // growthStage → PixelPlant stage 매핑
 const GROWTH_STAGE_TO_STAGE = {
@@ -860,16 +864,9 @@ function ProfileScreen() {
 
   // 수확한 식물 수 조회
   useEffect(() => {
-    import('./api/collection.js').then(({ getPlants }) =>
-      getPlants()
-        .then(plants => {
-          const count = Array.isArray(plants)
-            ? plants.filter(p => p.isCollected === true).length
-            : 0;
-          setHarvestedCount(count);
-        })
-        .catch(() => setHarvestedCount(0))
-    );
+    getPlants()
+      .then(data => setHarvestedCount(data?.stats?.collected ?? 0))
+      .catch(() => setHarvestedCount(0));
   }, []);
 
   async function handleSave() {

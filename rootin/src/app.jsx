@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { POTS, DEX } from './data.jsx';
+import { POTS } from './data.jsx';
+import { getPlants } from './api/collection.js';
 import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
@@ -28,6 +29,13 @@ function AppShell() {
   const [editorInitialTil, setEditorInitialTil] = useState(null);
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
+  const [collectionStats, setCollectionStats] = useState(null);
+
+  useEffect(() => {
+    getPlants()
+      .then(data => setCollectionStats(data?.stats ?? null))
+      .catch(() => {});
+  }, []);
 
   const screen = getScreenFromPath(location.pathname);
   const routePotId = getPotIdFromPath(location.pathname);
@@ -89,8 +97,6 @@ function AppShell() {
     }
   };
 
-  const unlockedDEXCount = DEX.filter(d => d.state !== 'locked').length;
-
   const titles = {
     dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
     editor:     { title: '오늘의 TIL 작성', subtitle: 'New entry' },
@@ -101,7 +107,12 @@ function AppShell() {
         : '화분',
       subtitle: 'Garden / Detail',
     },
-    collection: { title: '식물 도감', subtitle: `Collection · ${unlockedDEXCount} / ${DEX.length} 종 해금` },
+    collection: {
+      title: '식물 도감',
+      subtitle: collectionStats
+        ? `Collection · ${collectionStats.collected} / ${collectionStats.total} 종 해금`
+        : 'Collection · 식물 도감',
+    },
     ai:         { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
     profile:    { title: '내 계정', subtitle: 'Account' },
   };

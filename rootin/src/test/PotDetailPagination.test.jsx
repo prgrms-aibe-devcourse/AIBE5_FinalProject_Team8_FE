@@ -144,17 +144,16 @@ describe('PotDetailScreen — 페이지 크기 선택', () => {
     renderPotDetail();
     await waitFor(() => expect(screen.getByText('10개')).toBeInTheDocument());
 
-    // 2페이지로 이동
-    const nextBtn = screen.getByRole('button', { name: '다음 페이지' });
-    fireEvent.click(nextBtn);
+    // 2페이지로 이동 (상단 pagination [0] 사용)
+    fireEvent.click(screen.getAllByRole('button', { name: '다음 페이지' })[0]);
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '2페이지' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.getAllByRole('button', { name: '2페이지' })[0]).toHaveAttribute('aria-current', 'page');
     });
 
     // 페이지 크기 변경 → page 리셋
     fireEvent.click(screen.getByText('5개'));
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '1페이지' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.getAllByRole('button', { name: '1페이지' })[0]).toHaveAttribute('aria-current', 'page');
     });
   });
 });
@@ -164,9 +163,9 @@ describe('PotDetailScreen — 페이지 크기 선택', () => {
 describe('PotDetailScreen — 페이지네이션 렌더링', () => {
   it('총 페이지가 2 이상이면 네비게이션이 표시된다', async () => {
     renderPotDetail();
-    // 총 25개 / 10개씩 = 3페이지
+    // 총 25개 / 10개씩 = 3페이지 → 상단+하단 2개 렌더링
     await waitFor(() =>
-      expect(screen.getByRole('navigation', { name: 'TIL 페이지 네비게이션' })).toBeInTheDocument()
+      expect(screen.getAllByRole('navigation', { name: 'TIL 페이지 네비게이션' }).length).toBeGreaterThanOrEqual(1)
     );
   });
 
@@ -184,12 +183,12 @@ describe('PotDetailScreen — 페이지네이션 렌더링', () => {
   });
 
   it('페이지 번호 버튼이 totalPages 수만큼 렌더링된다', async () => {
-    renderPotDetail(); // 총 3페이지
+    renderPotDetail(); // 총 3페이지 → 상단+하단 각각 1~3페이지 버튼
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '3페이지' })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: '3페이지' }).length).toBeGreaterThanOrEqual(1)
     );
-    expect(screen.getByRole('button', { name: '1페이지' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '2페이지' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: '1페이지' }).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByRole('button', { name: '2페이지' }).length).toBeGreaterThanOrEqual(1);
   });
 });
 
@@ -199,21 +198,24 @@ describe('PotDetailScreen — 이전/다음 버튼', () => {
   it('첫 페이지에서 이전 버튼이 비활성화된다', async () => {
     renderPotDetail();
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '이전 페이지' })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: '이전 페이지' }).length).toBeGreaterThanOrEqual(1)
     );
-    expect(screen.getByRole('button', { name: '이전 페이지' })).toBeDisabled();
+    // 상단/하단 모두 disabled
+    screen.getAllByRole('button', { name: '이전 페이지' }).forEach(btn => {
+      expect(btn).toBeDisabled();
+    });
   });
 
   it('다음 버튼 클릭 시 2페이지로 이동하고 getMyTils를 page=1로 재호출한다', async () => {
     renderPotDetail();
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '다음 페이지' })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: '다음 페이지' }).length).toBeGreaterThanOrEqual(1)
     );
 
     const { getMyTils } = await import('../api/til.js');
     getMyTils.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: '다음 페이지' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '다음 페이지' })[0]);
 
     await waitFor(() => {
       expect(getMyTils).toHaveBeenCalledWith(
@@ -225,33 +227,39 @@ describe('PotDetailScreen — 이전/다음 버튼', () => {
   it('마지막 페이지에서 다음 버튼이 비활성화된다', async () => {
     renderPotDetail();
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '3페이지' })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: '3페이지' }).length).toBeGreaterThanOrEqual(1)
     );
 
-    fireEvent.click(screen.getByRole('button', { name: '3페이지' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '3페이지' })[0]);
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '3페이지' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.getAllByRole('button', { name: '3페이지' })[0]).toHaveAttribute('aria-current', 'page');
     });
 
-    expect(screen.getByRole('button', { name: '다음 페이지' })).toBeDisabled();
+    // 상단/하단 모두 disabled
+    screen.getAllByRole('button', { name: '다음 페이지' }).forEach(btn => {
+      expect(btn).toBeDisabled();
+    });
   });
 
   it('페이지 번호 버튼 클릭 시 해당 페이지로 이동한다', async () => {
     renderPotDetail();
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: '2페이지' })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: '2페이지' }).length).toBeGreaterThanOrEqual(1)
     );
 
     const { getMyTils } = await import('../api/til.js');
     getMyTils.mockClear();
 
-    fireEvent.click(screen.getByRole('button', { name: '2페이지' }));
+    fireEvent.click(screen.getAllByRole('button', { name: '2페이지' })[0]);
 
     await waitFor(() => {
       expect(getMyTils).toHaveBeenCalledWith(
         expect.objectContaining({ page: 1 })
       );
     });
-    expect(screen.getByRole('button', { name: '2페이지' })).toHaveAttribute('aria-current', 'page');
+    // 상단/하단 모두 aria-current 동기화
+    screen.getAllByRole('button', { name: '2페이지' }).forEach(btn => {
+      expect(btn).toHaveAttribute('aria-current', 'page');
+    });
   });
 });

@@ -1627,6 +1627,297 @@ function PotDetailBackButton({ onBack, style }) {
   );
 }
 
+const TIL_PAGE_SIZE_OPTIONS = [5, 10, 20];
+
+function TilPagination({ tilPage, tilTotalPages, onPageChange }) {
+  if (tilTotalPages <= 1) return null;
+
+  const WING = 2;
+  const pages = [];
+  const addPage = (i) => pages.push({ type: 'page', i });
+  const addEllipsis = (key) => pages.push({ type: 'ellipsis', key });
+
+  if (tilTotalPages <= 7) {
+    for (let i = 0; i < tilTotalPages; i++) addPage(i);
+  } else {
+    addPage(0);
+    const leftEdge = tilPage - WING;
+    const rightEdge = tilPage + WING;
+    if (leftEdge > 1) addEllipsis('left');
+    for (let i = Math.max(1, leftEdge); i <= Math.min(tilTotalPages - 2, rightEdge); i++) addPage(i);
+    if (rightEdge < tilTotalPages - 2) addEllipsis('right');
+    addPage(tilTotalPages - 1);
+  }
+
+  const arrowStyle = (disabled) => ({
+    width: 38, height: 38, borderRadius: 9,
+    border: '0.5px solid var(--rule-2)', background: '#fff',
+    color: disabled ? 'var(--ink-3)' : 'var(--ink)',
+    opacity: disabled ? 0.35 : 1,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 18, fontWeight: 400, lineHeight: 1,
+  });
+
+  return (
+    <div
+      role="navigation"
+      aria-label="TIL 페이지 네비게이션"
+      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+    >
+      <button type="button" aria-label="이전 페이지" disabled={tilPage === 0}
+        onClick={() => onPageChange(tilPage - 1)} style={arrowStyle(tilPage === 0)}>
+        ‹
+      </button>
+
+      {pages.map(item => {
+        if (item.type === 'ellipsis') {
+          return (
+            <span key={`ellipsis-${item.key}`} style={{
+              width: 32, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 13, color: 'var(--ink-3)', letterSpacing: '0.05em', userSelect: 'none',
+            }}>…</span>
+          );
+        }
+        const i = item.i;
+        const active = tilPage === i;
+        return (
+          <button
+            key={i} type="button"
+            aria-label={`${i + 1}페이지`}
+            aria-current={active ? 'page' : undefined}
+            onClick={() => onPageChange(i)}
+            style={{
+              width: 36, height: 38, borderRadius: 9,
+              border: `0.5px solid ${active ? 'var(--moss)' : 'var(--rule-2)'}`,
+              background: active ? '#ebf5ef' : '#fff',
+              color: active ? 'var(--moss-2)' : 'var(--ink-2)',
+              fontWeight: active ? 700 : 400,
+              fontSize: 13, fontFamily: 'var(--font-display)', cursor: 'pointer',
+            }}
+          >
+            {i + 1}
+          </button>
+        );
+      })}
+
+      <button type="button" aria-label="다음 페이지" disabled={tilPage >= tilTotalPages - 1}
+        onClick={() => onPageChange(tilPage + 1)} style={arrowStyle(tilPage >= tilTotalPages - 1)}>
+        ›
+      </button>
+    </div>
+  );
+}
+
+function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHarvest, onShowEditPot }) {
+  const speciesInfo = PIXEL_SPECIES[pot.species];
+  const monName = speciesInfo?.stages[stage]?.name;
+  const isRare = pot.species === 'moonlight';
+  const potTier = getPotTier(pot.level);
+  const detailSubText = dashboard
+    ? `최근 물주기 ${formatDateTime(pot.lastWateredAt)} · 누적 ${pot.totalExp} EXP`
+    : `${pot.createdAt} 생성 · 누적 ${Math.floor(pot.tilCount * 850)}자`;
+  const potExperienceText = formatPotExperience(pot);
+  const plantGrowthPercent = formatPlantGrowthPercent(pot);
+  const plantStageStatus = getPlantStageStatus(stage);
+  const harvestStatus = getHarvestStatus(pot.canHarvest);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div>
+        <PotDetailBackButton onBack={onBack} />
+      </div>
+      <Card padding={0} style={{ overflow: 'hidden' }}>
+        <div style={{
+          padding: '34px 24px 24px',
+          background: isRare
+            ? 'linear-gradient(180deg, #d8e2f0 0%, #f5f7f5 80%)'
+            : 'linear-gradient(180deg, #d4ebdc 0%, #f5f7f5 80%)',
+          textAlign: 'center',
+          position: 'relative',
+        }}>
+          <div style={{
+            position: 'absolute', top: 14, left: 14, right: 14,
+            display: 'flex', justifyContent: 'flex-end',
+          }}>
+            <Pill>{pot.tilCount} TIL</Pill>
+          </div>
+          <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
+            <PottedPlant species={pot.species} stage={stage} size={182} glow={isRare} potLevel={pot.level} />
+          </div>
+          {monName && (
+            <div style={{ marginTop: 12, fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
+              {monName}
+            </div>
+          )}
+        </div>
+        <div style={{ padding: '20px 24px 22px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div
+              title={`${pot.emoji} ${pot.name}`}
+              style={{
+                fontFamily: 'var(--font-display)',
+                fontSize: 22,
+                fontWeight: 700,
+                color: 'var(--ink)',
+                letterSpacing: '-0.01em',
+                ...POT_TITLE_PREVIEW_STYLE,
+              }}
+            >
+              {pot.emoji} {pot.name}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
+                <span style={{
+                  padding: '2px 7px',
+                  borderRadius: 999,
+                  background: 'var(--paper-2)',
+                  border: '0.5px solid var(--rule)',
+                  color: 'var(--moss-2)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-mono)',
+                  lineHeight: 1.5,
+                  whiteSpace: 'nowrap',
+                }}>
+                  Lv. {pot.level}
+                </span>
+                <Pill tone="green">{potTier.label}</Pill>
+                <Pill tone={isRare ? 'navy' : 'default'}>{isRare ? '✦ 희귀종' : '일반종'}</Pill>
+              </div>
+              {dashboard && (
+                <button
+                  type="button"
+                  onClick={onShowEditPot}
+                  style={{
+                    flexShrink: 0,
+                    padding: '4px 8px',
+                    borderRadius: 8,
+                    border: '0.5px solid var(--rule)',
+                    color: 'var(--ink-3)',
+                    fontSize: 11,
+                    fontFamily: 'var(--font-display)',
+                    background: '#fff',
+                  }}
+                >
+                  화분 수정
+                </button>
+              )}
+            </div>
+          </div>
+          <div
+            title={pot.intro}
+            style={{
+              fontSize: 12.5,
+              color: 'var(--ink-2)',
+              marginTop: 10,
+              lineHeight: 1.6,
+              ...POT_DESCRIPTION_PREVIEW_STYLE,
+            }}
+          >
+            {pot.intro}
+          </div>
+          <div style={{
+            marginTop: 18,
+            background: '#fff',
+            border: '0.5px solid var(--rule)',
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}>
+            {[
+              { label: '화분 경험치', value: potExperienceText, progress: pot.levelProgress },
+              { label: '식물 상태', value: `${plantStageStatus} · ${plantGrowthPercent}%`, tone: 'stage' },
+              { label: '수확 가능 여부', value: harvestStatus, tone: pot.canHarvest ? 'ready' : 'disabled' },
+            ].map((item, index) => (
+              <div key={item.label} style={{
+                padding: '13px 14px',
+                borderTop: index === 0 ? 'none' : '0.5px solid var(--rule)',
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                  gap: 14,
+                }}>
+                  <span style={{
+                    fontSize: 11,
+                    color: 'var(--ink-3)',
+                    fontFamily: 'var(--font-display)',
+                    letterSpacing: '0.06em',
+                  }}>
+                    {item.label}
+                  </span>
+                  <span style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: item.tone === 'ready' || item.tone === 'stage' ? 'var(--moss-2)' : item.tone === 'disabled' ? 'var(--ink-3)' : 'var(--ink)',
+                    fontFamily: 'var(--font-display)',
+                    lineHeight: 1.45,
+                    textAlign: 'right',
+                  }}>
+                    {item.value}
+                  </span>
+                </div>
+                {typeof item.progress === 'number' && (
+                  <div style={{ marginTop: 8 }}>
+                    <ProgressBar value={item.progress} height={8} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 14, fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+            {detailSubText}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+            <Btn variant="green" size="md" icon={Icon.drop} style={{ flex: 1 }} onClick={onStartTil}>
+              TIL 작성하고 물주기
+            </Btn>
+            <Btn
+              variant={pot.canHarvest ? 'green' : 'secondary'}
+              size="md"
+              onClick={onShowHarvest}
+              disabled={dashboard && !pot.canHarvest}
+              style={dashboard && !pot.canHarvest ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
+            >
+              수확
+            </Btn>
+          </div>
+        </div>
+      </Card>
+
+      {/* Evolution chain (mini) */}
+      <Card padding={18}>
+        <div className="eyebrow" style={{ marginBottom: 12 }}>진화 계통</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+          {['seed','sprout','leaf','bloom','full'].map(s => {
+            const stages = ['seed','sprout','leaf','bloom','full'];
+            const active = s === stage;
+            const reached = stages.indexOf(s) <= stages.indexOf(stage);
+            return (
+              <div key={s} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 8,
+                  background: active ? (isRare ? '#eef2fa' : '#e1f5ee') : (reached ? '#f3f6f3' : '#f7f9f7'),
+                  border: active ? `1.5px solid ${isRare ? '#185FA5' : '#0F6E56'}` : '0.5px solid var(--rule)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  opacity: reached ? 1 : 0.4,
+                }}>
+                  <PixelPlant species={pot.species} stage={s} size={36} locked={!reached} />
+                </div>
+                <div style={{ fontSize: 10, color: active ? (isRare ? '#185FA5' : 'var(--moss-2)') : 'var(--ink-3)', fontWeight: active ? 600 : 400, fontFamily: 'var(--font-display)' }}>
+                  {speciesInfo?.stages[s]?.name || STAGE_META[s].label}
+                </div>
+                <div style={{ fontSize: 9, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{STAGE_META[s].min}+</div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil }) {
   const { user } = useUser();
   const fallbackPot = POTS.find(p => p.id === potId);
@@ -1644,6 +1935,9 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   const [tilDetailLoading, setTilDetailLoading] = useState(false);
   const [tilSearchQuery, setTilSearchQuery] = useState('');
   const [selectedTilTag, setSelectedTilTag] = useState(null);
+  const [tilPage, setTilPage] = useState(0);
+  const [tilPageSize, setTilPageSize] = useState(10);
+  const [tilTotalPages, setTilTotalPages] = useState(0);
 
   useEffect(() => {
     if (!potId) return;
@@ -1676,17 +1970,21 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
     setTilsLoading(true);
     setTilsError(null);
 
-    getMyTils({ potId, page: 0, size: 20, sort: 'latest' })
-      .then(page => {
+    getMyTils({ potId, page: tilPage, size: tilPageSize, sort: 'latest' })
+      .then(pageData => {
         if (!active) return;
-        const content = Array.isArray(page?.content) ? page.content : [];
+        const content = Array.isArray(pageData?.content) ? pageData.content : [];
         setTils(content.map(toTilListItem));
-        setTilTotalCount(page?.totalElements ?? content.length);
+        setTilTotalCount(pageData?.totalElements ?? content.length);
+        setTilTotalPages(
+          pageData?.totalPages ?? Math.ceil((pageData?.totalElements ?? content.length) / tilPageSize)
+        );
       })
       .catch(() => {
         if (!active) return;
         setTils([]);
         setTilTotalCount(0);
+        setTilTotalPages(0);
         setTilsError('이 화분의 TIL 목록을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
       })
       .finally(() => {
@@ -1696,7 +1994,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
     return () => {
       active = false;
     };
-  }, [potId, user?.userId, refreshKey]);
+  }, [potId, user?.userId, refreshKey, tilPage, tilPageSize]);
 
   useEffect(() => {
     if (!selectedTil) return;
@@ -1769,17 +2067,6 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
     return matchesTag && matchesSearch;
   });
   const visibleTils = hasTilFilter ? filteredTils : displayedTils;
-  const speciesInfo = PIXEL_SPECIES[pot.species];
-  const monName = speciesInfo?.stages[stage]?.name;
-  const isRare = pot.species === 'moonlight';
-  const potTier = getPotTier(pot.level);
-  const detailSubText = dashboard
-    ? `최근 물주기 ${formatDateTime(pot.lastWateredAt)} · 누적 ${pot.totalExp} EXP`
-    : `${pot.createdAt} 생성 · 누적 ${Math.floor(pot.tilCount * 850)}자`;
-  const potExperienceText = formatPotExperience(pot);
-  const plantGrowthPercent = formatPlantGrowthPercent(pot);
-  const plantStageStatus = getPlantStageStatus(stage);
-  const harvestStatus = getHarvestStatus(pot.canHarvest);
   const handleStartTil = () => {
     onStartTil && onStartTil(pot.id);
   };
@@ -1827,258 +2114,122 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   };
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
-      <div className="pot-detail-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(350px, 400px) minmax(0, 760px)', gap: 24, alignItems: 'start' }}>
+    <div style={{
+      height: 'calc(100vh - 64px)',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      maxWidth: 1600,
+      margin: '0 auto',
+      width: '100%',
+      fontFamily: 'var(--font-body)',
+    }}>
+      <div className="pot-detail-layout" style={{
+        flex: 1,
+        minHeight: 0,
+        display: 'grid',
+        gridTemplateColumns: 'minmax(350px, 400px) minmax(0, 760px)',
+      }}>
 
-        {/* Left — plant card */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div>
-            <PotDetailBackButton onBack={onBack} />
-          </div>
-          <Card padding={0} style={{ overflow: 'hidden' }}>
-            <div style={{
-              padding: '34px 24px 24px',
-              background: isRare
-                ? 'linear-gradient(180deg, #d8e2f0 0%, #f5f7f5 80%)'
-                : 'linear-gradient(180deg, #d4ebdc 0%, #f5f7f5 80%)',
-              textAlign: 'center',
-              position: 'relative',
-            }}>
-              <div style={{
-                position: 'absolute', top: 14, left: 14, right: 14,
-                display: 'flex', justifyContent: 'flex-end',
-              }}>
-                <Pill>{pot.tilCount} TIL</Pill>
-              </div>
-              <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
-                <PottedPlant species={pot.species} stage={stage} size={182} glow={isRare} potLevel={pot.level} />
-              </div>
-              {monName && (
-                <div style={{ marginTop: 12, fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
-                  {monName}
-                </div>
-              )}
-            </div>
-            <div style={{ padding: '20px 24px 22px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div
-                  title={`${pot.emoji} ${pot.name}`}
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontSize: 22,
-                    fontWeight: 700,
-                    color: 'var(--ink)',
-                    letterSpacing: '-0.01em',
-                    ...POT_TITLE_PREVIEW_STYLE,
-                  }}
-                >
-                  {pot.emoji} {pot.name}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
-                    <span style={{
-                      padding: '2px 7px',
-                      borderRadius: 999,
-                      background: 'var(--paper-2)',
-                      border: '0.5px solid var(--rule)',
-                      color: 'var(--moss-2)',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      fontFamily: 'var(--font-mono)',
-                      lineHeight: 1.5,
-                      whiteSpace: 'nowrap',
-                    }}>
-                      Lv. {pot.level}
-                    </span>
-                    <Pill tone="green">{potTier.label}</Pill>
-                    <Pill tone={isRare ? 'navy' : 'default'}>{isRare ? '✦ 희귀종' : '일반종'}</Pill>
-                  </div>
-                  {dashboard && (
-                    <button
-                      type="button"
-                      onClick={() => setShowEditPot(true)}
-                      style={{
-                        flexShrink: 0,
-                        padding: '4px 8px',
-                        borderRadius: 8,
-                        border: '0.5px solid var(--rule)',
-                        color: 'var(--ink-3)',
-                        fontSize: 11,
-                        fontFamily: 'var(--font-display)',
-                        background: '#fff',
-                      }}
-                    >
-                      화분 수정
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div
-                title={pot.intro}
-                style={{
-                  fontSize: 12.5,
-                  color: 'var(--ink-2)',
-                  marginTop: 10,
-                  lineHeight: 1.6,
-                  ...POT_DESCRIPTION_PREVIEW_STYLE,
-                }}
-              >
-                {pot.intro}
-              </div>
-              <div style={{
-                marginTop: 18,
-                background: '#fff',
-                border: '0.5px solid var(--rule)',
-                borderRadius: 12,
-                overflow: 'hidden',
-              }}>
-                {[
-                  { label: '화분 경험치', value: potExperienceText, progress: pot.levelProgress },
-                  { label: '식물 상태', value: `${plantStageStatus} · ${plantGrowthPercent}%`, tone: 'stage' },
-                  { label: '수확 가능 여부', value: harvestStatus, tone: pot.canHarvest ? 'ready' : 'disabled' },
-                ].map((item, index) => (
-                  <div key={item.label} style={{
-                    padding: '13px 14px',
-                    borderTop: index === 0 ? 'none' : '0.5px solid var(--rule)',
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      justifyContent: 'space-between',
-                      gap: 14,
-                    }}>
-                      <span style={{
-                        fontSize: 11,
-                        color: 'var(--ink-3)',
-                        fontFamily: 'var(--font-display)',
-                        letterSpacing: '0.06em',
-                      }}>
-                        {item.label}
-                      </span>
-                      <span style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: item.tone === 'ready' || item.tone === 'stage' ? 'var(--moss-2)' : item.tone === 'disabled' ? 'var(--ink-3)' : 'var(--ink)',
-                        fontFamily: 'var(--font-display)',
-                        lineHeight: 1.45,
-                        textAlign: 'right',
-                      }}>
-                        {item.value}
-                      </span>
-                    </div>
-                    {typeof item.progress === 'number' && (
-                      <>
-                        <div style={{ marginTop: 8 }}>
-                          <ProgressBar value={item.progress} height={8} />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div style={{ marginTop: 14, fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-                {detailSubText}
-              </div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
-                <Btn variant="green" size="md" icon={Icon.drop} style={{ flex: 1 }} onClick={handleStartTil}>
-                  TIL 작성하고 물주기
-                </Btn>
-                <Btn
-                  variant={pot.canHarvest ? 'green' : 'secondary'}
-                  size="md"
-                  onClick={() => setShowHarvest(true)}
-                  disabled={dashboard && !pot.canHarvest}
-                  style={dashboard && !pot.canHarvest ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
-                >
-                  수확
-                </Btn>
-              </div>
-            </div>
-          </Card>
+        {/* Left — 독립 스크롤 컬럼 */}
+        <div style={{ overflowY: 'auto', padding: '32px 16px 32px 32px' }}>
+          <PotDetailSidebar
+            pot={pot}
+            stage={stage}
+            dashboard={dashboard}
+            onBack={onBack}
+            onStartTil={handleStartTil}
+            onShowHarvest={() => setShowHarvest(true)}
+            onShowEditPot={() => setShowEditPot(true)}
+          />
 
-          {/* Evolution chain (mini) */}
-          <Card padding={18}>
-            <div className="eyebrow" style={{ marginBottom: 12 }}>진화 계통</div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-              {['seed','sprout','leaf','bloom','full'].map(s => {
-                const stages = ['seed','sprout','leaf','bloom','full'];
-                const active = s === stage;
-                const reached = stages.indexOf(s) <= stages.indexOf(stage);
-                return (
-                  <div key={s} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 8,
-                      background: active ? (isRare ? '#eef2fa' : '#e1f5ee') : (reached ? '#f3f6f3' : '#f7f9f7'),
-                      border: active ? `1.5px solid ${isRare ? '#185FA5' : '#0F6E56'}` : '0.5px solid var(--rule)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      opacity: reached ? 1 : 0.4,
-                    }}>
-                      <PixelPlant species={pot.species} stage={s} size={36} locked={!reached} />
-                    </div>
-                    <div style={{ fontSize: 10, color: active ? (isRare ? '#185FA5' : 'var(--moss-2)') : 'var(--ink-3)', fontWeight: active ? 600 : 400, fontFamily: 'var(--font-display)' }}>
-                      {speciesInfo?.stages[s]?.name || STAGE_META[s].label}
-                    </div>
-                    <div style={{ fontSize: 9, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{STAGE_META[s].min}+</div>
-                  </div>
-                );
-              })}
-            </div>
-          </Card>
         </div>
 
-        {/* Right — TIL list */}
-        <div className="pot-detail-records" style={{ minWidth: 0 }}>
+        {/* Right — 독립 스크롤 컬럼 */}
+        <div className="pot-detail-records" style={{ minWidth: 0, overflowY: 'auto', padding: '32px 32px 32px 16px' }}>
           <SectionHeader eyebrow="이 화분의 기록" title={`TIL ${displayedTilCount}개`} action={
-            <div style={{ position: 'relative', width: 300, maxWidth: '42vw' }}>
-              <span style={{
-                position: 'absolute',
-                left: 12,
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--ink-3)',
-                display: 'inline-flex',
-                pointerEvents: 'none',
-              }}>{Icon.search}</span>
-              <input
-                value={tilSearchQuery}
-                onChange={e => setTilSearchQuery(e.target.value)}
-                placeholder="제목, 본문, 태그 검색"
-                aria-label="TIL 검색"
-                style={{
-                  width: '100%',
-                  height: 40,
-                  borderRadius: 10,
-                  border: '0.5px solid var(--rule-2)',
-                  background: '#fff',
-                  padding: tilSearchQuery ? '0 38px 0 34px' : '0 12px 0 34px',
-                  fontSize: 12.5,
-                  color: 'var(--ink)',
-                  outline: 'none',
-                  fontFamily: 'var(--font-body)',
-                }}
-              />
-              {tilSearchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setTilSearchQuery('')}
-                  aria-label="검색어 지우기"
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Page size selector */}
+              <div
+                role="group"
+                aria-label="페이지 크기 선택"
+                style={{ display: 'flex', borderRadius: 8, border: '0.5px solid var(--rule-2)', overflow: 'hidden' }}
+              >
+                {TIL_PAGE_SIZE_OPTIONS.map(size => (
+                  <button
+                    key={size}
+                    type="button"
+                    aria-pressed={tilPageSize === size}
+                    onClick={() => {
+                      setTilPageSize(size);
+                      setTilPage(0);
+                    }}
+                    style={{
+                      padding: '5px 10px',
+                      fontSize: 12,
+                      fontFamily: 'var(--font-display)',
+                      fontWeight: tilPageSize === size ? 700 : 400,
+                      color: tilPageSize === size ? 'var(--moss-2)' : 'var(--ink-3)',
+                      background: tilPageSize === size ? '#ebf5ef' : '#fff',
+                      borderRight: size !== 20 ? '0.5px solid var(--rule-2)' : 'none',
+                    }}
+                  >
+                    {size}개
+                  </button>
+                ))}
+              </div>
+              {/* Search input */}
+              <div style={{ position: 'relative', width: 240, maxWidth: '35vw' }}>
+                <span style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--ink-3)',
+                  display: 'inline-flex',
+                  pointerEvents: 'none',
+                }}>{Icon.search}</span>
+                <input
+                  value={tilSearchQuery}
+                  onChange={e => setTilSearchQuery(e.target.value)}
+                  placeholder="제목, 본문, 태그 검색"
+                  aria-label="TIL 검색"
                   style={{
-                    position: 'absolute',
-                    right: 8,
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    width: 24,
-                    height: 24,
-                    borderRadius: 8,
-                    color: 'var(--ink-3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    width: '100%',
+                    height: 40,
+                    borderRadius: 10,
+                    border: '0.5px solid var(--rule-2)',
+                    background: '#fff',
+                    padding: tilSearchQuery ? '0 38px 0 34px' : '0 12px 0 34px',
+                    fontSize: 12.5,
+                    color: 'var(--ink)',
+                    outline: 'none',
+                    fontFamily: 'var(--font-body)',
                   }}
-                >
-                  {Icon.close}
-                </button>
-              )}
+                />
+                {tilSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setTilSearchQuery('')}
+                    aria-label="검색어 지우기"
+                    style={{
+                      position: 'absolute',
+                      right: 8,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      width: 24,
+                      height: 24,
+                      borderRadius: 8,
+                      color: 'var(--ink-3)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {Icon.close}
+                  </button>
+                )}
+              </div>
             </div>
           } />
           {(suggestedTilTags.length > 0 || hasTilFilter) && (
@@ -2136,6 +2287,13 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
               )}
             </div>
           )}
+          {/* 상단 페이지네이션 */}
+          {!hasTilFilter && tilTotalPages > 1 && (
+            <div style={{ marginBottom: 12 }}>
+              <TilPagination tilPage={tilPage} tilTotalPages={tilTotalPages} onPageChange={setTilPage} />
+            </div>
+          )}
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {dashboard && tilsLoading && (
               <Card padding={22} style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6 }}>
@@ -2207,6 +2365,13 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
               </Card>
             ))}
           </div>
+
+          {/* 하단 페이지네이션 */}
+          {!hasTilFilter && (
+            <div style={{ marginTop: 20 }}>
+              <TilPagination tilPage={tilPage} tilTotalPages={tilTotalPages} onPageChange={setTilPage} />
+            </div>
+          )}
         </div>
       </div>
 

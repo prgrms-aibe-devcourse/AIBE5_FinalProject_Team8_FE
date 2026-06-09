@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { POTS, DEX } from './data.jsx';
+import { POTS } from './data.jsx';
+import { getPlants } from './api/collection.js';
 import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
@@ -28,6 +29,27 @@ function AppShell() {
   const [editorInitialTil, setEditorInitialTil] = useState(null);
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
+  // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(() => {
+    const v = typeof localStorage !== 'undefined' ? localStorage.getItem('rootin.tilRightOpen') : null;
+    return v === null ? true : v === 'true';
+  });
+  const [focusMode, setFocusMode] = useState(false);
+  const [collectionStats, setCollectionStats] = useState(null);
+
+  const toggleRightPanel = () => setRightOpen((o) => {
+    const next = !o;
+    try { localStorage.setItem('rootin.tilRightOpen', String(next)); } catch { /* noop */ }
+    return next;
+  });
+  const toggleFocusMode = () => setFocusMode((f) => !f);
+
+  useEffect(() => {
+    getPlants()
+      .then(data => setCollectionStats(data?.stats ?? null))
+      .catch(() => {});
+  }, []);
 
   const screen = getScreenFromPath(location.pathname);
   const routePotId = getPotIdFromPath(location.pathname);
@@ -35,6 +57,7 @@ function AppShell() {
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
 
   const handleNav = (nextScreen) => {
+    setFocusMode(false);
     if (nextScreen?.startsWith?.('/')) {
       navigate(nextScreen);
       return;
@@ -71,6 +94,12 @@ function AppShell() {
     navigate(potId ? `/editor?potId=${potId}` : '/editor', { replace: true });
   };
 
+  // 사이드바 "새 TIL 작성" — 수정 모드 해제(신규 작성 상태). 선택한 화분은 유지.
+  // (에디터 비우기는 context.startNewTil이 담당)
+  const startNewEditorTil = () => {
+    setEditorInitialTil(null);
+  };
+
   const handleTilPublished = (publishedPotId) => {
     if (editorReturnScreen?.startsWith?.('/garden/pots/')) {
       setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
@@ -89,8 +118,6 @@ function AppShell() {
     }
   };
 
-  const unlockedDEXCount = DEX.filter(d => d.state !== 'locked').length;
-
   const titles = {
     dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
     editor:     { title: '오늘의 TIL 작성', subtitle: 'New entry' },
@@ -101,7 +128,12 @@ function AppShell() {
         : '화분',
       subtitle: 'Garden / Detail',
     },
-    collection: { title: '식물 도감', subtitle: `Collection · ${unlockedDEXCount} / ${DEX.length} 종 해금` },
+    collection: {
+      title: '식물 도감',
+      subtitle: collectionStats
+        ? `Collection · ${collectionStats.collected} / ${collectionStats.total} 종 해금`
+        : 'Collection · 식물 도감',
+    },
     ai:         { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
     profile:    { title: '내 계정', subtitle: 'Account' },
   };
@@ -130,6 +162,8 @@ function AppShell() {
   return (
     <TilEditorProvider>
     <SidebarProvider
+      open={focusMode ? false : leftOpen}
+      onOpenChange={setLeftOpen}
       style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper)', minWidth: 1180 }}
       data-screen-label={screen}
     >
@@ -175,6 +209,8 @@ function AppShell() {
                 afterPublishScreen={editorReturnScreen ?? (activeEditorPotId ? `/garden/pots/${activeEditorPotId}` : '/dashboard')}
                 onPublished={handleTilPublished}
                 onSelectedPotChange={syncEditorPotQuery}
+                focusMode={focusMode}
+                onToggleFocus={toggleFocusMode}
               />
             )} />
             <Route path="/garden" element={<GardenScreen onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
@@ -193,7 +229,15 @@ function AppShell() {
           </Routes>
         </div>
       </SidebarInset>
-      {screen === 'editor' && <RootinSidebarRight onEditTil={openEditorForTil} onResumeDraft={resumeEditorDraft} />}
+      {screen === 'editor' && !focusMode && (
+        <RootinSidebarRight
+          onEditTil={openEditorForTil}
+          onResumeDraft={resumeEditorDraft}
+          onNewTil={startNewEditorTil}
+          open={rightOpen}
+          onToggle={toggleRightPanel}
+        />
+      )}
     </SidebarProvider>
     </TilEditorProvider>
   );

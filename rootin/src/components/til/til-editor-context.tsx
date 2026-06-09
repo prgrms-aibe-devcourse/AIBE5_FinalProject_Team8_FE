@@ -81,6 +81,7 @@ type TilEditorContextValue = {
   saveDraft: () => Promise<boolean>
   loadDraft: (potId: number) => Promise<DraftData | null>
   resumeDraft: (draft: { title?: string; content?: string; tags?: string[] } | null) => void
+  startNewTil: () => void
   clearDraft: () => Promise<void>
   publish: () => Promise<unknown>
   publishing: boolean
@@ -247,6 +248,14 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     [editor],
   )
 
+  // 새 TIL 작성 — 에디터/제목/태그를 비우고 수정 모드 해제 (화분 선택은 유지)
+  const startNewTil = useCallback(() => {
+    editor?.chain().focus().clearContent().run()
+    setTitle('')
+    setTags([])
+    setCurrentTilId(null)
+  }, [editor])
+
   // 발행 — 성공 시 해당 화분의 임시저장 삭제 후 에디터 초기화
   const publish = useCallback(async () => {
     if (!editor || !selectedPotId) return
@@ -291,6 +300,7 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     saveDraft,
     loadDraft,
     resumeDraft,
+    startNewTil,
     clearDraft,
     publish,
     publishing,

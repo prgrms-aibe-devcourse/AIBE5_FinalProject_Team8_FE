@@ -3,6 +3,7 @@
 import 'katex/dist/katex.min.css'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { motion, useScroll, useSpring } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -16,12 +17,22 @@ import TaskItem from '@tiptap/extension-task-item'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Placeholder from '@tiptap/extension-placeholder'
-import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { Mathematics } from '@tiptap/extension-mathematics'
-import Image from '@tiptap/extension-image'
+import Youtube from '@tiptap/extension-youtube'
+import Table from '@tiptap/extension-table'
+import TableRow from '@tiptap/extension-table-row'
+import TableHeader from '@tiptap/extension-table-header'
+import TableCell from '@tiptap/extension-table-cell'
 import { createLowlight, common } from 'lowlight'
 
-import { EditorToolbar } from './editor-toolbar'
+import { Minimize2 } from 'lucide-react'
+
+import { createCodeBlock } from './extensions/code-block'
+import { FontSize } from './extensions/font-size'
+import { Callout } from './extensions/callout'
+import { TrailingNode } from './extensions/trailing-node'
+import { ResizableImage } from './extensions/resizable-image'
+import { EditorToolbarIsland } from './editor-toolbar-island'
 import { EditorBubbleMenu } from './editor-bubble-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 
@@ -39,12 +50,16 @@ export function TilEditorPage({
   afterPublishScreen = 'dashboard',
   onPublished,
   onSelectedPotChange,
+  focusMode = false,
+  onToggleFocus,
 }: {
   onNav?: (screen: string) => void
   initialSelectedPotId?: number | string | null
   afterPublishScreen?: string
   onPublished?: (potId: number | string | null) => void
   onSelectedPotChange?: (potId: string | null) => void
+  focusMode?: boolean
+  onToggleFocus?: () => void
   initialTil?: {
     id?: number | string
     tilId?: number | string
@@ -95,18 +110,26 @@ export function TilEditorPage({
       }),
       TextStyle,
       Color,
+      FontSize,
       Highlight.configure({ multicolor: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       TaskList,
       TaskItem.configure({ nested: true }),
       Subscript,
       Superscript,
-      CodeBlockLowlight.configure({ lowlight }),
+      createCodeBlock(lowlight),
+      Callout,
       Mathematics,
-      Image.configure({ HTMLAttributes: { class: 'til-image' } }),
+      ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),
+      Youtube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
+      Table.configure({ resizable: true, HTMLAttributes: { class: 'til-table' } }),
+      TableRow,
+      TableHeader,
+      TableCell,
       Placeholder.configure({
         placeholder: '오늘 배운 것을 자유롭게 기록해보세요. “/” 없이 위 도구 모음을 사용하세요…',
       }),
+      TrailingNode,
     ],
     content: '',
     editorProps: {
@@ -292,53 +315,92 @@ export function TilEditorPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor?.state])
 
+  // 본문 스크롤 진행도 → 하단 게이지 (스프링으로 부드럽게 차오름)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({ container: scrollRef })
+  const scrollFill = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 })
+
   return (
-    <div className="flex h-screen flex-col overflow-y-auto bg-background">
-      {/* Sticky toolbar (헤더 제거 — 사이드바 토글을 툴바 좌측에 통합) */}
-      <div className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="mx-auto flex w-full max-w-3xl items-center gap-2 px-4 py-1.5 md:px-6">
-          <SidebarTrigger className="size-8 shrink-0 text-muted-foreground" />
-          <span className="h-5 w-px shrink-0 bg-border/70" />
-          {editor ? (
-            <div className="scrollbar-subtle min-w-0 flex-1 overflow-x-auto">
-              <EditorToolbar editor={editor} />
-            </div>
-          ) : (
-            <div className="h-9 flex-1" />
-          )}
+    <div className="relative flex h-screen flex-col overflow-hidden bg-background">
+      {/* 좌상단 떠있는 사이드바 토글 (집중 모드에선 숨김) — 캔버스 기준 배치라 사이드바 로고를 가리지 않음 */}
+      {!focusMode && (
+        <div className="pointer-events-none absolute left-4 top-4 z-30">
+          <SidebarTrigger
+            aria-label="사이드바 토글"
+            className="til-pulltab pointer-events-auto size-9 rounded-full text-muted-foreground"
+          />
         </div>
+      )}
+
+      {/* 떠있는 툴바 아일랜드 (집중 모드에선 숨김) */}
+      {!focusMode && editor ? (
+        <EditorToolbarIsland editor={editor} onToggleFocus={onToggleFocus} />
+      ) : null}
+
+      {/* 집중 모드 종료 버튼 */}
+      {focusMode && (
+        <button
+          type="button"
+          onClick={onToggleFocus}
+          className="til-pulltab fixed right-4 top-4 z-30 flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-medium text-muted-foreground"
+        >
+          <Minimize2 className="size-4" />
+          집중 모드 종료
+        </button>
+      )}
+
+      {/* Writing canvas — 네이티브 스크롤(확실히 동작), 네이티브 스크롤바는 숨김 */}
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <main className="mx-auto w-full max-w-3xl px-5 pb-40 pt-24 md:px-6">
+          <TilMeta />
+          <div className="til-prose mt-8">
+            {editor ? (
+              <>
+                <EditorBubbleMenu editor={editor} />
+                <EditorContent editor={editor} />
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
+                <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
+              </div>
+            )}
+          </div>
+        </main>
       </div>
 
-      {/* Writing canvas */}
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pb-40 pt-10 md:px-6">
-        <TilMeta />
-        <div className="til-prose mt-8">
-          {editor ? (
-            <>
-              <EditorBubbleMenu editor={editor} />
-              <EditorContent editor={editor} />
-            </>
-          ) : (
-            <div className="space-y-3">
-              <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
-              <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
-            </div>
-          )}
-        </div>
-      </main>
+      {/* 하단 스크롤 진행 게이지 — 트랙 위로 초록 막대가 좌→우로 차오름 (스프링) */}
+      <div
+        className="relative h-1.5 w-full shrink-0 overflow-hidden"
+        style={{ background: 'color-mix(in oklch, var(--moss) 9%, transparent)' }}
+      >
+        <motion.div
+          aria-hidden
+          className="absolute inset-y-0 left-0 w-full origin-left"
+          style={{
+            scaleX: scrollFill,
+            background: 'linear-gradient(90deg, var(--moss) 0%, var(--sprout) 100%)',
+          }}
+        />
+      </div>
 
-      <TilStatusIsland
-        saved={saved}
-        onSave={handleSaveDraft}
-        onPublish={handlePublish}
-        publishing={publishing || updating}
-        canPublish={canPublish}
-        stats={stats}
-        saveLabel={isEditMode ? '변경 저장' : '임시저장'}
-        publishLabel={isEditMode ? '수정 완료' : '발행'}
-        publishingLabel={isEditMode ? '저장 중…' : '발행 중…'}
-        isEditMode={isEditMode}
-      />
+      {!focusMode && (
+        <TilStatusIsland
+          saved={saved}
+          onSave={handleSaveDraft}
+          onPublish={handlePublish}
+          publishing={publishing || updating}
+          canPublish={canPublish}
+          stats={stats}
+          saveLabel={isEditMode ? '변경 저장' : '임시저장'}
+          publishLabel={isEditMode ? '수정 완료' : '발행'}
+          publishingLabel={isEditMode ? '저장 중…' : '발행 중…'}
+          isEditMode={isEditMode}
+        />
+      )}
     </div>
   )
 }

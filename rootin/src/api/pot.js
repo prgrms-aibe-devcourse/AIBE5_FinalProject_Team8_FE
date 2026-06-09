@@ -63,6 +63,18 @@ export function updatePot(potId, payload) {
 }
 
 /**
+ * 화분 삭제
+ * DELETE /api/v1/pots/{potId}
+ *
+ * @param {number|string} potId
+ */
+export function deletePot(potId) {
+  return request(`/api/v1/pots/${potId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
  * 특정 화분 기본 상세 조회
  * GET /api/v1/pots/{potId}
  *

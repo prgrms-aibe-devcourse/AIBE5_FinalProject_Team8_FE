@@ -1893,7 +1893,24 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
                     <Pill tone="green">{potTier.label}</Pill>
                     <Pill tone={isRare ? 'navy' : 'default'}>{isRare ? '✦ 희귀종' : '일반종'}</Pill>
                   </div>
-
+                  {dashboard && (
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPot(true)}
+                      style={{
+                        flexShrink: 0,
+                        padding: '4px 8px',
+                        borderRadius: 8,
+                        border: '0.5px solid var(--rule)',
+                        color: 'var(--ink-3)',
+                        fontSize: 11,
+                        fontFamily: 'var(--font-display)',
+                        background: '#fff',
+                      }}
+                    >
+                      화분 수정
+                    </button>
+                  )}
                 </div>
               </div>
               <div
@@ -1976,16 +1993,6 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
                   수확
                 </Btn>
               </div>
-              {dashboard && (
-                <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <Btn type="button" variant="secondary" size="md" icon={Icon.edit} style={{ flex: 1 }} onClick={() => setShowEditPot(true)}>
-                    화분 수정
-                  </Btn>
-                  <Btn type="button" variant="danger" size="md" style={{ flex: 1 }} onClick={() => setShowDeletePot(true)}>
-                    화분 삭제
-                  </Btn>
-                </div>
-              )}
             </div>
           </Card>
 
@@ -2233,6 +2240,10 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
           pot={pot}
           onClose={() => setShowEditPot(false)}
           onUpdated={handlePotUpdated}
+          onDeleteRequest={() => {
+            setShowEditPot(false);
+            setShowDeletePot(true);
+          }}
         />
       )}
     </div>
@@ -2493,7 +2504,7 @@ function DeletePotModal({ pot, onClose, onDeleted }) {
   );
 }
 
-function EditPotModal({ pot, onClose, onUpdated }) {
+function EditPotModal({ pot, onClose, onUpdated, onDeleteRequest }) {
   const [title, setTitle] = useState(pot.name ?? '');
   const [description, setDescription] = useState(pot.intro === EMPTY_POT_INTRO ? '' : (pot.intro ?? ''));
   const [loading, setLoading] = useState(false);
@@ -2647,13 +2658,18 @@ function EditPotModal({ pot, onClose, onUpdated }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-          <Btn type="button" variant="secondary" size="lg" style={{ flex: 1 }} onClick={onClose} disabled={loading}>
-            취소
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginTop: 22, alignItems: 'center' }}>
+          <Btn type="button" variant="danger" size="lg" onClick={onDeleteRequest} disabled={loading}>
+            화분 삭제
           </Btn>
-          <Btn type="submit" variant="green" size="lg" style={{ flex: 1 }} disabled={loading || titleInvalid || descriptionInvalid}>
-            {loading ? '저장 중...' : '저장'}
-          </Btn>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <Btn type="button" variant="secondary" size="lg" onClick={onClose} disabled={loading}>
+              취소
+            </Btn>
+            <Btn type="submit" variant="green" size="lg" disabled={loading || titleInvalid || descriptionInvalid}>
+              {loading ? '저장 중...' : '저장'}
+            </Btn>
+          </div>
         </div>
       </form>
     </div>

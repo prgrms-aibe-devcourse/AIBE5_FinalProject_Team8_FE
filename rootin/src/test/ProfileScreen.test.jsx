@@ -225,7 +225,7 @@ describe('ProfileScreen — 비밀번호 변경 폼', () => {
     fireEvent.click(screen.getByText('변경'));
     fillPasswordForm({ next: 'short', confirm: 'short' });
 
-    fireEvent.click(screen.getByText('비밀번호 변경'));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     expect(screen.getByText('비밀번호는 8자 이상이어야 합니다.')).toBeInTheDocument();
   });
 
@@ -234,7 +234,7 @@ describe('ProfileScreen — 비밀번호 변경 폼', () => {
     fireEvent.click(screen.getByText('변경'));
     fillPasswordForm({ confirm: 'different!!' });
 
-    fireEvent.click(screen.getByText('비밀번호 변경'));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     expect(screen.getByText('새 비밀번호가 일치하지 않습니다.')).toBeInTheDocument();
   });
 
@@ -243,7 +243,7 @@ describe('ProfileScreen — 비밀번호 변경 폼', () => {
     fireEvent.click(screen.getByText('변경'));
     fillPasswordForm();
 
-    fireEvent.click(screen.getByText('비밀번호 변경'));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     expect(screen.getByText('정말 비밀번호를 변경하시겠습니까?')).toBeInTheDocument();
     expect(screen.getByText('아니요')).toBeInTheDocument();
     expect(screen.getByText('변경합니다')).toBeInTheDocument();
@@ -253,7 +253,7 @@ describe('ProfileScreen — 비밀번호 변경 폼', () => {
     renderProfile(mockApiUserLocal);
     fireEvent.click(screen.getByText('변경'));
     fillPasswordForm();
-    fireEvent.click(screen.getByText('비밀번호 변경'));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     fireEvent.click(screen.getByText('아니요'));
 
     expect(screen.getByText('현재 비밀번호')).toBeInTheDocument();
@@ -265,12 +265,13 @@ describe('ProfileScreen — 비밀번호 변경 폼', () => {
     patchPassword.mockResolvedValue({});
     localStorage.setItem('accessToken', 'tok');
     localStorage.setItem('refreshToken', 'ref');
-    const reloadSpy = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+    const reloadSpy = vi.fn();
+    Object.defineProperty(window, 'location', { configurable: true, writable: true, value: { reload: reloadSpy } });
 
     renderProfile(mockApiUserLocal);
     fireEvent.click(screen.getByText('변경'));
     fillPasswordForm();
-    fireEvent.click(screen.getByText('비밀번호 변경'));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     fireEvent.click(screen.getByText('변경합니다'));
 
     await waitFor(() => {
@@ -283,8 +284,6 @@ describe('ProfileScreen — 비밀번호 변경 폼', () => {
       expect(localStorage.getItem('refreshToken')).toBeNull();
       expect(reloadSpy).toHaveBeenCalled();
     });
-
-    reloadSpy.mockRestore();
   });
 
   it('"변경합니다" 클릭 후 API 실패 시 에러와 함께 입력 폼으로 돌아간다', async () => {
@@ -297,7 +296,7 @@ describe('ProfileScreen — 비밀번호 변경 폼', () => {
     renderProfile(mockApiUserLocal);
     fireEvent.click(screen.getByText('변경'));
     fillPasswordForm({ current: 'wrong!!!' });
-    fireEvent.click(screen.getByText('비밀번호 변경'));
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }));
     fireEvent.click(screen.getByText('변경합니다'));
 
     await waitFor(() => {

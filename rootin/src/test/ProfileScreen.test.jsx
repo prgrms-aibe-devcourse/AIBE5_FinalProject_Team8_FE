@@ -41,13 +41,9 @@ function renderProfile(apiUser = mockApiUser) {
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  // 수확 식물 기본 mock
+  // 수확 식물 기본 mock — { stats: { collected } } 구조
   const { getPlants } = await import('../api/collection.js');
-  getPlants.mockResolvedValue([
-    { isCollected: true },
-    { isCollected: true },
-    { isCollected: false },
-  ]);
+  getPlants.mockResolvedValue({ stats: { collected: 2, total: 3, common: 2, rare: 1 } });
 });
 
 // ─── 저장 버튼 ────────────────────────────────────────────────────────────────
@@ -141,8 +137,8 @@ describe('ProfileScreen — provider 조건부 렌더', () => {
 // ─── 수확한 식물 수 API 연동 ────────────────────────────────────────────────
 
 describe('ProfileScreen — 수확한 식물 수', () => {
-  it('isCollected=true인 항목만 카운트해 표시한다', async () => {
-    // beforeEach에서 [true, true, false] mock → 2종
+  it('stats.collected 값을 수확 식물 수로 표시한다', async () => {
+    // beforeEach에서 collected: 2 mock → 2종
     renderProfile();
     await waitFor(() => {
       expect(screen.getByText('2종')).toBeInTheDocument();

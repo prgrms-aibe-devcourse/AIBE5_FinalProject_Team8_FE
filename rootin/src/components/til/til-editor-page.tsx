@@ -3,6 +3,7 @@
 import 'katex/dist/katex.min.css'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { motion, useScroll, useSpring } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
@@ -17,7 +18,6 @@ import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Mathematics } from '@tiptap/extension-mathematics'
-import Image from '@tiptap/extension-image'
 import Youtube from '@tiptap/extension-youtube'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
@@ -30,6 +30,8 @@ import { Minimize2 } from 'lucide-react'
 import { createCodeBlock } from './extensions/code-block'
 import { FontSize } from './extensions/font-size'
 import { Callout } from './extensions/callout'
+import { TrailingNode } from './extensions/trailing-node'
+import { ResizableImage } from './extensions/resizable-image'
 import { EditorToolbarIsland } from './editor-toolbar-island'
 import { EditorBubbleMenu } from './editor-bubble-menu'
 import { SidebarTrigger } from '@/components/ui/sidebar'
@@ -115,7 +117,7 @@ export function TilEditorPage({
       createCodeBlock(lowlight),
       Callout,
       Mathematics,
-      Image.configure({ HTMLAttributes: { class: 'til-image' } }),
+      ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),
       Youtube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
       Table.configure({ resizable: true, HTMLAttributes: { class: 'til-table' } }),
       TableRow,
@@ -124,6 +126,7 @@ export function TilEditorPage({
       Placeholder.configure({
         placeholder: '오늘 배운 것을 자유롭게 기록해보세요. “/” 없이 위 도구 모음을 사용하세요…',
       }),
+      TrailingNode,
     ],
     content: '',
     editorProps: {
@@ -299,8 +302,13 @@ export function TilEditorPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor?.state])
 
+  // 본문 스크롤 진행도 → 하단 게이지 (스프링으로 부드럽게 차오름)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const { scrollYProgress } = useScroll({ container: scrollRef })
+  const scrollFill = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 })
+
   return (
-    <div className="flex h-screen flex-col overflow-y-auto bg-background">
+    <div className="relative flex h-screen flex-col overflow-hidden bg-background">
       {/* 좌상단 떠있는 사이드바 토글 (집중 모드에선 숨김) */}
       {!focusMode && (
         <div className="pointer-events-none fixed left-4 top-4 z-30">
@@ -328,23 +336,43 @@ export function TilEditorPage({
         </button>
       )}
 
-      {/* Writing canvas */}
-      <main className="mx-auto w-full max-w-3xl flex-1 px-5 pb-40 pt-24 md:px-6">
-        <TilMeta />
-        <div className="til-prose mt-8">
-          {editor ? (
-            <>
-              <EditorBubbleMenu editor={editor} />
-              <EditorContent editor={editor} />
-            </>
-          ) : (
-            <div className="space-y-3">
-              <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
-              <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
-            </div>
-          )}
-        </div>
-      </main>
+      {/* Writing canvas — 네이티브 스크롤(확실히 동작), 네이티브 스크롤바는 숨김 */}
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <main className="mx-auto w-full max-w-3xl px-5 pb-40 pt-24 md:px-6">
+          <TilMeta />
+          <div className="til-prose mt-8">
+            {editor ? (
+              <>
+                <EditorBubbleMenu editor={editor} />
+                <EditorContent editor={editor} />
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="h-5 w-2/3 animate-pulse rounded bg-muted" />
+                <div className="h-5 w-1/2 animate-pulse rounded bg-muted" />
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
+
+      {/* 하단 스크롤 진행 게이지 — 트랙 위로 초록 막대가 좌→우로 차오름 (스프링) */}
+      <div
+        className="relative h-1.5 w-full shrink-0 overflow-hidden"
+        style={{ background: 'color-mix(in oklch, var(--moss) 9%, transparent)' }}
+      >
+        <motion.div
+          aria-hidden
+          className="absolute inset-y-0 left-0 w-full origin-left"
+          style={{
+            scaleX: scrollFill,
+            background: 'linear-gradient(90deg, var(--moss) 0%, var(--sprout) 100%)',
+          }}
+        />
+      </div>
 
       {!focusMode && (
         <TilStatusIsland

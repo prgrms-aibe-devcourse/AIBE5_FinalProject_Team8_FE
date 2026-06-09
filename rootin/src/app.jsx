@@ -85,6 +85,12 @@ function AppShell() {
     setEditorInitialTil(null);
   };
 
+  // 사이드바 "새 TIL 작성" — 수정 모드 해제(신규 작성 상태). 선택한 화분은 유지.
+  // (에디터 비우기는 context.startNewTil이 담당)
+  const startNewEditorTil = () => {
+    setEditorInitialTil(null);
+  };
+
   const handleTilPublished = (publishedPotId) => {
     if (editorReturnScreen === 'pot-detail') {
       setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
@@ -191,6 +197,7 @@ function AppShell() {
         <RootinSidebarRight
           onEditTil={openEditorForTil}
           onResumeDraft={resumeEditorDraft}
+          onNewTil={startNewEditorTil}
           open={rightOpen}
           onToggle={toggleRightPanel}
         />

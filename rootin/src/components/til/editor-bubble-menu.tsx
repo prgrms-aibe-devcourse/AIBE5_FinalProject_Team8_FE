@@ -48,7 +48,7 @@ export function EditorBubbleMenu({ editor }: { editor: Editor }) {
       editor={editor}
       tippyOptions={{ duration: 150, maxWidth: 'none' }}
       shouldShow={({ editor: e, from, to }) =>
-        from !== to && !e.isActive('codeBlock')
+        from !== to && !e.isActive('codeBlock') && !e.isActive('image')
       }
       className="til-bubble-menu flex items-center gap-0.5 rounded-xl border border-primary/10 bg-secondary/95 p-1 shadow-[var(--shadow-lg)] backdrop-blur-xl"
     >

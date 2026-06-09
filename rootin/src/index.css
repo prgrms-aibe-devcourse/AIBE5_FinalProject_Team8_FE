@@ -441,6 +441,52 @@
   outline-offset: 2px;
 }
 
+/* 리사이즈 가능한 이미지 (모서리 드래그) */
+.til-prose .ProseMirror .til-image-wrapper {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  margin: 0.5em 0;
+}
+.til-prose .ProseMirror .til-image-wrapper .til-image {
+  display: block;
+  margin: 0;
+}
+.til-prose .ProseMirror .til-image-wrapper[data-selected='true'] .til-image {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.til-prose .ProseMirror .til-image-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--primary);
+  border: 1.5px solid var(--background);
+  border-radius: 9999px;
+  z-index: 2;
+}
+.til-prose .ProseMirror .til-image-handle-tl {
+  top: -5px;
+  left: -5px;
+  cursor: nwse-resize;
+}
+.til-prose .ProseMirror .til-image-handle-tr {
+  top: -5px;
+  right: -5px;
+  cursor: nesw-resize;
+}
+.til-prose .ProseMirror .til-image-handle-bl {
+  bottom: -5px;
+  left: -5px;
+  cursor: nesw-resize;
+}
+.til-prose .ProseMirror .til-image-handle-br {
+  bottom: -5px;
+  right: -5px;
+  cursor: nwse-resize;
+}
+
 /* Inline code */
 .til-prose .ProseMirror code {
   font-family: var(--font-mono);

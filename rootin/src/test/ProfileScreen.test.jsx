@@ -9,6 +9,7 @@ vi.mock('../api/user.js', () => ({
   patchUserMe: vi.fn(),
   getProfileImagePresignedUrl: vi.fn(),
   deleteUserMe: vi.fn(),
+  patchPassword: vi.fn(),
 }));
 
 vi.mock('../api/collection.js', () => ({
@@ -189,6 +190,121 @@ describe('ProfileScreen — 프로필 이미지 업로드', () => {
         expect.objectContaining({ method: 'PUT' })
       );
     });
+  });
+});
+
+// ─── 비밀번호 변경 폼 ────────────────────────────────────────────────────────
+
+// 유효한 입력값을 채우는 헬퍼
+function fillPasswordForm({ current = 'old1234!', next = 'new1234!!', confirm = 'new1234!!' } = {}) {
+  const [currentInput, newInput, confirmInput] = document.querySelectorAll('input[type="password"]');
+  fireEvent.change(currentInput, { target: { value: current } });
+  fireEvent.change(newInput, { target: { value: next } });
+  fireEvent.change(confirmInput, { target: { value: confirm } });
+}
+
+describe('ProfileScreen — 비밀번호 변경 폼', () => {
+  it('"변경" 클릭 시 비밀번호 모달이 열린다', () => {
+    renderProfile(mockApiUserLocal);
+    fireEvent.click(screen.getByText('변경'));
+    expect(screen.getByText('현재 비밀번호')).toBeInTheDocument();
+    expect(screen.getByText('새 비밀번호')).toBeInTheDocument();
+    expect(screen.getByText('새 비밀번호 확인')).toBeInTheDocument();
+  });
+
+  it('취소 클릭 시 모달이 닫히고 비밀번호 행으로 돌아간다', () => {
+    renderProfile(mockApiUserLocal);
+    fireEvent.click(screen.getByText('변경'));
+    fireEvent.click(screen.getByText('취소'));
+    expect(screen.queryByText('현재 비밀번호')).not.toBeInTheDocument();
+    expect(screen.getByText('비밀번호')).toBeInTheDocument();
+  });
+
+  it('새 비밀번호가 8자 미만이면 에러 메시지가 표시된다', () => {
+    renderProfile(mockApiUserLocal);
+    fireEvent.click(screen.getByText('변경'));
+    fillPasswordForm({ next: 'short', confirm: 'short' });
+
+    fireEvent.click(screen.getByText('비밀번호 변경'));
+    expect(screen.getByText('비밀번호는 8자 이상이어야 합니다.')).toBeInTheDocument();
+  });
+
+  it('새 비밀번호와 확인 비밀번호가 다르면 에러 메시지가 표시된다', () => {
+    renderProfile(mockApiUserLocal);
+    fireEvent.click(screen.getByText('변경'));
+    fillPasswordForm({ confirm: 'different!!' });
+
+    fireEvent.click(screen.getByText('비밀번호 변경'));
+    expect(screen.getByText('새 비밀번호가 일치하지 않습니다.')).toBeInTheDocument();
+  });
+
+  it('유효성 통과 시 확인 단계로 전환된다', () => {
+    renderProfile(mockApiUserLocal);
+    fireEvent.click(screen.getByText('변경'));
+    fillPasswordForm();
+
+    fireEvent.click(screen.getByText('비밀번호 변경'));
+    expect(screen.getByText('정말 비밀번호를 변경하시겠습니까?')).toBeInTheDocument();
+    expect(screen.getByText('아니요')).toBeInTheDocument();
+    expect(screen.getByText('변경합니다')).toBeInTheDocument();
+  });
+
+  it('확인 단계에서 "아니요" 클릭 시 입력 폼으로 돌아간다', () => {
+    renderProfile(mockApiUserLocal);
+    fireEvent.click(screen.getByText('변경'));
+    fillPasswordForm();
+    fireEvent.click(screen.getByText('비밀번호 변경'));
+    fireEvent.click(screen.getByText('아니요'));
+
+    expect(screen.getByText('현재 비밀번호')).toBeInTheDocument();
+    expect(screen.queryByText('정말 비밀번호를 변경하시겠습니까?')).not.toBeInTheDocument();
+  });
+
+  it('"변경합니다" 클릭 후 성공 시 토큰이 제거되고 페이지가 리로드된다', async () => {
+    const { patchPassword } = await import('../api/user.js');
+    patchPassword.mockResolvedValue({});
+    localStorage.setItem('accessToken', 'tok');
+    localStorage.setItem('refreshToken', 'ref');
+    const reloadSpy = vi.spyOn(window.location, 'reload').mockImplementation(() => {});
+
+    renderProfile(mockApiUserLocal);
+    fireEvent.click(screen.getByText('변경'));
+    fillPasswordForm();
+    fireEvent.click(screen.getByText('비밀번호 변경'));
+    fireEvent.click(screen.getByText('변경합니다'));
+
+    await waitFor(() => {
+      expect(patchPassword).toHaveBeenCalledWith({
+        currentPassword: 'old1234!',
+        newPassword: 'new1234!!',
+        confirmPassword: 'new1234!!',
+      });
+      expect(localStorage.getItem('accessToken')).toBeNull();
+      expect(localStorage.getItem('refreshToken')).toBeNull();
+      expect(reloadSpy).toHaveBeenCalled();
+    });
+
+    reloadSpy.mockRestore();
+  });
+
+  it('"변경합니다" 클릭 후 API 실패 시 에러와 함께 입력 폼으로 돌아간다', async () => {
+    const { patchPassword } = await import('../api/user.js');
+    const error = Object.assign(new Error('HTTP 401'), {
+      body: { message: '현재 비밀번호가 올바르지 않습니다.' },
+    });
+    patchPassword.mockRejectedValue(error);
+
+    renderProfile(mockApiUserLocal);
+    fireEvent.click(screen.getByText('변경'));
+    fillPasswordForm({ current: 'wrong!!!' });
+    fireEvent.click(screen.getByText('비밀번호 변경'));
+    fireEvent.click(screen.getByText('변경합니다'));
+
+    await waitFor(() => {
+      expect(screen.getByText('현재 비밀번호가 올바르지 않습니다.')).toBeInTheDocument();
+    });
+    expect(screen.getByText('현재 비밀번호')).toBeInTheDocument(); // 폼으로 복귀
+    expect(screen.queryByText('정말 비밀번호를 변경하시겠습니까?')).not.toBeInTheDocument();
   });
 });
 

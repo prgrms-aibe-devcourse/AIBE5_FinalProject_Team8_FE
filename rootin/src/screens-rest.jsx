@@ -873,6 +873,15 @@ function ProfileScreen() {
   const [withdrawing, setWithdrawing] = useState(false);
   const fileInputRef = useRef(null);
 
+  // 비밀번호 변경 폼 상태
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [pwStep, setPwStep] = useState('form'); // 'form' | 'confirm'
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwError, setPwError] = useState(null);
+  const [pwSaving, setPwSaving] = useState(false);
+
   // user가 비동기로 로드된 후 입력 상태 동기화
   useEffect(() => {
     if (user && !editing) {
@@ -962,6 +971,41 @@ function ProfileScreen() {
       alert('회원 탈퇴에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setWithdrawing(false);
+    }
+  }
+
+  function handlePasswordFormCancel() {
+    setShowPasswordForm(false);
+    setPwStep('form');
+    setPwCurrent('');
+    setPwNew('');
+    setPwConfirm('');
+    setPwError(null);
+  }
+
+  function handlePasswordNext() {
+    setPwError(null);
+    if (!pwCurrent) { setPwError('현재 비밀번호를 입력해주세요.'); return; }
+    if (pwNew.length < 8) { setPwError('비밀번호는 8자 이상이어야 합니다.'); return; }
+    if (pwNew !== pwConfirm) { setPwError('새 비밀번호가 일치하지 않습니다.'); return; }
+    setPwStep('confirm');
+  }
+
+  async function handlePasswordConfirm() {
+    setPwError(null);
+    setPwSaving(true);
+    try {
+      const { patchPassword } = await import('./api/user.js');
+      await patchPassword({ currentPassword: pwCurrent, newPassword: pwNew, confirmPassword: pwConfirm });
+      clearUser();
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.reload();
+    } catch (err) {
+      setPwError(err?.body?.message ?? '비밀번호 변경에 실패했습니다. 다시 시도해주세요.');
+      setPwStep('form');
+    } finally {
+      setPwSaving(false);
     }
   }
 
@@ -1115,21 +1159,25 @@ function ProfileScreen() {
       <Card padding={24}>
         <SectionHeader eyebrow="계정 관리" title="설정" />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {[
-            { label: '이메일', value: user?.email ?? '' },
-            isLocal ? { label: '비밀번호', value: '••••••••', action: '변경' } : null,
-          ].filter(Boolean).map((row, i, arr) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 20,
-              padding: '14px 0',
-              borderBottom: i < arr.length - 1 ? '0.5px solid var(--rule)' : 'none',
-            }}>
-              <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>{row.label}</div>
-              <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>{row.value}</div>
-              {row.sub && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{row.sub}</div>}
-              {row.action && <Btn variant="secondary" size="sm">{row.action}</Btn>}
+
+          {/* 이메일 행 */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 20,
+            padding: '14px 0',
+            borderBottom: isLocal ? '0.5px solid var(--rule)' : 'none',
+          }}>
+            <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>이메일</div>
+            <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>{user?.email ?? ''}</div>
+          </div>
+
+          {/* 비밀번호 행 — local 유저만 */}
+          {isLocal && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '14px 0' }}>
+              <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>비밀번호</div>
+              <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>••••••••</div>
+              <Btn variant="secondary" size="sm" onClick={() => setShowPasswordForm(true)}>변경</Btn>
             </div>
-          ))}
+          )}
         </div>
       </Card>
 
@@ -1151,6 +1199,113 @@ function ProfileScreen() {
           {withdrawing ? '처리 중…' : '회원 탈퇴'}
         </button>
       </div>
+
+      {/* 비밀번호 변경 모달 */}
+      {showPasswordForm && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15, 42, 71, 0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={handlePasswordFormCancel}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: 420, background: '#fff', borderRadius: 18,
+              padding: '32px 28px', boxShadow: 'var(--shadow-lg)',
+            }}
+          >
+            <div className="eyebrow" style={{ color: 'var(--moss-2)', marginBottom: 4 }}>계정 관리</div>
+            <h3 style={{
+              fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700,
+              color: 'var(--ink)', marginBottom: 22,
+            }}>
+              비밀번호 변경
+            </h3>
+
+            {pwStep === 'form' ? (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {[
+                    { label: '현재 비밀번호', value: pwCurrent, setter: setPwCurrent },
+                    { label: '새 비밀번호', value: pwNew, setter: setPwNew },
+                    { label: '새 비밀번호 확인', value: pwConfirm, setter: setPwConfirm },
+                  ].map(({ label, value, setter }) => (
+                    <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <label style={{
+                        fontSize: 11.5, color: 'var(--ink-3)',
+                        fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase',
+                      }}>
+                        {label}
+                      </label>
+                      <input
+                        type="password"
+                        value={value}
+                        onChange={e => setter(e.target.value)}
+                        style={{
+                          padding: '9px 12px', border: '0.5px solid var(--rule-2)', borderRadius: 8,
+                          fontSize: 13.5, color: 'var(--ink)', fontFamily: 'var(--font-body)',
+                          outline: 'none', width: '100%', boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {pwError && (
+                  <div style={{
+                    marginTop: 12, padding: '9px 13px', borderRadius: 8,
+                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
+                    fontSize: 12.5, color: '#b8536a',
+                  }}>
+                    {pwError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+                  <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={handlePasswordFormCancel}>
+                    취소
+                  </Btn>
+                  <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={handlePasswordNext}>
+                    비밀번호 변경
+                  </Btn>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{
+                  padding: '18px 16px', borderRadius: 10, background: 'var(--paper-2)',
+                  fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 22,
+                }}>
+                  정말 비밀번호를 변경하시겠습니까?<br />
+                  <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>변경 후에는 새 비밀번호로 다시 로그인해야 합니다.</span>
+                </div>
+
+                {pwError && (
+                  <div style={{
+                    marginBottom: 14, padding: '9px 13px', borderRadius: 8,
+                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
+                    fontSize: 12.5, color: '#b8536a',
+                  }}>
+                    {pwError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={() => { setPwStep('form'); setPwError(null); }} disabled={pwSaving}>
+                    아니요
+                  </Btn>
+                  <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={handlePasswordConfirm} disabled={pwSaving}>
+                    {pwSaving ? '변경 중…' : '변경합니다'}
+                  </Btn>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

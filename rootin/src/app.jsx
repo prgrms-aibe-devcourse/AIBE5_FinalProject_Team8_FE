@@ -29,7 +29,21 @@ function AppShell() {
   const [editorInitialTil, setEditorInitialTil] = useState(null);
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
+  // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(() => {
+    const v = typeof localStorage !== 'undefined' ? localStorage.getItem('rootin.tilRightOpen') : null;
+    return v === null ? true : v === 'true';
+  });
+  const [focusMode, setFocusMode] = useState(false);
   const [collectionStats, setCollectionStats] = useState(null);
+
+  const toggleRightPanel = () => setRightOpen((o) => {
+    const next = !o;
+    try { localStorage.setItem('rootin.tilRightOpen', String(next)); } catch { /* noop */ }
+    return next;
+  });
+  const toggleFocusMode = () => setFocusMode((f) => !f);
 
   useEffect(() => {
     getPlants()
@@ -43,6 +57,7 @@ function AppShell() {
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
 
   const handleNav = (nextScreen) => {
+    setFocusMode(false);
     if (nextScreen?.startsWith?.('/')) {
       navigate(nextScreen);
       return;
@@ -77,6 +92,12 @@ function AppShell() {
     setEditorInitialPotId(potId ?? null);
     setEditorInitialTil(null);
     navigate(potId ? `/editor?potId=${potId}` : '/editor', { replace: true });
+  };
+
+  // 사이드바 "새 TIL 작성" — 수정 모드 해제(신규 작성 상태). 선택한 화분은 유지.
+  // (에디터 비우기는 context.startNewTil이 담당)
+  const startNewEditorTil = () => {
+    setEditorInitialTil(null);
   };
 
   const handleTilPublished = (publishedPotId) => {
@@ -141,6 +162,8 @@ function AppShell() {
   return (
     <TilEditorProvider>
     <SidebarProvider
+      open={focusMode ? false : leftOpen}
+      onOpenChange={setLeftOpen}
       style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper)', minWidth: 1180 }}
       data-screen-label={screen}
     >
@@ -186,6 +209,8 @@ function AppShell() {
                 afterPublishScreen={editorReturnScreen ?? (activeEditorPotId ? `/garden/pots/${activeEditorPotId}` : '/dashboard')}
                 onPublished={handleTilPublished}
                 onSelectedPotChange={syncEditorPotQuery}
+                focusMode={focusMode}
+                onToggleFocus={toggleFocusMode}
               />
             )} />
             <Route path="/garden" element={<GardenScreen onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
@@ -204,7 +229,15 @@ function AppShell() {
           </Routes>
         </div>
       </SidebarInset>
-      {screen === 'editor' && <RootinSidebarRight onEditTil={openEditorForTil} onResumeDraft={resumeEditorDraft} />}
+      {screen === 'editor' && !focusMode && (
+        <RootinSidebarRight
+          onEditTil={openEditorForTil}
+          onResumeDraft={resumeEditorDraft}
+          onNewTil={startNewEditorTil}
+          open={rightOpen}
+          onToggle={toggleRightPanel}
+        />
+      )}
     </SidebarProvider>
     </TilEditorProvider>
   );

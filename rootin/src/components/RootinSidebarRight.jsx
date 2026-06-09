@@ -277,16 +277,6 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
           initial="hidden"
           animate="visible"
         >
-          {/* 패널 헤더 */}
-          <motion.header variants={sectionVariants} className="px-1 pt-1">
-            <div className="text-[15px] font-bold tracking-tight text-foreground" style={{ fontFamily: 'var(--font-display)' }}>
-              학습 동행
-            </div>
-            <div className="mt-0.5 text-[11.5px] text-muted-foreground">
-              오늘의 기록이 식물을 키워요
-            </div>
-          </motion.header>
-
           {/* 새 TIL 작성 — 에디터를 비우고 새 글 시작 */}
           <motion.button
             type="button"

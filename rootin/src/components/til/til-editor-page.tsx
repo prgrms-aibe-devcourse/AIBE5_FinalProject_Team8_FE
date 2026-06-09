@@ -322,9 +322,9 @@ export function TilEditorPage({
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-background">
-      {/* 좌상단 떠있는 사이드바 토글 (집중 모드에선 숨김) */}
+      {/* 좌상단 떠있는 사이드바 토글 (집중 모드에선 숨김) — 캔버스 기준 배치라 사이드바 로고를 가리지 않음 */}
       {!focusMode && (
-        <div className="pointer-events-none fixed left-4 top-4 z-30">
+        <div className="pointer-events-none absolute left-4 top-4 z-30">
           <SidebarTrigger
             aria-label="사이드바 토글"
             className="til-pulltab pointer-events-auto size-9 rounded-full text-muted-foreground"

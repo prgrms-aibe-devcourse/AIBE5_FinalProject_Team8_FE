@@ -27,6 +27,24 @@ const STAGE_REPRESENTATIVE_TIL_COUNT = {
   full: 40,
 };
 
+const POT_TITLE_MAX_LENGTH = 10;
+const POT_DESCRIPTION_MAX_LENGTH = 25;
+const EMPTY_POT_INTRO = '아직 소개글이 없는 화분이에요.';
+const POT_TITLE_PREVIEW_STYLE = {
+  minWidth: 0,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+};
+const POT_DESCRIPTION_PREVIEW_STYLE = {
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
+  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
+};
+
 const POT_LAYOUT_SLOTS = [
   { x: 18, y: 78 },
   { x: 40, y: 72 },
@@ -176,7 +194,7 @@ function toGardenPot(apiPot) {
     name: apiPot.title,
     emoji: getStageEmoji(stage),
     species: inferSpecies(apiPot.plantName),
-    intro: apiPot.description || '아직 소개글이 없는 화분이에요.',
+    intro: apiPot.description || EMPTY_POT_INTRO,
     tilCount: STAGE_REPRESENTATIVE_TIL_COUNT[stage],
     level,
     levelProgress,
@@ -202,7 +220,7 @@ function toDashboardPot(dashboard) {
     name: dashboard.title,
     emoji: getStageEmoji(stage),
     species: inferSpecies(dashboard.plant?.name),
-    intro: dashboard.description || '아직 소개글이 없는 화분이에요.',
+    intro: dashboard.description || EMPTY_POT_INTRO,
     tilCount: dashboard.totalTilCount ?? STAGE_REPRESENTATIVE_TIL_COUNT[stage],
     level: dashboard.level ?? 1,
     levelProgress,
@@ -456,10 +474,22 @@ function PotCard({ pot, onClick }) {
         : 'linear-gradient(180deg, #ffffff 0%, #f9faf7 100%)',
       borderColor: rare ? '#ccd6ec' : undefined,
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>Lv.{pot.level} · {potTier.shortLabel} 화분 · {stageMeta.label}</div>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 600, color: 'var(--ink)', marginTop: 4 }}>{pot.emoji} {pot.name}</div>
+          <div
+            title={`${pot.emoji} ${pot.name}`}
+            style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 17,
+              fontWeight: 600,
+              color: 'var(--ink)',
+              marginTop: 4,
+              ...POT_TITLE_PREVIEW_STYLE,
+            }}
+          >
+            {pot.emoji} {pot.name}
+          </div>
         </div>
         {pot.waterToday ? (
           <Pill tone="green"><span style={{ display: 'inline-flex', marginRight: 2 }}>{Icon.drop}</span>물주기 완료</Pill>
@@ -484,7 +514,18 @@ function PotCard({ pot, onClick }) {
         </div>
       </div>
 
-      <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6, minHeight: 36 }}>{pot.intro}</div>
+      <div
+        title={pot.intro}
+        style={{
+          fontSize: 12.5,
+          color: 'var(--ink-2)',
+          lineHeight: 1.6,
+          minHeight: 36,
+          ...POT_DESCRIPTION_PREVIEW_STYLE,
+        }}
+      >
+        {pot.intro}
+      </div>
 
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>
@@ -718,9 +759,10 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
                   ? 'rgba(235, 245, 239, 0.95)'
                   : isDark ? 'rgba(15, 42, 71, 0.6)' : 'rgba(255, 255, 255, 0.75)',
                 border: isSelected ? '1px solid var(--leaf)' : 'none',
-                whiteSpace: 'nowrap',
+                maxWidth: 132,
                 imageRendering: 'pixelated',
-              }}>
+                ...POT_TITLE_PREVIEW_STYLE,
+              }} title={`${pot.emoji} ${pot.name}`}>
                 {pot.emoji} {pot.name}
               </div>
             </div>
@@ -1396,8 +1438,8 @@ function CreatePotModal({ userId, onClose, onCreated }) {
 
   const titleLength = title.trim().length;
   const descriptionLength = description.length;
-  const titleInvalid = titleLength === 0 || title.length > 100;
-  const descriptionInvalid = descriptionLength > 255;
+  const titleInvalid = titleLength === 0 || title.length > POT_TITLE_MAX_LENGTH;
+  const descriptionInvalid = descriptionLength > POT_DESCRIPTION_MAX_LENGTH;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -1407,12 +1449,12 @@ function CreatePotModal({ userId, onClose, onCreated }) {
       setError('화분 제목을 입력해 주세요.');
       return;
     }
-    if (title.length > 100) {
-      setError('화분 제목은 최대 100자까지 입력할 수 있어요.');
+    if (title.length > POT_TITLE_MAX_LENGTH) {
+      setError(`화분 제목은 최대 ${POT_TITLE_MAX_LENGTH}자까지 입력할 수 있어요.`);
       return;
     }
-    if (description.length > 255) {
-      setError('화분 소개글은 최대 255자까지 입력할 수 있어요.');
+    if (description.length > POT_DESCRIPTION_MAX_LENGTH) {
+      setError(`화분 소개글은 최대 ${POT_DESCRIPTION_MAX_LENGTH}자까지 입력할 수 있어요.`);
       return;
     }
 
@@ -1480,11 +1522,12 @@ function CreatePotModal({ userId, onClose, onCreated }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span>화분 제목</span>
-              <span style={{ color: title.length > 100 ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/100</span>
+              <span style={{ color: title.length > POT_TITLE_MAX_LENGTH ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/{POT_TITLE_MAX_LENGTH}</span>
             </span>
             <input
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value.slice(0, POT_TITLE_MAX_LENGTH))}
+              maxLength={POT_TITLE_MAX_LENGTH}
               placeholder="예: Spring 공부"
               disabled={loading}
               autoFocus
@@ -1503,17 +1546,17 @@ function CreatePotModal({ userId, onClose, onCreated }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span>소개글</span>
-              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{descriptionLength}/255</span>
+              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{descriptionLength}/{POT_DESCRIPTION_MAX_LENGTH}</span>
             </span>
             <textarea
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={e => setDescription(e.target.value.slice(0, POT_DESCRIPTION_MAX_LENGTH))}
+              maxLength={POT_DESCRIPTION_MAX_LENGTH}
               placeholder="이 화분에 어떤 기록을 모을지 적어보세요."
               disabled={loading}
-              rows={4}
               style={{
-                minHeight: 96,
-                resize: 'vertical',
+                height: 82,
+                resize: 'none',
                 borderRadius: 10,
                 border: `0.5px solid ${descriptionInvalid ? '#f0c4cc' : 'var(--rule-2)'}`,
                 background: 'var(--paper)',
@@ -1557,6 +1600,33 @@ function CreatePotModal({ userId, onClose, onCreated }) {
 // ============================
 // Pot Detail Screen
 // ============================
+function PotDetailBackButton({ onBack, style }) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 7,
+        padding: '8px 12px',
+        borderRadius: 999,
+        border: '0.5px solid #c9dccd',
+        background: '#fff',
+        color: 'var(--moss-2)',
+        fontSize: 12.5,
+        fontWeight: 700,
+        fontFamily: 'var(--font-display)',
+        boxShadow: '0 4px 12px rgba(40, 84, 57, 0.08)',
+        ...style,
+      }}
+    >
+      <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span>
+      정원으로 돌아가기
+    </button>
+  );
+}
+
 function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil }) {
   const { user } = useUser();
   const fallbackPot = POTS.find(p => p.id === potId);
@@ -1643,9 +1713,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   if (dashboardLoading && !pot) {
     return (
       <div style={{ padding: 32, maxWidth: 960, margin: '0 auto' }}>
-        <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14 }}>
-          <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
-        </button>
+        <PotDetailBackButton onBack={onBack} style={{ marginBottom: 16 }} />
         <Card padding={28} style={{ textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
           화분 대시보드를 불러오는 중이에요.
         </Card>
@@ -1656,9 +1724,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   if (!pot) {
     return (
       <div style={{ padding: 32, maxWidth: 960, margin: '0 auto' }}>
-        <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14 }}>
-          <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
-        </button>
+        <PotDetailBackButton onBack={onBack} style={{ marginBottom: 16 }} />
         <Card padding={28} style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>🌱</div>
           <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>Garden Detail</div>
@@ -1761,14 +1827,13 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
 
   return (
     <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
-      <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--ink-3)', fontSize: 12.5, marginBottom: 14 }}>
-        <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span> 정원으로
-      </button>
-
       <div className="pot-detail-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(350px, 400px) minmax(0, 760px)', gap: 24, alignItems: 'start' }}>
 
         {/* Left — plant card */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div>
+            <PotDetailBackButton onBack={onBack} />
+          </div>
           <Card padding={0} style={{ overflow: 'hidden' }}>
             <div style={{
               padding: '34px 24px 24px',
@@ -1795,7 +1860,17 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
             </div>
             <div style={{ padding: '20px 24px 22px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.01em' }}>
+                <div
+                  title={`${pot.emoji} ${pot.name}`}
+                  style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 22,
+                    fontWeight: 700,
+                    color: 'var(--ink)',
+                    letterSpacing: '-0.01em',
+                    ...POT_TITLE_PREVIEW_STYLE,
+                  }}
+                >
                   {pot.emoji} {pot.name}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
@@ -1837,7 +1912,18 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
                   )}
                 </div>
               </div>
-              <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 10, lineHeight: 1.6 }}>{pot.intro}</div>
+              <div
+                title={pot.intro}
+                style={{
+                  fontSize: 12.5,
+                  color: 'var(--ink-2)',
+                  marginTop: 10,
+                  lineHeight: 1.6,
+                  ...POT_DESCRIPTION_PREVIEW_STYLE,
+                }}
+              >
+                {pot.intro}
+              </div>
               <div style={{
                 marginTop: 18,
                 background: '#fff',
@@ -2080,46 +2166,41 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
                 onClick={() => handleOpenTilDetail(t)}
                 style={{ cursor: 'pointer' }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
-                      {t.date} · {t.chars}자
-                    </div>
-                    <div style={{
-                      fontFamily: 'var(--font-display)',
-                      fontSize: 16,
-                      fontWeight: 600,
-                      color: 'var(--ink)',
-                      lineHeight: 1.45,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}>
-                      {t.title}
-                    </div>
-                    <div style={{
-                      fontSize: 13,
-                      color: 'var(--ink-2)',
-                      lineHeight: 1.6,
-                      marginTop: 6,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    }}>
-                      {t.excerpt}
-                    </div>
-                    <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
-                      {t.tags.map(tag => (
-                        <span key={tag} style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 999, background: 'var(--paper-2)', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>
+                    {t.date} · {t.chars}자
                   </div>
-                  <div style={{ width: 56, height: 56, borderRadius: 10, background: isRare ? '#eef2fa' : 'var(--paper-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <PottedPlant species={pot.species} stage={stage} size={44} potLevel={pot.level} />
+                  <div style={{
+                    fontFamily: 'var(--font-display)',
+                    fontSize: 16,
+                    fontWeight: 600,
+                    color: 'var(--ink)',
+                    lineHeight: 1.45,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}>
+                    {t.title}
+                  </div>
+                  <div style={{
+                    fontSize: 13,
+                    color: 'var(--ink-2)',
+                    lineHeight: 1.6,
+                    marginTop: 6,
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}>
+                    {t.excerpt}
+                  </div>
+                  <div style={{ display: 'flex', gap: 5, marginTop: 10, flexWrap: 'wrap' }}>
+                    {t.tags.map(tag => (
+                      <span key={tag} style={{ fontSize: 10.5, padding: '2px 8px', borderRadius: 999, background: 'var(--paper-2)', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                        #{tag}
+                      </span>
+                    ))}
                   </div>
                 </div>
               </Card>
@@ -2301,12 +2382,12 @@ function TilDetailModal({ til, loading, onClose, onEdit }) {
 
 function EditPotModal({ pot, onClose, onUpdated }) {
   const [title, setTitle] = useState(pot.name ?? '');
-  const [description, setDescription] = useState(pot.intro === '아직 소개글이 없는 화분이에요.' ? '' : (pot.intro ?? ''));
+  const [description, setDescription] = useState(pot.intro === EMPTY_POT_INTRO ? '' : (pot.intro ?? ''));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const titleInvalid = title.trim().length === 0 || title.length > 100;
-  const descriptionInvalid = description.length > 255;
+  const titleInvalid = title.trim().length === 0 || title.length > POT_TITLE_MAX_LENGTH;
+  const descriptionInvalid = description.length > POT_DESCRIPTION_MAX_LENGTH;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -2316,12 +2397,12 @@ function EditPotModal({ pot, onClose, onUpdated }) {
       setError('화분 제목을 입력해 주세요.');
       return;
     }
-    if (title.length > 100) {
-      setError('화분 제목은 최대 100자까지 입력할 수 있어요.');
+    if (title.length > POT_TITLE_MAX_LENGTH) {
+      setError(`화분 제목은 최대 ${POT_TITLE_MAX_LENGTH}자까지 입력할 수 있어요.`);
       return;
     }
-    if (description.length > 255) {
-      setError('화분 소개글은 최대 255자까지 입력할 수 있어요.');
+    if (description.length > POT_DESCRIPTION_MAX_LENGTH) {
+      setError(`화분 소개글은 최대 ${POT_DESCRIPTION_MAX_LENGTH}자까지 입력할 수 있어요.`);
       return;
     }
 
@@ -2393,11 +2474,12 @@ function EditPotModal({ pot, onClose, onUpdated }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span>화분 제목</span>
-              <span style={{ color: title.length > 100 ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/100</span>
+              <span style={{ color: title.length > POT_TITLE_MAX_LENGTH ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/{POT_TITLE_MAX_LENGTH}</span>
             </span>
             <input
               value={title}
-              onChange={e => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value.slice(0, POT_TITLE_MAX_LENGTH))}
+              maxLength={POT_TITLE_MAX_LENGTH}
               disabled={loading}
               autoFocus
               style={{
@@ -2415,16 +2497,16 @@ function EditPotModal({ pot, onClose, onUpdated }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
               <span>소개글</span>
-              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{description.length}/255</span>
+              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{description.length}/{POT_DESCRIPTION_MAX_LENGTH}</span>
             </span>
             <textarea
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={e => setDescription(e.target.value.slice(0, POT_DESCRIPTION_MAX_LENGTH))}
+              maxLength={POT_DESCRIPTION_MAX_LENGTH}
               disabled={loading}
-              rows={4}
               style={{
-                minHeight: 96,
-                resize: 'vertical',
+                height: 82,
+                resize: 'none',
                 borderRadius: 10,
                 border: `0.5px solid ${descriptionInvalid ? '#f0c4cc' : 'var(--rule-2)'}`,
                 background: 'var(--paper)',

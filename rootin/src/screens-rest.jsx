@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { getPlants } from './api/collection.js';
-import { DEX } from './data.jsx';
 import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult } from './api/ai.js';
 import { getPots } from './api/pot.js';
 import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
@@ -10,267 +9,244 @@ import { useUser } from './context/UserContext.jsx';
 
 // Collection (식물도감), AI, Profile, Auth screens
 
-// ============================
-// Evolution chain card (pokedex style)
-// ============================
-function EvoCard({ entry }) {
-  const stages = ['seed', 'sprout', 'leaf', 'bloom', 'full'];
-  const stageOrder = ['씨앗', '새싹', '잎', '개화', '만개'];
-  const stageMap = { '씨앗': 'seed', '새싹': 'sprout', '잎': 'leaf', '개화': 'bloom', '만개': 'full' };
-  const reachedIdx = stages.indexOf(entry.currentStage);
-  const speciesInfo = PIXEL_SPECIES[entry.species];
-  const isHarvested = entry.state === 'harvested';
-  const isRare = entry.rarity === 'rare';
-  const isSecret = entry.rarity === 'secret';
-  const isLocked = entry.state === 'locked';
+// BE speciesKey → PixelPlant species 키 매핑
+const SPECIES_TO_PIXEL = {
+  seed:   'seed',
+  shroom: 'mushroom',
+  cactus: 'cactus',
+  fire:   'fire',
+  ice:    'ice',
+  moon:   'moonlight',
+  bolt:   'bolt',
+  rose:   'rose',
+};
 
-  if (isLocked) {
-    return (
-      <div style={{
-        position: 'relative',
-        background: '#fff', borderRadius: 14,
-        border: '0.5px solid #f0c4cc',
-        padding: '16px 20px 14px',
-        opacity: 0.85,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>#???</span>
-            <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink-2)' }}>{entry.label}</span>
-          </div>
-          <Pill tone="pink">🔴 비밀종</Pill>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6 }}>
-          {stages.map((s, i) => (
-            <div key={s} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-              <div style={{
-                width: 56, height: 56, borderRadius: 6,
-                background: '#fcebeb', border: '0.5px solid #f7c1c1',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                filter: 'brightness(0.4)',
-              }}>
-                {i === 0 ? <PixelPlant species="secret" stage="seed" size={42} locked /> : null}
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--ink-3)' }}>???</div>
-            </div>
-          ))}
-        </div>
-        <div style={{
-          position: 'absolute', inset: 0, borderRadius: 14,
-          background: 'rgba(247, 249, 247, 0.85)',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}>
-          <div style={{ fontSize: 20 }}>🔒</div>
-          <div style={{ fontSize: 12, color: 'var(--ink-2)', fontFamily: 'var(--font-display)' }}>
-            {entry.unlockHint}
-          </div>
-        </div>
-      </div>
-    );
-  }
+const STAGE_KEYS = ['seed', 'sprout', 'leaf', 'bloom', 'full'];
 
-  const borderColor = isRare ? '#ccc9f0' : 'var(--rule)';
+const STAGE_BADGE_STYLE = {
+  seed:   { background: '#fff4e0', color: '#8b6340', border: '#f0dcb5' },
+  sprout: { background: '#ebf5ef', color: '#2e6b48', border: '#d4ebdc' },
+  leaf:   { background: '#e3f2e8', color: '#1d5e38', border: '#c4e0cc' },
+  bloom:  { background: '#ffeef2', color: '#b8536a', border: '#ffd4dc' },
+  full:   { background: '#eef2f8', color: '#1a3a5c', border: '#d8e2ee' },
+};
+
+// ============================
+// 도감 단일 카드 (5열 그리드용)
+// ============================
+function DexCard({ entry, speciesKey, rare }) {
+  const pixelSpecies = SPECIES_TO_PIXEL[speciesKey] ?? speciesKey;
+  const stageKey = STAGE_KEYS[entry.stageIndex] ?? 'seed';
+  const badge = STAGE_BADGE_STYLE[stageKey];
+
+  const collectedBorder = rare
+    ? '0.5px solid #d8e2ee'
+    : '0.5px solid var(--sprout, #9dd0b0)';
 
   return (
-    <div style={{
-      background: '#fff', borderRadius: 14,
-      border: `0.5px solid ${borderColor}`,
-      padding: '16px 20px 14px',
-    }}>
-      {/* meta row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>#{entry.no}</span>
-          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap' }}>{entry.label}</span>
-          {entry.pot && (
-            <span style={{ fontSize: 12, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
-              · {entry.pot.emoji} {entry.pot.name} 화분 {entry.pot.round}회차
-            </span>
-          )}
+    <div
+      style={{
+        background: entry.collected ? 'var(--card)' : 'var(--paper-2)',
+        border: entry.collected ? collectedBorder : '0.5px solid var(--rule)',
+        borderRadius: 'var(--r-lg, 14px)',
+        padding: '12px 8px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
+        cursor: 'pointer', position: 'relative',
+        minHeight: 160,
+        transition: 'transform 0.12s, box-shadow 0.12s',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.boxShadow = 'var(--shadow-md)';
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = '';
+        e.currentTarget.style.boxShadow = '';
+      }}
+    >
+      {/* 도감 번호 */}
+      <div style={{
+        fontSize: 9, color: 'var(--ink-3)',
+        alignSelf: 'flex-start',
+        marginTop: 2,
+        fontFamily: 'var(--font-mono)',
+        letterSpacing: '0.04em',
+      }}>
+        No.{entry.dexNumber}
+      </div>
+
+      {/* 픽셀 아트 */}
+      <div style={{ width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <PixelPlant species={pixelSpecies} stage={stageKey} size={62} locked={!entry.collected} />
+      </div>
+
+      {/* 이름 */}
+      <div style={{
+        fontSize: 11, fontWeight: 600,
+        color: entry.collected ? 'var(--ink)' : 'var(--ink-3)',
+        textAlign: 'center', lineHeight: 1.3,
+        fontFamily: 'var(--font-display)',
+      }}>
+        {entry.collected ? entry.monName : '???'}
+      </div>
+
+      {/* 단계 뱃지 */}
+      {entry.collected ? (
+        <div style={{
+          fontSize: 9, fontWeight: 600,
+          padding: '2px 8px', borderRadius: 999,
+          whiteSpace: 'nowrap',
+          background: badge.background, color: badge.color,
+          border: `0.5px solid ${badge.border}`,
+          fontFamily: 'var(--font-display)',
+        }}>
+          {entry.stageName} 수확
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <Pill tone={isRare ? 'navy' : 'green'}>{isRare ? '✦ 희귀종' : '일반종'}</Pill>
-          {isHarvested
-            ? <Pill tone="navy">수확 완료</Pill>
-            : <Pill tone="green">{speciesInfo?.stages[entry.currentStage]?.stage} 중</Pill>
-          }
-        </div>
-      </div>
-
-      {/* evolution chain */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 6, alignItems: 'flex-end' }}>
-        {stages.map((s, i) => {
-          const passed = i <= reachedIdx;
-          const isCurrent = i === reachedIdx && !isHarvested;
-          const date = entry.levels[stageOrder[i]];
-          const stageName = speciesInfo?.stages[s]?.name || stageOrder[i];
-
-          let bg = '#f7f9f7', border = '0.5px solid var(--rule)';
-          if (passed) {
-            bg = isRare ? '#eef2fa' : (isHarvested ? '#e6f1fb' : '#eaf3de');
-            border = isRare ? '0.5px solid #afa9ec' : (isHarvested ? '0.5px solid #185fa5' : '0.5px solid #c8e0a8');
-          }
-          if (isCurrent) {
-            bg = isRare ? '#eef2fa' : '#e1f5ee';
-            border = isRare ? '1.5px solid #534ab7' : '1.5px solid #0f6e56';
-          }
-
-          return (
-            <div key={s} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, position: 'relative' }}>
-              {i < 4 && (
-                <div style={{
-                  position: 'absolute', right: -6, top: 22,
-                  fontSize: 14, color: 'var(--ink-3)', zIndex: 1,
-                }}>›</div>
-              )}
-              <div style={{
-                width: 56, height: 56, borderRadius: 6,
-                background: bg, border, position: 'relative',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <PixelPlant species={entry.species} stage={s} size={42} locked={!passed} />
-              </div>
-              <div style={{ fontSize: 10, color: passed ? 'var(--ink)' : 'var(--ink-3)', fontWeight: passed ? 500 : 400 }}>
-                {stageName}
-              </div>
-              {date && (
-                <div style={{ fontSize: 9, color: isHarvested ? '#185fa5' : '#0f6e56', fontFamily: 'var(--font-mono)' }}>
-                  {date}
-                </div>
-              )}
-              <div style={{ fontSize: 9, color: 'var(--ink-3)' }}>
-                {stageOrder[i]} {isCurrent && '←'}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* footer */}
-      <div style={{ display: 'flex', gap: 18, marginTop: 12, paddingTop: 10, borderTop: '0.5px solid var(--rule)', fontSize: 11, color: 'var(--ink-3)' }}>
-        {!isHarvested && (
-          <span>현재 단계 <b style={{ color: 'var(--ink)' }}>{speciesInfo?.stages[entry.currentStage]?.stage} ({reachedIdx + 1}/5)</b></span>
-        )}
-        <span>화분 레벨 <b style={{ color: 'var(--ink)' }}>Lv.{entry.potLevel}</b></span>
-        <span>시작일 <b style={{ color: 'var(--ink)' }}>{entry.startedAt}</b></span>
-        {isHarvested && <span>수확일 <b style={{ color: 'var(--ink)' }}>{entry.harvestedAt}</b></span>}
-      </div>
+      ) : (
+        <div style={{ height: 18 }} />
+      )}
     </div>
   );
 }
 
-// API 응답 → EvoCard가 기대하는 entry 형식으로 변환
-function toEvoEntry(plant, index) {
-  return {
-    no: String(index + 1).padStart(3, '0'),
-    species: plant.species ?? 'seed',
-    label: plant.plantType,
-    rarity: plant.rarity,          // "rare" | "common" (BE에서 영어로 내려옴)
-    state: plant.state,
-    pot: plant.potTitle
-      ? { emoji: '', name: plant.potTitle, round: plant.round }
-      : null,
-    levels: plant.stageDates ?? {},
-    currentStage: plant.state === 'harvested' ? 'full' : (plant.currentStage ?? 'seed'),
-    potLevel: plant.potLevel ?? 0,
-    startedAt: plant.startedAt ?? '',
-    harvestedAt: plant.harvestedAt ?? null,
-    unlockHint: '아직 한 번도 키우지 않은 식물이에요',
-  };
+// ============================
+// 계열 구분선
+// ============================
+function DexSectionDivider({ section }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '28px 0 14px' }}>
+      <span style={{
+        fontSize: 10, fontWeight: 700,
+        color: 'var(--ink-3)',
+        textTransform: 'uppercase', letterSpacing: '0.1em',
+        whiteSpace: 'nowrap',
+        fontFamily: 'var(--font-display)',
+      }}>
+        {section.speciesLabel}
+      </span>
+      <Pill tone={section.rare ? 'navy' : 'green'}>
+        {section.rare ? '✦ 희귀종' : '일반종'}
+      </Pill>
+      <div style={{ flex: 1, height: '0.5px', background: 'var(--rule)' }} />
+      <span style={{
+        fontSize: 10, color: 'var(--ink-3)',
+        fontFamily: 'var(--font-mono)',
+        whiteSpace: 'nowrap',
+      }}>{section.numRange}</span>
+    </div>
+  );
 }
 
 function CollectionScreen() {
-  const [plants, setPlants] = useState([]);
+  const [dex, setDex] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     getPlants()
-      .then(data => setPlants(data?.plants ?? []))
+      .then(data => setDex(data))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
-  const growing   = plants.filter(p => p.state === 'growing');
-  const harvested = plants.filter(p => p.state === 'harvested');
-  const locked    = plants.filter(p => p.state === 'locked');
+  const filteredSections = useMemo(() => {
+    if (!dex?.sections) return [];
+    return dex.sections
+      .map(section => ({
+        ...section,
+        entries: filter === 'all' ? section.entries
+          : filter === 'collected' ? section.entries.filter(e => e.collected)
+          : section.entries.filter(e => !e.collected),
+      }))
+      .filter(section => section.entries.length > 0);
+  }, [dex, filter]);
+
+  const stats = dex?.stats;
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto' }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1200, margin: '0 auto' }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ flex: '1 1 320px' }}>
+      {/* 헤더 */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, gap: 14, flexWrap: 'wrap' }}>
+        <div>
           <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>식물 도감</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--ink)', marginTop: 6, letterSpacing: '-0.02em' }}>
-            직접 키워낸 식물의 진화 기록
-          </h2>
-          <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
-            화분에서 자란 식물의 모든 성장 과정을 도감에 모아요.
+          <div style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: 24, fontWeight: 700,
+            color: 'var(--ink)',
+            marginTop: 4, letterSpacing: '-0.02em',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <svg width="24" height="24" viewBox="0 0 80 80" fill="none">
+              <path d="M22 50 L18 68 L62 68 L58 50 Z" fill="#c8a882"/>
+              <rect x="20" y="44" width="40" height="8" rx="4" fill="#b8946a"/>
+              <rect x="38" y="22" width="4" height="28" rx="2" fill="#a8d5b5"/>
+              <ellipse cx="28" cy="32" rx="12" ry="8" fill="#a8d5b5" transform="rotate(-20 28 32)"/>
+              <ellipse cx="52" cy="26" rx="11" ry="7.5" fill="#3d8b5e" transform="rotate(15 52 26)"/>
+              <circle cx="40" cy="14" r="8" fill="#3d8b5e" opacity="0.9"/>
+              <circle cx="33" cy="9" r="6" fill="#3d8b5e" opacity="0.65"/>
+              <circle cx="47" cy="9" r="6" fill="#4a9066" opacity="0.65"/>
+              <circle cx="40" cy="14" r="2.5" fill="#e8f5ec"/>
+            </svg>
+            키워낸 식물의 수집 도감
           </div>
+          <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
+            화분에서 수확할 때마다 도감 칸이 채워져요.
+          </div>
+          {stats && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+              <Pill tone="default">총 {stats.total}칸</Pill>
+              <Pill tone="green">일반 {stats.common}칸</Pill>
+              <Pill tone="navy">희귀 {stats.rare}칸</Pill>
+              <Btn variant="green" size="sm">
+                {stats.collected} / {stats.total} 수집
+              </Btn>
+            </div>
+          )}
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
-          <div style={{ background: '#fff', border: '0.5px solid var(--rule)', borderRadius: 10, padding: '10px 18px', textAlign: 'center', minWidth: 80 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>{growing.length}</div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>키우는 중</div>
-          </div>
-          <div style={{ background: '#fff', border: '0.5px solid var(--rule)', borderRadius: 10, padding: '10px 18px', textAlign: 'center', minWidth: 80 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>{harvested.length}</div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>수확 완료</div>
-          </div>
-          <div style={{ background: '#fff', border: '0.5px solid var(--rule)', borderRadius: 10, padding: '10px 18px', textAlign: 'center', minWidth: 80 }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: '#3b6d11' }}>
-              {harvested.length} / {plants.length}
-            </div>
-            <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>종 해금</div>
-          </div>
+        {/* 필터 버튼 */}
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {[
+            { key: 'all',       label: '전체' },
+            { key: 'collected', label: '수집 완료' },
+            { key: 'locked',    label: '미수집' },
+          ].map(({ key, label }) => (
+            <Btn
+              key={key}
+              variant={filter === key ? 'green' : 'secondary'}
+              size="sm"
+              onClick={() => setFilter(key)}
+            >
+              {label}
+            </Btn>
+          ))}
         </div>
       </div>
 
       {loading && (
-        <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>도감을 불러오는 중...</div>
+        <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+          도감을 불러오는 중…
+        </div>
       )}
 
-      {!loading && (
-        <>
-          {/* 키우는 중 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, marginTop: 8 }}>
-            <span style={{ fontSize: 13, color: 'var(--ink-2)', fontFamily: 'var(--font-display)', fontWeight: 500, whiteSpace: 'nowrap' }}>🌱 키우는 중</span>
-            <Pill tone="green">{growing.length}종</Pill>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 30 }}>
-            {growing.length === 0
-              ? <div style={{ fontSize: 12.5, color: 'var(--ink-3)', padding: '16px 0' }}>현재 키우는 식물이 없어요.</div>
-              : growing.map((p, i) => <EvoCard key={i} entry={toEvoEntry(p, i)} />)
-            }
-          </div>
-
-          {/* 수확 완료 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <span style={{ fontSize: 13, color: 'var(--ink-2)', fontFamily: 'var(--font-display)', fontWeight: 500, whiteSpace: 'nowrap' }}>🏆 수확 완료</span>
-            <Pill tone="navy">{harvested.length}종</Pill>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 30 }}>
-            {harvested.length === 0
-              ? <div style={{ fontSize: 12.5, color: 'var(--ink-3)', padding: '16px 0' }}>아직 수확 완료한 식물이 없어요.</div>
-              : harvested.map((p, i) => <EvoCard key={i} entry={toEvoEntry(p, growing.length + i)} />)
-            }
-          </div>
-
-          {/* 미수집 */}
-          {locked.length > 0 && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <span style={{ fontSize: 13, color: 'var(--ink-2)', fontFamily: 'var(--font-display)', fontWeight: 500, whiteSpace: 'nowrap' }}>🔒 미수집</span>
-                <Pill tone="pink">{locked.length}종</Pill>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {locked.map((p, i) => <EvoCard key={i} entry={toEvoEntry(p, growing.length + harvested.length + i)} />)}
-              </div>
-            </>
-          )}
-        </>
+      {!loading && filteredSections.length === 0 && (
+        <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+          해당 조건의 식물이 없어요.
+        </div>
       )}
+
+      {/* 계열별 섹션 */}
+      {!loading && filteredSections.map(section => (
+        <div key={section.speciesKey}>
+          <DexSectionDivider section={section} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 8 }}>
+            {section.entries.map(entry => (
+              <DexCard key={entry.dexNumber} entry={entry} speciesKey={section.speciesKey} rare={section.rare} />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -279,9 +255,14 @@ function CollectionScreen() {
 
 // plantName → PixelPlant species 매핑
 const PLANT_NAME_TO_SPECIES = {
-  '기본 씨앗': 'seed',
-  '달빛씨앗': 'moonlight',
-  '버섯씨앗': 'mushroom',
+  '기본 씨앗':  'seed',
+  '버섯씨앗':   'mushroom',
+  '선인장씨앗': 'cactus',
+  '불꽃씨앗':   'fire',
+  '얼음씨앗':   'ice',
+  '달빛씨앗':   'moonlight',
+  '번개씨앗':   'bolt',
+  '흑장미씨앗': 'rose',
 };
 // growthStage → PixelPlant stage 매핑
 const GROWTH_STAGE_TO_STAGE = {
@@ -873,6 +854,15 @@ function ProfileScreen() {
   const [withdrawing, setWithdrawing] = useState(false);
   const fileInputRef = useRef(null);
 
+  // 비밀번호 변경 폼 상태
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [pwStep, setPwStep] = useState('form'); // 'form' | 'confirm'
+  const [pwCurrent, setPwCurrent] = useState('');
+  const [pwNew, setPwNew] = useState('');
+  const [pwConfirm, setPwConfirm] = useState('');
+  const [pwError, setPwError] = useState(null);
+  const [pwSaving, setPwSaving] = useState(false);
+
   // user가 비동기로 로드된 후 입력 상태 동기화
   useEffect(() => {
     if (user && !editing) {
@@ -883,16 +873,9 @@ function ProfileScreen() {
 
   // 수확한 식물 수 조회
   useEffect(() => {
-    import('./api/collection.js').then(({ getPlants }) =>
-      getPlants()
-        .then(plants => {
-          const count = Array.isArray(plants)
-            ? plants.filter(p => p.isCollected === true).length
-            : 0;
-          setHarvestedCount(count);
-        })
-        .catch(() => setHarvestedCount(0))
-    );
+    getPlants()
+      .then(data => setHarvestedCount(data?.stats?.collected ?? 0))
+      .catch(() => setHarvestedCount(0));
   }, []);
 
   async function handleSave() {
@@ -962,6 +945,41 @@ function ProfileScreen() {
       alert('회원 탈퇴에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setWithdrawing(false);
+    }
+  }
+
+  function handlePasswordFormCancel() {
+    setShowPasswordForm(false);
+    setPwStep('form');
+    setPwCurrent('');
+    setPwNew('');
+    setPwConfirm('');
+    setPwError(null);
+  }
+
+  function handlePasswordNext() {
+    setPwError(null);
+    if (!pwCurrent) { setPwError('현재 비밀번호를 입력해주세요.'); return; }
+    if (pwNew.length < 8) { setPwError('비밀번호는 8자 이상이어야 합니다.'); return; }
+    if (pwNew !== pwConfirm) { setPwError('새 비밀번호가 일치하지 않습니다.'); return; }
+    setPwStep('confirm');
+  }
+
+  async function handlePasswordConfirm() {
+    setPwError(null);
+    setPwSaving(true);
+    try {
+      const { patchPassword } = await import('./api/user.js');
+      await patchPassword({ currentPassword: pwCurrent, newPassword: pwNew, confirmPassword: pwConfirm });
+      clearUser();
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      window.location.reload();
+    } catch (err) {
+      setPwError(err?.body?.message ?? '비밀번호 변경에 실패했습니다. 다시 시도해주세요.');
+      setPwStep('form');
+    } finally {
+      setPwSaving(false);
     }
   }
 
@@ -1115,21 +1133,25 @@ function ProfileScreen() {
       <Card padding={24}>
         <SectionHeader eyebrow="계정 관리" title="설정" />
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {[
-            { label: '이메일', value: user?.email ?? '' },
-            isLocal ? { label: '비밀번호', value: '••••••••', action: '변경' } : null,
-          ].filter(Boolean).map((row, i, arr) => (
-            <div key={i} style={{
-              display: 'flex', alignItems: 'center', gap: 20,
-              padding: '14px 0',
-              borderBottom: i < arr.length - 1 ? '0.5px solid var(--rule)' : 'none',
-            }}>
-              <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>{row.label}</div>
-              <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>{row.value}</div>
-              {row.sub && <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>{row.sub}</div>}
-              {row.action && <Btn variant="secondary" size="sm">{row.action}</Btn>}
+
+          {/* 이메일 행 */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 20,
+            padding: '14px 0',
+            borderBottom: isLocal ? '0.5px solid var(--rule)' : 'none',
+          }}>
+            <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>이메일</div>
+            <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>{user?.email ?? ''}</div>
+          </div>
+
+          {/* 비밀번호 행 — local 유저만 */}
+          {isLocal && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '14px 0' }}>
+              <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>비밀번호</div>
+              <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>••••••••</div>
+              <Btn variant="secondary" size="sm" onClick={() => setShowPasswordForm(true)}>변경</Btn>
             </div>
-          ))}
+          )}
         </div>
       </Card>
 
@@ -1151,6 +1173,113 @@ function ProfileScreen() {
           {withdrawing ? '처리 중…' : '회원 탈퇴'}
         </button>
       </div>
+
+      {/* 비밀번호 변경 모달 */}
+      {showPasswordForm && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(15, 42, 71, 0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={handlePasswordFormCancel}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: 420, background: '#fff', borderRadius: 18,
+              padding: '32px 28px', boxShadow: 'var(--shadow-lg)',
+            }}
+          >
+            <div className="eyebrow" style={{ color: 'var(--moss-2)', marginBottom: 4 }}>계정 관리</div>
+            <h3 style={{
+              fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700,
+              color: 'var(--ink)', marginBottom: 22,
+            }}>
+              비밀번호 변경
+            </h3>
+
+            {pwStep === 'form' ? (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {[
+                    { label: '현재 비밀번호', value: pwCurrent, setter: setPwCurrent },
+                    { label: '새 비밀번호', value: pwNew, setter: setPwNew },
+                    { label: '새 비밀번호 확인', value: pwConfirm, setter: setPwConfirm },
+                  ].map(({ label, value, setter }) => (
+                    <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <label style={{
+                        fontSize: 11.5, color: 'var(--ink-3)',
+                        fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase',
+                      }}>
+                        {label}
+                      </label>
+                      <input
+                        type="password"
+                        value={value}
+                        onChange={e => setter(e.target.value)}
+                        style={{
+                          padding: '9px 12px', border: '0.5px solid var(--rule-2)', borderRadius: 8,
+                          fontSize: 13.5, color: 'var(--ink)', fontFamily: 'var(--font-body)',
+                          outline: 'none', width: '100%', boxSizing: 'border-box',
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {pwError && (
+                  <div style={{
+                    marginTop: 12, padding: '9px 13px', borderRadius: 8,
+                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
+                    fontSize: 12.5, color: '#b8536a',
+                  }}>
+                    {pwError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+                  <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={handlePasswordFormCancel}>
+                    취소
+                  </Btn>
+                  <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={handlePasswordNext}>
+                    비밀번호 변경
+                  </Btn>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{
+                  padding: '18px 16px', borderRadius: 10, background: 'var(--paper-2)',
+                  fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 22,
+                }}>
+                  정말 비밀번호를 변경하시겠습니까?<br />
+                  <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>변경 후에는 새 비밀번호로 다시 로그인해야 합니다.</span>
+                </div>
+
+                {pwError && (
+                  <div style={{
+                    marginBottom: 14, padding: '9px 13px', borderRadius: 8,
+                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
+                    fontSize: 12.5, color: '#b8536a',
+                  }}>
+                    {pwError}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={() => { setPwStep('form'); setPwError(null); }} disabled={pwSaving}>
+                    아니요
+                  </Btn>
+                  <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={handlePasswordConfirm} disabled={pwSaving}>
+                    {pwSaving ? '변경 중…' : '변경합니다'}
+                  </Btn>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1177,7 +1306,7 @@ function parseApiError(err) {
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 
-function AuthScreen({ onAuth }) {
+function AuthScreen({ onAuth, onBackToLanding }) {
   const [mode, setMode] = useState('login'); // login | signup
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1309,6 +1438,24 @@ function AuthScreen({ onAuth }) {
 
       {/* Right form */}
       <div style={{ padding: '60px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        {onBackToLanding && (
+          <button
+            type="button"
+            onClick={onBackToLanding}
+            style={{
+              alignSelf: 'flex-start',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              marginBottom: 24,
+              color: 'var(--ink-3)',
+              fontSize: 12.5,
+              fontFamily: 'var(--font-display)',
+            }}
+          >
+            ← 처음으로
+          </button>
+        )}
         <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>{mode === 'login' ? 'Welcome back' : 'Start growing'}</div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: 'var(--ink)', marginTop: 8, letterSpacing: '-0.02em' }}>
           {mode === 'login' ? '다시 만나서 반가워요' : '새로운 정원 시작하기'}

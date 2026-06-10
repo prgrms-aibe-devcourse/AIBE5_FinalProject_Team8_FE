@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { getPlants } from './api/collection.js';
 import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult } from './api/ai.js';
 import { getPots } from './api/pot.js';
+import { getMyTils } from './api/til.js';
 import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { Plant, RootinLogo, STAGE_META } from './plants.jsx';
@@ -253,6 +254,297 @@ function CollectionScreen() {
 
 // === AI Screen ===
 
+const TIL_MODAL_PAGE_SIZE = 10;
+
+/**
+ * AI 학습에 포함할 TIL을 선택하는 확인 모달
+ * Props:
+ *   potId      — 조회할 화분 ID
+ *   onConfirm  — (tilIds: number[]) => void
+ *   onClose    — () => void
+ */
+function AiTilSelectModal({ potId, onConfirm, onClose }) {
+  const [tils, setTils]               = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
+  const [keyword, setKeyword]         = useState('');
+  const [selectedTag, setSelectedTag] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [page, setPage]               = useState(0);
+
+  // 진입 시 화분 TIL 전체 로딩 (클라이언트 페이징)
+  useEffect(() => {
+    if (!potId) return;
+    let active = true;
+    setLoading(true);
+    setError(null);
+
+    getMyTils({ potId, page: 0, size: 100, sort: 'latest' })
+      .then(pageData => {
+        if (!active) return;
+        const content = Array.isArray(pageData?.content) ? pageData.content : [];
+        setTils(content.map(t => ({
+          id: t.tilId,
+          title: t.title,
+          date: t.publishedAt ?? t.createdAt,
+          tags: Array.isArray(t.tags) ? t.tags : [],
+        })));
+      })
+      .catch(() => {
+        if (active) setError('TIL 목록을 불러오지 못했어요.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [potId]);
+
+  // 태그 목록 (빈도순)
+  const tagCounts = useMemo(() => {
+    const map = new Map();
+    tils.forEach(t => t.tags.forEach(tag => {
+      const k = String(tag).trim();
+      if (k) map.set(k, (map.get(k) ?? 0) + 1);
+    }));
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  }, [tils]);
+
+  // 클라이언트 필터
+  const filtered = useMemo(() => {
+    const kw = keyword.trim().toLowerCase();
+    return tils.filter(t => {
+      const matchesTag = !selectedTag || t.tags.map(String).includes(selectedTag);
+      const matchesKw  = !kw || t.title.toLowerCase().includes(kw);
+      return matchesTag && matchesKw;
+    });
+  }, [tils, keyword, selectedTag]);
+
+  // 필터 변경 시 첫 페이지로 리셋
+  useEffect(() => { setPage(0); }, [keyword, selectedTag]);
+
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / TIL_MODAL_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const pageTils    = filtered.slice(currentPage * TIL_MODAL_PAGE_SIZE, (currentPage + 1) * TIL_MODAL_PAGE_SIZE);
+
+  // 전체 선택: 현재 필터된 TIL 전체 기준
+  const allFilteredIds   = filtered.map(t => t.id);
+  const isAllSelected    = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
+  const isIndeterminate  = !isAllSelected && allFilteredIds.some(id => selectedIds.has(id));
+
+  const toggleAll = useCallback(() => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (isAllSelected) {
+        allFilteredIds.forEach(id => next.delete(id));
+      } else {
+        allFilteredIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  }, [isAllSelected, allFilteredIds]);
+
+  const toggleOne = useCallback((id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleConfirm = () => {
+    onConfirm(Array.from(selectedIds));
+  };
+
+  const formatDate = (iso) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="학습할 TIL 선택"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0,0,0,0.45)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div style={{
+        background: '#fff', borderRadius: 16, padding: 24,
+        width: 560, maxHeight: '80vh',
+        display: 'flex', flexDirection: 'column', gap: 16,
+        boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+      }}>
+        {/* 헤더 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>
+              학습할 TIL 선택
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+              AI가 분석할 TIL을 골라주세요
+            </div>
+          </div>
+          <button
+            aria-label="닫기"
+            onClick={onClose}
+            style={{
+              width: 28, height: 28, borderRadius: 7,
+              border: '0.5px solid var(--rule-2)', background: '#fff',
+              fontSize: 14, color: 'var(--ink-2)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >✕</button>
+        </div>
+
+        {/* 검색 */}
+        <input
+          type="text"
+          placeholder="제목으로 검색..."
+          value={keyword}
+          onChange={e => setKeyword(e.target.value)}
+          style={{
+            width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
+            border: '0.5px solid var(--rule-2)', fontSize: 13, color: 'var(--ink)',
+            outline: 'none', fontFamily: 'var(--font-body)',
+          }}
+        />
+
+        {/* 태그 필터 */}
+        {tagCounts.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {tagCounts.map(([tag]) => (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(prev => prev === tag ? null : tag)}
+                style={{
+                  padding: '4px 10px', borderRadius: 20, fontSize: 11.5,
+                  background: selectedTag === tag ? 'var(--moss)' : '#f3f7f3',
+                  color: selectedTag === tag ? '#fff' : 'var(--ink-2)',
+                  border: selectedTag === tag ? '1px solid var(--moss)' : '0.5px solid var(--rule)',
+                  cursor: 'pointer', fontFamily: 'var(--font-body)',
+                }}
+              >#{tag}</button>
+            ))}
+          </div>
+        )}
+
+        {/* 전체 선택 + 카운트 */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid var(--rule)', paddingBottom: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--ink-2)' }}>
+            <input
+              type="checkbox"
+              checked={isAllSelected}
+              ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+              onChange={toggleAll}
+              disabled={filtered.length === 0}
+            />
+            전체 선택 ({filtered.length}개)
+          </label>
+          <span style={{ fontSize: 12, color: 'var(--moss-2)', fontWeight: 600 }}>
+            {selectedIds.size}개 선택됨
+          </span>
+        </div>
+
+        {/* TIL 목록 */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }} className="scrollbar">
+          {loading ? (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+              TIL 목록을 불러오는 중...
+            </div>
+          ) : error ? (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: '#b8536a', fontSize: 13 }}>{error}</div>
+          ) : pageTils.length === 0 ? (
+            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+              {tils.length === 0 ? '이 화분에 TIL이 없어요.' : '검색 결과가 없어요.'}
+            </div>
+          ) : (
+            pageTils.map(til => (
+              <label
+                key={til.id}
+                style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
+                  background: selectedIds.has(til.id) ? 'var(--paper-2)' : '#fcfdfb',
+                  border: selectedIds.has(til.id) ? '1px solid var(--moss)' : '0.5px solid var(--rule)',
+                  transition: 'background 0.1s, border-color 0.1s',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(til.id)}
+                  onChange={() => toggleOne(til.id)}
+                  style={{ marginTop: 2, flexShrink: 0 }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {til.title}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{formatDate(til.date)}</span>
+                    {til.tags.slice(0, 3).map(tag => (
+                      <span key={tag} style={{ fontSize: 10.5, color: 'var(--moss-2)', background: '#f0f7f0', borderRadius: 4, padding: '1px 6px' }}>
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </label>
+            ))
+          )}
+        </div>
+
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+            <button
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={currentPage === 0}
+              aria-label="이전 페이지"
+              style={{
+                padding: '5px 12px', borderRadius: 7, fontSize: 12,
+                border: '0.5px solid var(--rule-2)', background: '#fff',
+                color: currentPage === 0 ? 'var(--ink-3)' : 'var(--ink)',
+                cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
+              }}
+            >이전</button>
+            <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{currentPage + 1} / {totalPages}</span>
+            <button
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={currentPage === totalPages - 1}
+              aria-label="다음 페이지"
+              style={{
+                padding: '5px 12px', borderRadius: 7, fontSize: 12,
+                border: '0.5px solid var(--rule-2)', background: '#fff',
+                color: currentPage === totalPages - 1 ? 'var(--ink-3)' : 'var(--ink)',
+                cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
+              }}
+            >다음</button>
+          </div>
+        )}
+
+        {/* 확인 / 취소 */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <Btn variant="secondary" size="md" style={{ flex: 1 }} onClick={onClose}>취소</Btn>
+          <Btn
+            variant="green" size="md"
+            style={{ flex: 2, opacity: selectedIds.size === 0 ? 0.45 : 1, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer' }}
+            disabled={selectedIds.size === 0}
+            onClick={handleConfirm}
+          >
+            {selectedIds.size === 0 ? 'TIL을 선택해 주세요' : `${selectedIds.size}개 TIL로 생성`}
+          </Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // plantName → PixelPlant species 매핑
 const PLANT_NAME_TO_SPECIES = {
   '기본 씨앗':  'seed',
@@ -348,6 +640,11 @@ function AIScreen() {
   // 저장 완료 피드백용
   const [saved, setSaved] = useState(false);
 
+  // TIL 선택 모달
+  const [modalOpen, setModalOpen] = useState(false);
+  // 마지막으로 선택한 tilIds (다시 생성 시 재사용)
+  const [lastTilIds, setLastTilIds] = useState([]);
+
   const selectedPot = pots.find(p => p.id === potId) ?? null;
 
   // 페이지 진입 시 화분 목록 + 사용자 포인트 로딩
@@ -411,8 +708,15 @@ function AIScreen() {
     setError(null);
   };
 
+  // 모달 확인 — tilIds 받아서 생성 실행
+  const handleModalConfirm = (tilIds) => {
+    setModalOpen(false);
+    setLastTilIds(tilIds);
+    handleGenerate(tilIds);
+  };
+
   // 생성 버튼 — mode에 따라 summary/quiz API 호출
-  const handleGenerate = async () => {
+  const handleGenerate = async (tilIds) => {
     if (!potId) return;
     setGenerating(true);
     setGenerated(false);
@@ -420,9 +724,10 @@ function AIScreen() {
     setError(null);
 
     try {
+      const ids = tilIds ?? lastTilIds;
       const data = mode === 'summary'
-        ? await generateSummary(potId)
-        : await generateQuiz(potId, quizCount);
+        ? await generateSummary(potId, ids)
+        : await generateQuiz(potId, quizCount, ids);
 
       setAiResult(data);
       setRemainPoint(data.remainPoint);
@@ -488,6 +793,7 @@ function AIScreen() {
   };
 
   return (
+    <>
     <div style={{ padding: 32, width: '100%', display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24, maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
 
       {/* Left — source picker */}
@@ -586,7 +892,7 @@ function AIScreen() {
           <Btn
             variant="green" size="lg"
             style={{ width: '100%', marginTop: 14, opacity: potId ? 1 : 0.45, cursor: potId ? 'pointer' : 'not-allowed' }}
-            onClick={handleGenerate}
+            onClick={() => potId && setModalOpen(true)}
           >
             {generating ? '생성 중...' : (mode === 'quiz' ? `🌱 복습 문제 ${quizCount}개 만들기` : '✨ 요약 생성하기')} · {mode === 'quiz' ? quizCount * 10 : 50} 포인트 사용
           </Btn>
@@ -656,7 +962,7 @@ function AIScreen() {
           title={resultMode === 'quiz' ? `복습 문제 (${quizCount}문항)` : 'TIL 요약 결과지'}
           action={generated ? (
             <div style={{ display: 'flex', gap: 8 }}>
-              <Btn variant="secondary" size="sm" onClick={handleGenerate}>다시 생성</Btn>
+              <Btn variant="secondary" size="sm" onClick={() => handleGenerate(lastTilIds)}>다시 생성</Btn>
               <Btn variant="primary" size="sm" onClick={handleSave}>
                 {saved ? '✓ 저장됨' : '결과 저장'}
               </Btn>
@@ -685,6 +991,15 @@ function AIScreen() {
         </Card>
       </div>
     </div>
+
+    {modalOpen && (
+      <AiTilSelectModal
+        potId={potId}
+        onConfirm={handleModalConfirm}
+        onClose={() => setModalOpen(false)}
+      />
+    )}
+    </>
   );
 }
 

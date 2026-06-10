@@ -255,6 +255,7 @@ function CollectionScreen() {
 // === AI Screen ===
 
 const TIL_MODAL_PAGE_SIZE = 10;
+const TIL_IDS_MAX_SIZE = 200; // BE AiPolicy.TIL_IDS_MAX_SIZE 와 동기화 — AI에 전달 가능한 선택 최대 개수
 
 /**
  * AI 학습에 포함할 TIL을 선택하는 확인 모달
@@ -265,6 +266,7 @@ const TIL_MODAL_PAGE_SIZE = 10;
  */
 function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const [tils, setTils]               = useState([]);
+  const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(null);
   const [keyword, setKeyword]         = useState('');
@@ -272,23 +274,48 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [page, setPage]               = useState(0);
 
-  // 진입 시 화분 TIL 전체 로딩 (클라이언트 페이징)
+  // 진입 시 화분 TIL 전체 로딩 — 전체 페이지 순회
   useEffect(() => {
     if (!potId) return;
     let active = true;
     setLoading(true);
     setError(null);
 
-    getMyTils({ potId, page: 0, size: 100, sort: 'latest' })
-      .then(pageData => {
+    const PAGE_SIZE = 100;
+
+    const toItem = t => ({
+      id: t.tilId,
+      title: t.title,
+      date: t.publishedAt ?? t.createdAt,
+      tags: Array.isArray(t.tags) ? t.tags : [],
+    });
+
+    getMyTils({ potId, page: 0, size: PAGE_SIZE, sort: 'latest' })
+      .then(async first => {
         if (!active) return;
-        const content = Array.isArray(pageData?.content) ? pageData.content : [];
-        setTils(content.map(t => ({
-          id: t.tilId,
-          title: t.title,
-          date: t.publishedAt ?? t.createdAt,
-          tags: Array.isArray(t.tags) ? t.tags : [],
-        })));
+        const total = first?.totalElements ?? 0;
+        const totalPages = first?.totalPages ?? 1;
+        const firstContent = Array.isArray(first?.content) ? first.content : [];
+
+        setTotalElements(total);
+
+        if (totalPages <= 1) {
+          setTils(firstContent.map(toItem));
+          return;
+        }
+
+        // 나머지 페이지 병렬 fetch
+        const rest = await Promise.all(
+          Array.from({ length: totalPages - 1 }, (_, i) =>
+            getMyTils({ potId, page: i + 1, size: PAGE_SIZE, sort: 'latest' })
+          )
+        );
+        if (!active) return;
+
+        const all = [firstContent, ...rest.map(p => Array.isArray(p?.content) ? p.content : [])]
+          .flat()
+          .map(toItem);
+        setTils(all);
       })
       .catch(() => {
         if (active) setError('TIL 목록을 불러오지 못했어요.');
@@ -338,7 +365,11 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
       if (isAllSelected) {
         allFilteredIds.forEach(id => next.delete(id));
       } else {
-        allFilteredIds.forEach(id => next.add(id));
+        // 최대치까지만 추가
+        for (const id of allFilteredIds) {
+          if (next.size >= TIL_IDS_MAX_SIZE) break;
+          next.add(id);
+        }
       }
       return next;
     });
@@ -346,6 +377,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
 
   const toggleOne = useCallback((id) => {
     setSelectedIds(prev => {
+      if (!prev.has(id) && prev.size >= TIL_IDS_MAX_SIZE) return prev;
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -436,18 +468,25 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
 
         {/* 전체 선택 + 카운트 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid var(--rule)', paddingBottom: 8 }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--ink-2)' }}>
-            <input
-              type="checkbox"
-              checked={isAllSelected}
-              ref={el => { if (el) el.indeterminate = isIndeterminate; }}
-              onChange={toggleAll}
-              disabled={filtered.length === 0}
-            />
-            전체 선택 ({filtered.length}개)
-          </label>
-          <span style={{ fontSize: 12, color: 'var(--moss-2)', fontWeight: 600 }}>
-            {selectedIds.size}개 선택됨
+          {(totalElements <= TIL_IDS_MAX_SIZE || (!!( keyword.trim() || selectedTag) && filtered.length <= TIL_IDS_MAX_SIZE)) ? (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--ink-2)' }}>
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                onChange={toggleAll}
+                disabled={filtered.length === 0}
+              />
+              전체 선택 ({filtered.length}개)
+            </label>
+          ) : (
+            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+              전체 선택은 검색·태그로 범위를 좁혀 선택하세요
+            </span>
+          )}
+          <span style={{ fontSize: 12, fontWeight: 600, color: selectedIds.size >= TIL_IDS_MAX_SIZE ? '#b8536a' : 'var(--moss-2)' }}>
+            {selectedIds.size} / {TIL_IDS_MAX_SIZE}개 선택
+            {selectedIds.size >= TIL_IDS_MAX_SIZE && ' (최대)'}
           </span>
         </div>
 
@@ -479,6 +518,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
                   type="checkbox"
                   checked={selectedIds.has(til.id)}
                   onChange={() => toggleOne(til.id)}
+                  disabled={!selectedIds.has(til.id) && selectedIds.size >= TIL_IDS_MAX_SIZE}
                   style={{ marginTop: 2, flexShrink: 0 }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>

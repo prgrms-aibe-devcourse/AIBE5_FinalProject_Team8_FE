@@ -525,6 +525,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
           </div>
         )}
 
+
         {/* TIL 목록 */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }} className="scrollbar">
           {loading ? (

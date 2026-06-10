@@ -287,6 +287,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
+
   // 진입 시 화분 TIL 전체 로딩 — 전체 페이지 순회
   useEffect(() => {
     if (!potId) return;

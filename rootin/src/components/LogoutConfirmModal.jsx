@@ -1,6 +1,33 @@
+import { useEffect, useState } from 'react';
+
 export function LogoutConfirmModal({ onConfirm, onClose }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && !loading) onClose();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [onClose, loading]);
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await onConfirm();
+    } catch {
+      setError('로그아웃에 실패했어요. 다시 시도해 주세요.');
+      setLoading(false);
+    }
+  };
+
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="logout-modal-title"
       style={{
         position: 'fixed',
         inset: 0,
@@ -12,7 +39,7 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
         backdropFilter: 'blur(4px)',
         padding: 24,
       }}
-      onClick={onClose}
+      onClick={loading ? undefined : onClose}
     >
       <div
         onClick={e => e.stopPropagation()}
@@ -28,7 +55,10 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
             <div className="eyebrow" style={{ color: 'var(--ink-3)' }}>로그아웃</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+            <h2
+              id="logout-modal-title"
+              style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}
+            >
               정말 로그아웃 할까요?
             </h2>
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.6 }}>
@@ -38,6 +68,7 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             style={{
               width: 32,
               height: 32,
@@ -49,7 +80,8 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
               justifyContent: 'center',
               flexShrink: 0,
               background: '#fff',
-              cursor: 'pointer',
+              cursor: loading ? 'default' : 'pointer',
+              opacity: loading ? 0.5 : 1,
             }}
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -58,10 +90,26 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
           </button>
         </div>
 
+        {error && (
+          <div style={{
+            marginTop: 14,
+            padding: '10px 12px',
+            borderRadius: 9,
+            background: '#fff3f5',
+            border: '0.5px solid #f7c1c1',
+            color: '#9f4055',
+            fontSize: 12.5,
+            lineHeight: 1.6,
+          }}>
+            {error}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             style={{
               flex: 1,
               height: 42,
@@ -71,14 +119,16 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
               color: 'var(--ink)',
               fontSize: 14,
               fontWeight: 500,
-              cursor: 'pointer',
+              cursor: loading ? 'default' : 'pointer',
+              opacity: loading ? 0.5 : 1,
             }}
           >
             취소
           </button>
           <button
             type="button"
-            onClick={onConfirm}
+            onClick={handleConfirm}
+            disabled={loading}
             style={{
               flex: 1,
               height: 42,
@@ -88,10 +138,11 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
               color: '#fff',
               fontSize: 14,
               fontWeight: 600,
-              cursor: 'pointer',
+              cursor: loading ? 'default' : 'pointer',
+              opacity: loading ? 0.7 : 1,
             }}
           >
-            로그아웃
+            {loading ? '로그아웃 중...' : '로그아웃'}
           </button>
         </div>
       </div>

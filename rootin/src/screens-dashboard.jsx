@@ -597,19 +597,22 @@ function DashboardScreen({ onNav }) {
   }, [interestMonths]);
 
   useEffect(() => {
+    // getQuests()는 포인트 적립을 수행하므로 먼저 완료한 뒤 포인트를 조회한다
     Promise.allSettled([
       getSummary(),
       getWeekly(),
       getDistribution(),
       getQuests(),
-      getPointSummary(),
-    ]).then(([sumRes, weekRes, distRes, questRes, pointRes]) => {
+    ]).then(([sumRes, weekRes, distRes, questRes]) => {
       if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
       if (weekRes.status === 'fulfilled')  setWeekly(transformWeekly(weekRes.value?.weeklyData ?? []));
       if (distRes.status === 'fulfilled')  setDistribution(distRes.value?.distribution ?? []);
       if (questRes.status === 'fulfilled') setQuests(questRes.value);
-      if (pointRes.status === 'fulfilled') setCurrentPoint(pointRes.value?.currentPoint ?? 0);
-    });
+      // 퀘스트 포인트 적립 완료 후 포인트 재조회
+      return getPointSummary();
+    }).then(pointRes => {
+      setCurrentPoint(pointRes?.currentPoint ?? 0);
+    }).catch(() => {});
   }, []);
 
   const streak     = summary?.currentStreak  ?? 0;

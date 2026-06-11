@@ -597,26 +597,32 @@ function DashboardScreen({ onNav }) {
   }, [interestMonths]);
 
   useEffect(() => {
-    // getQuests()는 포인트 적립을 수행하므로 먼저 완료한 뒤 포인트를 조회한다
+    // getQuests()는 포인트 적립을 수행하므로, 완료 후 포인트를 재조회한다 (성공/실패 무관)
+    const questsP = getQuests();
+
     Promise.allSettled([
       getSummary(),
       getWeekly(),
       getDistribution(),
-      getQuests(),
+      questsP,
     ]).then(([sumRes, weekRes, distRes, questRes]) => {
       if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
       if (weekRes.status === 'fulfilled')  setWeekly(transformWeekly(weekRes.value?.weeklyData ?? []));
       if (distRes.status === 'fulfilled')  setDistribution(distRes.value?.distribution ?? []);
-      if (questRes.status === 'fulfilled') {
-        setQuests(questRes.value);
-        // 퀘스트 포인트 적립 완료 후 포인트 재조회
-        return getPointSummary();
-      }
-      return Promise.resolve(null);
-    }).then(pointRes => {
-      if (pointRes) setCurrentPoint(pointRes?.currentPoint ?? 0);
+      if (questRes.status === 'fulfilled') setQuests(questRes.value);
     }).catch(error => {
       console.error('데이터 로딩 중 오류 발생:', error);
+    });
+
+    // 퀘스트 완료 여부와 무관하게 포인트 잔액 갱신
+    questsP.finally(() => {
+      getPointSummary()
+        .then(pointRes => {
+          if (pointRes !== null) setCurrentPoint(pointRes?.currentPoint ?? 0);
+        })
+        .catch(error => {
+          console.error('포인트 조회 중 오류 발생:', error);
+        });
     });
   }, []);
 

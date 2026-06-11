@@ -287,7 +287,6 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-
   // 진입 시 화분 TIL 전체 로딩 — 전체 페이지 순회
   useEffect(() => {
     if (!potId) return;
@@ -327,18 +326,9 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
         );
         if (!active) return;
 
-<<<<<<< HEAD
-<<<<<<< HEAD
         const hadPartialFailure = rest.some(r => r.status === 'rejected');
         setPartialError(hadPartialFailure);
 
-=======
->>>>>>> b736782 (fix(screens-rest): handleSelectSavedItem 다시 생성 시 tilIds 누락 수정, toggleAll prev 기반 재계산으로 더블클릭 버그 수정, 태그 trim 불일치 수정, Promise.allSettled 전환, allFilteredIds useMemo 메모화, AbortController로 병렬 fetch 취소 처리)
-=======
-        const hadPartialFailure = rest.some(r => r.status === 'rejected');
-        setPartialError(hadPartialFailure);
-
->>>>>>> e16b455 (fix: FE/rootin/src/screens-rest.jsx: 코드 리뷰 반영 — toggleAll prev 기반 isAll 계산(이중클릭 버그), toItem 태그 trim/filter, Promise.allSettled 부분 실패 배너, 첫 페이지 AbortController signal 누락, 보관함 결과 "다시 생성" 버튼 lastTilIds 없을 때 숨김)
         const all = [
           firstContent,
           ...rest

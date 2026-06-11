@@ -242,8 +242,9 @@ function AppShell() {
     </SidebarProvider>
     {logoutModalOpen && (
       <LogoutConfirmModal
-        onConfirm={() => {
-          import('./api/auth.js').then(({ logout }) => logout().catch(() => {}));
+        onConfirm={async () => {
+          const { logout } = await import('./api/auth.js');
+          await logout();
           clearUser();
           setAuthed(false);
           setLogoutModalOpen(false);

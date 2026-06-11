@@ -776,35 +776,6 @@
   }
 }
 
-/* 로그아웃 확인 모달 — rootin 페이퍼 톤 + 부드러운 그림자 */
-.rootin-logout-dialog {
-  border-radius: var(--radius-xl);
-  border-color: color-mix(in oklch, var(--moss) 14%, var(--border));
-  box-shadow: var(--shadow-lg);
-}
-.rootin-logout-dialog [data-slot="alert-dialog-title"] {
-  font-family: var(--font-display);
-  letter-spacing: -0.01em;
-  color: var(--ink);
-}
-.rootin-logout-dialog [data-slot="alert-dialog-description"] {
-  line-height: 1.6;
-}
-.rootin-logout-dialog [data-slot="alert-dialog-footer"] button {
-  transition: transform 140ms ease-out, box-shadow 140ms ease-out,
-    background-color 140ms ease-out;
-}
-.rootin-logout-dialog [data-slot="alert-dialog-footer"] button:hover {
-  transform: translateY(-1px);
-}
-.rootin-logout-dialog [data-slot="alert-dialog-action"] {
-  background: var(--danger);
-  color: white;
-}
-.rootin-logout-dialog [data-slot="alert-dialog-action"]:hover {
-  background: color-mix(in oklch, var(--danger) 90%, black);
-}
-
 /* ---------------------------------------------------------------- */
 /* 3단계: 에디터 버블 메뉴 등장 모션 (선택 시 부드럽게 떠오름)        */
 /* ---------------------------------------------------------------- */

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useUser } from '../context/UserContext.jsx';
 import { Icon } from '../ui.jsx';
 import { Plant, RootinLogo } from '../plants.jsx';
@@ -13,20 +12,9 @@ import {
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
 import { NavMain } from '@/components/nav-main';
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from '@/components/ui/alert-dialog';
 
 export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
   const { user } = useUser();
-  const [logoutOpen, setLogoutOpen] = React.useState(false);
 
   const navMainItems = [
     { title: '대시보드', icon: Icon.home, isActive: current === 'dashboard', onClick: () => onNav('dashboard') },
@@ -75,26 +63,12 @@ export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton className="rootin-logout-btn" onClick={() => setLogoutOpen(true)}>
+            <SidebarMenuButton className="rootin-logout-btn" onClick={onLogout}>
               <div style={{ width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               </div>
               <span>로그아웃</span>
             </SidebarMenuButton>
-            <AlertDialog open={logoutOpen} onOpenChange={setLogoutOpen}>
-              <AlertDialogContent className="rootin-logout-dialog">
-                <AlertDialogHeader>
-                  <AlertDialogTitle>로그아웃 하시겠어요?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    작성 중인 내용이 있다면 임시저장 후 종료하는 것을 권장해요. 언제든 다시 돌아와 학습을 이어갈 수 있습니다.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>취소</AlertDialogCancel>
-                  <AlertDialogAction onClick={onLogout}>로그아웃</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

@@ -7,6 +7,7 @@ import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
 import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens-rest.jsx';
 import { LandingScreen } from './screens-landing.jsx';
+import { NotFoundScreen } from './screens-error.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb';
@@ -14,6 +15,8 @@ import { Separator } from '@/components/ui/separator';
 import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
 import { TilEditorProvider } from '@/components/til/til-editor-context';
+import { LogoutConfirmModal } from '@/components/LogoutConfirmModal.jsx';
+import { logout, clearTokens } from './api/auth.js';
 
 // App shell — sidebar + topbar + route-based screen routing
 
@@ -28,7 +31,9 @@ function AppShell() {
   const [editorInitialPotId, setEditorInitialPotId] = useState(null);
   const [editorInitialTil, setEditorInitialTil] = useState(null);
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
+  const [gardenRefreshKey, setGardenRefreshKey] = useState(0);
   // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
   // 좌측 사이드바 열림 상태는 SidebarProvider가 controlled라 새로고침 시 쿠키(sidebar_state)에서 복원
   const [leftOpen, setLeftOpen] = useState(() => {
@@ -109,6 +114,8 @@ function AppShell() {
     if (editorReturnScreen?.startsWith?.('/garden/pots/')) {
       setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
       setPotDetailRefreshKey(key => key + 1);
+    } else if (editorReturnScreen === '/garden') {
+      setGardenRefreshKey(key => key + 1);
     }
   };
 
@@ -176,12 +183,7 @@ function AppShell() {
         current={screen.startsWith('pot') ? 'garden' : screen}
         onNav={handleNav}
         onForceShow={() => { setFocusMode(false); setLeftOpen(true); }}
-        onLogout={() => {
-          import('./api/auth.js').then(({ logout }) => logout().catch(() => {}));
-          clearUser();
-          setAuthed(false);
-          navigate('/landing', { replace: true });
-        }}
+        onLogout={() => setLogoutModalOpen(true)}
       />
       <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
         {screen !== 'editor' && (
@@ -219,7 +221,7 @@ function AppShell() {
                 onToggleFocus={toggleFocusMode}
               />
             )} />
-            <Route path="/garden" element={<GardenScreen onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
+            <Route path="/garden" element={<GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
             <Route path="/garden/pots/:potId" element={(
               <PotDetailRoute
                 refreshKey={potDetailRefreshKey}
@@ -231,7 +233,7 @@ function AppShell() {
             <Route path="/collection" element={<CollectionScreen />} />
             <Route path="/ai" element={<AIScreen />} />
             <Route path="/profile" element={<ProfileScreen />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<NotFoundScreen />} />
           </Routes>
         </div>
       </SidebarInset>
@@ -245,6 +247,22 @@ function AppShell() {
         />
       )}
     </SidebarProvider>
+    {logoutModalOpen && (
+      <LogoutConfirmModal
+        onConfirm={async () => {
+          try {
+            await logout().catch(() => {}); // 서버 세션 무효화 (best-effort)
+          } finally {
+            clearTokens();
+            clearUser();
+            setAuthed(false);
+            setLogoutModalOpen(false);
+            navigate('/landing', { replace: true });
+          }
+        }}
+        onClose={() => setLogoutModalOpen(false)}
+      />
+    )}
     </TilEditorProvider>
   );
 }

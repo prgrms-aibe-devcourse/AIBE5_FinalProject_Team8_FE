@@ -618,15 +618,21 @@ function DashboardScreen({ onNav }) {
     });
 
     // 퀘스트 완료 여부와 무관하게 포인트 잔액 갱신
-    questsP.finally(() => {
-      getPointSummary()
-        .then(pointRes => {
-          if (active && pointRes != null) setCurrentPoint(pointRes.currentPoint ?? 0);
-        })
-        .catch(error => {
-          console.error('포인트 조회 중 오류 발생:', error);
-        });
-    });
+    questsP
+      .catch(error => {
+        console.error('퀘스트 조회 중 오류 발생:', error);
+        return null;
+      })
+      .finally(() => {
+        if (!active) return;
+        getPointSummary()
+          .then(pointRes => {
+            if (active && pointRes != null) setCurrentPoint(pointRes.currentPoint ?? 0);
+          })
+          .catch(error => {
+            console.error('포인트 조회 중 오류 발생:', error);
+          });
+      });
 
     return () => { active = false; };
   }, []);

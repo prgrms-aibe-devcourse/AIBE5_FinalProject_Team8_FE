@@ -6,6 +6,7 @@ import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { Plant, RootinLogo, STAGE_META } from './plants.jsx';
 import { useUser } from './context/UserContext.jsx';
+import { inferSpecies } from './utils/plant.js';
 
 // Collection (식물도감), AI, Profile, Auth screens
 
@@ -253,24 +254,13 @@ function CollectionScreen() {
 
 // === AI Screen ===
 
-// plantName → PixelPlant species 매핑
-const PLANT_NAME_TO_SPECIES = {
-  '기본 씨앗':  'seed',
-  '버섯씨앗':   'mushroom',
-  '선인장씨앗': 'cactus',
-  '불꽃씨앗':   'fire',
-  '얼음씨앗':   'ice',
-  '달빛씨앗':   'moonlight',
-  '번개씨앗':   'bolt',
-  '흑장미씨앗': 'rose',
-};
 // growthStage → PixelPlant stage 매핑
 const GROWTH_STAGE_TO_STAGE = {
   SEED: 'seed', SPROUT: 'sprout', MATURE: 'leaf', BLOOM: 'bloom', FULL_BLOOM: 'full',
 };
 
 function PotCard({ pot, selected, onClick }) {
-  const species = PLANT_NAME_TO_SPECIES[pot.plantName] ?? 'seed';
+  const species = inferSpecies(pot.plantName);
   const stage = GROWTH_STAGE_TO_STAGE[pot.growthStage] ?? 'seed';
 
   // TIL 개수: BE 응답의 tilCount 필드 사용, 없으면 미표시

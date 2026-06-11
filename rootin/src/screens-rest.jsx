@@ -278,6 +278,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   useEffect(() => {
     if (!potId) return;
     let active = true;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
 
@@ -287,7 +288,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
       id: t.tilId,
       title: t.title,
       date: t.publishedAt ?? t.createdAt,
-      tags: Array.isArray(t.tags) ? t.tags : [],
+      tags: Array.isArray(t.tags) ? t.tags.map(tag => String(tag).trim()).filter(Boolean) : [],
     });
 
     getMyTils({ potId, page: 0, size: PAGE_SIZE, sort: 'latest' })
@@ -304,15 +305,20 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
           return;
         }
 
-        // 나머지 페이지 병렬 fetch
-        const rest = await Promise.all(
+        // 나머지 페이지 병렬 fetch — allSettled로 부분 실패 시에도 성공 페이지 활용
+        const rest = await Promise.allSettled(
           Array.from({ length: totalPages - 1 }, (_, i) =>
-            getMyTils({ potId, page: i + 1, size: PAGE_SIZE, sort: 'latest' })
+            getMyTils({ potId, page: i + 1, size: PAGE_SIZE, sort: 'latest', signal: controller.signal })
           )
         );
         if (!active) return;
 
-        const all = [firstContent, ...rest.map(p => Array.isArray(p?.content) ? p.content : [])]
+        const all = [
+          firstContent,
+          ...rest
+            .filter(r => r.status === 'fulfilled')
+            .map(r => Array.isArray(r.value?.content) ? r.value.content : []),
+        ]
           .flat()
           .map(toItem);
         setTils(all);
@@ -324,7 +330,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
         if (active) setLoading(false);
       });
 
-    return () => { active = false; };
+    return () => { active = false; controller.abort(); };
   }, [potId]);
 
   // 태그 목록 (빈도순)
@@ -355,17 +361,18 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const pageTils    = filtered.slice(currentPage * TIL_MODAL_PAGE_SIZE, (currentPage + 1) * TIL_MODAL_PAGE_SIZE);
 
   // 전체 선택: 현재 필터된 TIL 전체 기준
-  const allFilteredIds   = filtered.map(t => t.id);
-  const isAllSelected    = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
-  const isIndeterminate  = !isAllSelected && allFilteredIds.some(id => selectedIds.has(id));
+  const allFilteredIds  = useMemo(() => filtered.map(t => t.id), [filtered]);
+  const isAllSelected   = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
+  const isIndeterminate = !isAllSelected && allFilteredIds.some(id => selectedIds.has(id));
 
   const toggleAll = useCallback(() => {
     setSelectedIds(prev => {
+      // prev 기반으로 재계산 — 더블클릭 등 동일 틱 중복 호출 방어
+      const isAll = allFilteredIds.length > 0 && allFilteredIds.every(id => prev.has(id));
       const next = new Set(prev);
-      if (isAllSelected) {
+      if (isAll) {
         allFilteredIds.forEach(id => next.delete(id));
       } else {
-        // 최대치까지만 추가
         for (const id of allFilteredIds) {
           if (next.size >= TIL_IDS_MAX_SIZE) break;
           next.add(id);
@@ -373,7 +380,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
       }
       return next;
     });
-  }, [isAllSelected, allFilteredIds]);
+  }, [allFilteredIds]);
 
   const toggleOne = useCallback((id) => {
     setSelectedIds(prev => {
@@ -744,6 +751,7 @@ function AIScreen() {
     if (item.pot) setPotId(item.pot.id);
     if (item.quizCount) setQuizCount(item.quizCount);
     setAiResult(item.content ?? null);
+    setLastTilIds(item.tilIds ?? []);
     setGenerated(true);
     setError(null);
   };

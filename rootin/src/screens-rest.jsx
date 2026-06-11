@@ -7,6 +7,7 @@ import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { Plant, RootinLogo, STAGE_META } from './plants.jsx';
 import { useUser } from './context/UserContext.jsx';
+import { inferSpecies } from './utils/plant.js';
 
 // Collection (식물도감), AI, Profile, Auth screens
 
@@ -274,6 +275,17 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const [selectedTag, setSelectedTag] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [page, setPage]               = useState(0);
+  const dialogRef                     = useRef(null);
+
+  // 모달 열릴 때 포커스 이동 (스크린 리더 대응)
+  useEffect(() => { dialogRef.current?.focus(); }, []);
+
+  // Escape 키로 모달 닫기
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   // 진입 시 화분 TIL 전체 로딩 — 전체 페이지 순회
   useEffect(() => {
@@ -402,6 +414,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const formatDate = (iso) => {
     if (!iso) return '';
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
     return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
   };
 
@@ -409,7 +422,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="학습할 TIL 선택"
+      aria-labelledby="ai-til-modal-title"
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
         background: 'rgba(0,0,0,0.45)',
@@ -417,18 +430,23 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div style={{
-        background: '#fff', borderRadius: 16, padding: 24,
-        width: 560, maxHeight: '80vh',
-        display: 'flex', flexDirection: 'column', gap: 16,
-        boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
-      }}>
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        style={{
+          background: '#fff', borderRadius: 16, padding: 24,
+          width: 560, maxHeight: '80vh',
+          display: 'flex', flexDirection: 'column', gap: 16,
+          boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+          outline: 'none',
+        }}
+      >
         {/* 헤더 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)' }}>
+            <h2 id="ai-til-modal-title" style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', margin: 0 }}>
               학습할 TIL 선택
-            </div>
+            </h2>
             <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
               AI가 분석할 TIL을 골라주세요
             </div>
@@ -492,7 +510,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
             </label>
           ) : (
             <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-              전체 선택은 검색·태그로 범위를 좁혀 선택하세요
+              검색·태그로 {TIL_IDS_MAX_SIZE}개 이하로 좁히면 전체 선택할 수 있어요
             </span>
           )}
           <span style={{ fontSize: 12, fontWeight: 600, color: selectedIds.size >= TIL_IDS_MAX_SIZE ? '#b8536a' : 'var(--moss-2)' }}>
@@ -620,7 +638,7 @@ const GROWTH_STAGE_TO_STAGE = {
 };
 
 function PotCard({ pot, selected, onClick }) {
-  const species = PLANT_NAME_TO_SPECIES[pot.plantName] ?? 'seed';
+  const species = inferSpecies(pot.plantName);
   const stage = GROWTH_STAGE_TO_STAGE[pot.growthStage] ?? 'seed';
 
   // TIL 개수: BE 응답의 tilCount 필드 사용, 없으면 미표시

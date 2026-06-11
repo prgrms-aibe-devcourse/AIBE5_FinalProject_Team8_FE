@@ -6,7 +6,7 @@ import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { Plant, RootinLogo, STAGE_META } from './plants.jsx';
 import { useUser } from './context/UserContext.jsx';
-import { PLANT_NAME_TO_SPECIES } from './utils/plant.js';
+import { inferSpecies } from './utils/plant.js';
 
 // Collection (식물도감), AI, Profile, Auth screens
 
@@ -260,7 +260,7 @@ const GROWTH_STAGE_TO_STAGE = {
 };
 
 function PotCard({ pot, selected, onClick }) {
-  const species = PLANT_NAME_TO_SPECIES[pot.plantName] ?? 'seed';
+  const species = inferSpecies(pot.plantName);
   const stage = GROWTH_STAGE_TO_STAGE[pot.growthStage] ?? 'seed';
 
   // TIL 개수: BE 응답의 tilCount 필드 사용, 없으면 미표시

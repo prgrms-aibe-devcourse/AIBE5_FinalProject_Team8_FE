@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronRight, ChevronDown, Sprout, FileText, Pencil, Lightbulb, Sparkles, Flame, Loader2, Plus } from 'lucide-react';
 import { getMyTils, getTil, getDraft } from '@/api/til.js';
 import { cn } from '@/lib/utils';
-import { PLANT_NAME_TO_SPECIES, inferSpecies } from '@/utils/plant.js';
+import { inferSpecies } from '@/utils/plant.js';
 
 const PANEL_WIDTH = 344;
 

@@ -7,7 +7,7 @@ import { useUser } from './context/UserContext.jsx';
 import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { tilCountToStage, STAGE_META } from './plants.jsx';
-import { PLANT_NAME_TO_SPECIES, inferSpecies } from './utils/plant.js';
+import { inferSpecies } from './utils/plant.js';
 
 // Garden + Pot Detail screens — pixel-art edition with 정원 꾸미기 mode
 
@@ -2837,10 +2837,8 @@ function EditPotModal({ pot, onClose, onUpdated, onDeleteRequest }) {
   );
 }
 
-const HARVEST_SPECIES_MAP = { '기본 씨앗': 'seed', '달빛씨앗': 'moonlight', '버섯씨앗': 'mushroom' };
-
 function HarvestResult({ result, onClose, potLevel }) {
-  const nextSpecies = HARVEST_SPECIES_MAP[result.nextPlantName] ?? 'seed';
+  const nextSpecies = inferSpecies(result.nextPlantName);
   const isNextRare  = result.nextRarity === '희귀';
   return (
     <>

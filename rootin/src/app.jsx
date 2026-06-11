@@ -29,6 +29,7 @@ function AppShell() {
   const [editorInitialTil, setEditorInitialTil] = useState(null);
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
+  const [gardenRefreshKey, setGardenRefreshKey] = useState(0);
   // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(() => {
@@ -104,6 +105,8 @@ function AppShell() {
     if (editorReturnScreen?.startsWith?.('/garden/pots/')) {
       setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
       setPotDetailRefreshKey(key => key + 1);
+    } else if (editorReturnScreen === '/garden') {
+      setGardenRefreshKey(key => key + 1);
     }
   };
 
@@ -213,7 +216,7 @@ function AppShell() {
                 onToggleFocus={toggleFocusMode}
               />
             )} />
-            <Route path="/garden" element={<GardenScreen onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
+            <Route path="/garden" element={<GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
             <Route path="/garden/pots/:potId" element={(
               <PotDetailRoute
                 refreshKey={potDetailRefreshKey}

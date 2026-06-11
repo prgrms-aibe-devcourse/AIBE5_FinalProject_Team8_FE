@@ -180,6 +180,7 @@ function PotDistribution({ distribution }) {
 const COLORS = ['#1a3a5c', '#3d8b5e', '#c8733a', '#534ab7', '#c45c8a'];
 const W = 700, H = 220;
 const PAD = { top: 14, right: 16, bottom: 36, left: 40 };
+const normalizeTag = tag => String(tag ?? '').trim();
 
 function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
@@ -190,12 +191,41 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
     return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>관심사 데이터가 없습니다.</div>;
   }
 
+  const n = interests.length;
+
+  if (n < 2) {
+    return (
+      <div style={{
+        minHeight: 278,
+        border: '1px solid var(--line)',
+        borderRadius: 8,
+        background: 'linear-gradient(180deg, rgba(233, 245, 235, 0.8), rgba(255, 255, 255, 0.9))',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        padding: 28,
+      }}>
+        <div>
+          <div style={{ fontSize: 30, marginBottom: 10 }}>🌱</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
+            아직 흐름을 비교하기엔 기록이 조금 부족해요.
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+            2개월 이상 TIL을 쌓으면<br />
+            학습 주제가 어떻게 변했는지 보여드릴게요.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // 1. 상위 5개 태그 추출 및 'undefined' 방어 처리
   const tagTotals = {};
   interests.forEach(m => {
     if (m.topTags && Array.isArray(m.topTags)) {
       m.topTags.forEach(t => {
-        const tag = String(t.tag ?? '').trim();
+        const tag = normalizeTag(t.tag);
         const count = Number(t.count) || 0;
         // 태그명이 존재하고, 문자열 'undefined'나 공백이 아닌 경우에만 정상 집계합니다.
         if (tag && tag !== 'undefined') {
@@ -215,7 +245,6 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
     return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>표시할 학습 주제 데이터가 없습니다.</div>;
   }
 
-  const n = interests.length;
   // 월별 라벨 추출 (예: '2026-05' -> '05월')
   const monthLabels = interests.map(m => (m.month ? m.month.slice(5) + '월' : ''));
 
@@ -224,7 +253,7 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
   topTags.forEach(tag => {
     tagCounts[tag] = interests.map(m => {
       if (!m.topTags) return 0;
-      const f = m.topTags.find(t => String(t.tag ?? '').trim() === tag);
+      const f = m.topTags.find(t => normalizeTag(t.tag) === tag);
       return f ? Number(f.count) || 0 : 0;
     });
   });
@@ -257,22 +286,32 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
     }
   }
 
-  // 월별 전체 누적값 중 가장 큰 값을 찾아내어 Y축 스케일의 최댓값(상한선)으로 삼습니다.
+  // 숨긴 태그가 있어도 Y축 스케일이 흔들리지 않도록 전체 상위 태그 기준으로 최댓값을 고정합니다.
   const maxCount = Math.max(
     ...Array.from({ length: n }, (_, i) => {
       let sum = 0;
-      activeTags.forEach(tag => { sum += tagCounts[tag][i]; });
+      topTags.forEach(tag => { sum += tagCounts[tag][i]; });
       return sum;
     }),
     1 // 데이터가 없거나 0일 경우의 나눗셈 분모 에러 방지
   );
 
-  // SVG 좌표 변환용 비례식 함수
-  const xScale = i => PAD.left + (n <= 1 ? 0 : (i / (n - 1))) * (W - PAD.left - PAD.right);
+  const plotWidth = W - PAD.left - PAD.right;
+
+  // SVG 좌표 변환용 비례식 함수. 월 데이터가 1개뿐이면 차트 중앙에 배치합니다.
+  const xScale = i => PAD.left + (n <= 1 ? 0.5 : (i / (n - 1))) * plotWidth;
   const yScale = v => PAD.top + (1 - v / maxCount) * (H - PAD.top - PAD.bottom);
 
   // 4. SVG 누적 영역 패스(Area Path) 빌드 함수
   const getAreaPath = (ci) => {
+    if (n === 1) {
+      const x = xScale(0);
+      const halfWidth = Math.min(56, plotWidth * 0.12);
+      const yTop = yScale(stackedCounts[ci][0]);
+      const yBottom = yScale(ci === 0 ? 0 : stackedCounts[ci - 1][0]);
+      return `M ${x - halfWidth},${yTop} L ${x + halfWidth},${yTop} L ${x + halfWidth},${yBottom} L ${x - halfWidth},${yBottom} Z`;
+    }
+
     const topPoints = [];     // 현재 레이어의 윗선 좌표들
     const bottomPoints = [];  // 현재 레이어의 밑선 좌표들 (이전 레이어의 윗선)
 
@@ -291,6 +330,17 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
     return `M ${topPoints.join(' L ')} L ${bottomPoints.join(' L ')} Z`;
   };
 
+  const getTopPath = (ci) => {
+    if (n === 1) {
+      const x = xScale(0);
+      const halfWidth = Math.min(56, plotWidth * 0.12);
+      const y = yScale(stackedCounts[ci][0]);
+      return `M ${x - halfWidth},${y} L ${x + halfWidth},${y}`;
+    }
+
+    return `M ${Array.from({ length: n }, (_, i) => `${xScale(i)},${yScale(stackedCounts[ci][i])}`).join(' L ')}`;
+  };
+
   // Y축 눈금선 (5등분). 데이터가 작을 때 같은 숫자가 반복되지 않도록 중복을 제거합니다.
   const yTicks = Array.from(new Set(
     Array.from({ length: 5 }, (_, i) => Math.round((maxCount / 4) * i))
@@ -305,7 +355,7 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
   })).filter(t => !hiddenTags.has(t.tag));
 
   const topSum          = [...totals].sort((a, b) => b.sum - a.sum)[0];
-  const topThis         = [...totals].sort((a, b) => b.lastCount - a.lastCount)[0];
+  const topThis         = [...totals].sort((a, b) => b.lastCount - a.lastCount || b.lastRatio - a.lastRatio || b.sum - a.sum)[0];
   const topMonthlyRatio = [...totals].sort((a, b) => b.lastRatio - a.lastRatio || b.lastCount - a.lastCount)[0];
 
   // 범례 클릭 시 활성/비활성 전환 토글 함수
@@ -322,6 +372,19 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
   const handleMouseMove = e => {
     const rect = e.currentTarget.getBoundingClientRect();
     const svgX = ((e.clientX - rect.left) / rect.width) * W;
+    const svgY = ((e.clientY - rect.top) / rect.height) * H;
+
+    const isInsidePlot =
+      svgX >= PAD.left &&
+      svgX <= W - PAD.right &&
+      svgY >= PAD.top &&
+      svgY <= H - PAD.bottom;
+
+    if (!isInsidePlot) {
+      setHoveredIdx(null);
+      return;
+    }
+
     if (n <= 1) { setHoveredIdx(0); return; }
     let closest = 0;
     let minDist = Infinity;
@@ -370,7 +433,7 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
       <div style={{ position: 'relative' }}>
         <svg
           viewBox={`0 0 ${W} ${H}`} width="100%" height={H}
-          style={{ overflow: 'visible', cursor: 'crosshair' }}
+          style={{ overflow: 'visible', cursor: 'crosshair', display: 'block', maxWidth: W, margin: '0 auto' }}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoveredIdx(null)}
         >
@@ -411,16 +474,14 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
                   d={areaD}
                   fill={color}
                   opacity={0.35} // 겹치거나 누적된 아래 영역이 은은하게 보이도록 반투명 처리
-                  style={{ transition: 'd 0.2s ease' }}
                 />
                 {/* 2. 영역 경계를 더 선명하게 보여줄 상단 라인 패스 */}
                 <path
-                  d={`M ${Array.from({ length: n }, (_, i) => `${xScale(i)},${yScale(stackedCounts[ci][i])}`).join(' L ')}`}
+                  d={getTopPath(ci)}
                   fill="none"
                   stroke={color}
                   strokeWidth={2}
                   opacity={0.8}
-                  style={{ transition: 'd 0.2s ease' }}
                 />
               </g>
             );

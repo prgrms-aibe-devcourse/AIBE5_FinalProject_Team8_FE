@@ -327,9 +327,12 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
         );
         if (!active) return;
 
+<<<<<<< HEAD
         const hadPartialFailure = rest.some(r => r.status === 'rejected');
         setPartialError(hadPartialFailure);
 
+=======
+>>>>>>> 8fe0980 (fix(screens-rest): handleSelectSavedItem 다시 생성 시 tilIds 누락 수정, toggleAll prev 기반 재계산으로 더블클릭 버그 수정, 태그 trim 불일치 수정, Promise.allSettled 전환, allFilteredIds useMemo 메모화, AbortController로 병렬 fetch 취소 처리)
         const all = [
           firstContent,
           ...rest

@@ -175,68 +175,190 @@ function PotDistribution({ distribution }) {
   );
 }
 
-// ── 관심사 라인 차트 (선 두께 = 밀도) ──────────────────────────
+// ── 관심사 누적 영역 차트 ──────────────────────────
 
 const COLORS = ['#1a3a5c', '#3d8b5e', '#c8733a', '#534ab7', '#c45c8a'];
 const W = 700, H = 220;
 const PAD = { top: 14, right: 16, bottom: 36, left: 40 };
+const normalizeTag = tag => String(tag ?? '').trim();
 
-function InterestLineChart({ interests, months, onMonthsChange }) {
+function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [hiddenTags, setHiddenTags] = useState(new Set());
 
+  // 데이터가 아예 없거나 빈 배열일 때의 방어 처리
   if (!interests || interests.length === 0) {
     return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>관심사 데이터가 없습니다.</div>;
   }
 
-  // 상위 5개 태그
-  const tagTotals = {};
-  interests.forEach(m => m.topTags.forEach(t => {
-    tagTotals[t.tag] = (tagTotals[t.tag] ?? 0) + t.count;
-  }));
-  const topTags = Object.entries(tagTotals)
-    .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([tag]) => tag);
-
   const n = interests.length;
-  const monthLabels = interests.map(m => m.month.slice(5) + '월');
 
-  // 태그별 월별 count
+  if (n < 2) {
+    return (
+      <div style={{
+        minHeight: 278,
+        border: '1px solid var(--line)',
+        borderRadius: 8,
+        background: 'linear-gradient(180deg, rgba(233, 245, 235, 0.8), rgba(255, 255, 255, 0.9))',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        textAlign: 'center',
+        padding: 28,
+      }}>
+        <div>
+          <div style={{ fontSize: 30, marginBottom: 10 }}>🌱</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
+            아직 흐름을 비교하기엔 기록이 조금 부족해요.
+          </div>
+          <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+            2개월 이상 TIL을 쌓으면<br />
+            학습 주제가 어떻게 변했는지 보여드릴게요.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 1. 상위 5개 태그 추출 및 'undefined' 방어 처리
+  const tagTotals = {};
+  interests.forEach(m => {
+    if (m.topTags && Array.isArray(m.topTags)) {
+      m.topTags.forEach(t => {
+        const tag = normalizeTag(t.tag);
+        const count = Number(t.count) || 0;
+        // 태그명이 존재하고, 문자열 'undefined'나 공백이 아닌 경우에만 정상 집계합니다.
+        if (tag && tag !== 'undefined') {
+          tagTotals[tag] = (tagTotals[tag] ?? 0) + count;
+        }
+      });
+    }
+  });
+
+  // 누적 작성 개수가 가장 많은 순서대로 상위 5개 태그를 추출합니다.
+  const topTags = Object.entries(tagTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([tag]) => tag);
+
+  if (topTags.length === 0) {
+    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>표시할 학습 주제 데이터가 없습니다.</div>;
+  }
+
+  // 월별 라벨 추출 (예: '2026-05' -> '05월')
+  const monthLabels = interests.map(m => (m.month ? m.month.slice(5) + '월' : ''));
+
+  // 2. 태그별 월별 count 추출
   const tagCounts = {};
   topTags.forEach(tag => {
     tagCounts[tag] = interests.map(m => {
-      const f = m.topTags.find(t => t.tag === tag);
-      return f ? Number(f.count) : 0;
+      if (!m.topTags) return 0;
+      const f = m.topTags.find(t => normalizeTag(t.tag) === tag);
+      return f ? Number(f.count) || 0 : 0;
     });
   });
 
-  // 태그별 상대 밀도 (0~1)
-  const tagDensity = {};
-  topTags.forEach(tag => {
-    const mx = Math.max(...tagCounts[tag], 1);
-    tagDensity[tag] = tagCounts[tag].map(c => c / mx);
-  });
+  // 월별 표시 태그 합계. 툴팁과 요약 카드에서 각 주제의 월별 비율을 계산할 때 사용합니다.
+  const monthTotals = interests.map((_, i) =>
+    topTags.reduce((sum, tag) => sum + tagCounts[tag][i], 0)
+  );
 
-  const maxCount = Math.max(...topTags.flatMap(tag => tagCounts[tag]), 1);
-  const xScale = i => PAD.left + (n <= 1 ? 0 : (i / (n - 1))) * (W - PAD.left - PAD.right);
+  const getMonthlyRatio = (tag, monthIndex) => {
+    const total = monthTotals[monthIndex] || 0;
+    if (total === 0) return 0;
+    return Math.round((tagCounts[tag][monthIndex] / total) * 100);
+  };
+
+  // 현재 숨겨지지 않은(활성화된) 태그 필터링
+  const activeTags = topTags.filter(tag => !hiddenTags.has(tag));
+
+  // 3. Y축 누적(Stacking) 데이터 연산
+  // stackedCounts[활성태그인덱스][월인덱스] = 누적 높이 값
+  const stackedCounts = Array.from({ length: activeTags.length }, () => Array(n).fill(0));
+
+  for (let i = 0; i < n; i++) {
+    let currentSum = 0;
+    for (let ci = 0; ci < activeTags.length; ci++) {
+      const tag = activeTags[ci];
+      currentSum += tagCounts[tag][i];
+      // 하단부터 차례차례 개수를 쌓아 올립니다.
+      stackedCounts[ci][i] = currentSum;
+    }
+  }
+
+  // 숨긴 태그가 있어도 Y축 스케일이 흔들리지 않도록 전체 상위 태그 기준으로 최댓값을 고정합니다.
+  const maxCount = Math.max(
+    ...Array.from({ length: n }, (_, i) => {
+      let sum = 0;
+      topTags.forEach(tag => { sum += tagCounts[tag][i]; });
+      return sum;
+    }),
+    1 // 데이터가 없거나 0일 경우의 나눗셈 분모 에러 방지
+  );
+
+  const plotWidth = W - PAD.left - PAD.right;
+
+  // SVG 좌표 변환용 비례식 함수. 월 데이터가 1개뿐이면 차트 중앙에 배치합니다.
+  const xScale = i => PAD.left + (n <= 1 ? 0.5 : (i / (n - 1))) * plotWidth;
   const yScale = v => PAD.top + (1 - v / maxCount) * (H - PAD.top - PAD.bottom);
-  const strokeW = d => 1.5 + d * 6.5;
 
-  // Y 눈금
-  const yTicks = Array.from({ length: 5 }, (_, i) => Math.round((maxCount / 4) * i));
+  // 4. SVG 누적 영역 패스(Area Path) 빌드 함수
+  const getAreaPath = (ci) => {
+    if (n === 1) {
+      const x = xScale(0);
+      const halfWidth = Math.min(56, plotWidth * 0.12);
+      const yTop = yScale(stackedCounts[ci][0]);
+      const yBottom = yScale(ci === 0 ? 0 : stackedCounts[ci - 1][0]);
+      return `M ${x - halfWidth},${yTop} L ${x + halfWidth},${yTop} L ${x + halfWidth},${yBottom} L ${x - halfWidth},${yBottom} Z`;
+    }
 
-  // 요약 카드
+    const topPoints = [];     // 현재 레이어의 윗선 좌표들
+    const bottomPoints = [];  // 현재 레이어의 밑선 좌표들 (이전 레이어의 윗선)
+
+    for (let i = 0; i < n; i++) {
+      const x = xScale(i);
+      const yTop = yScale(stackedCounts[ci][i]);
+      // 첫 번째 활성 태그의 밑선은 바닥 Y좌표(0)이고, 그 외에는 이전 태그의 누적 윗선을 밑선으로 사용합니다.
+      const yBottom = yScale(ci === 0 ? 0 : stackedCounts[ci - 1][i]);
+
+      topPoints.push(`${x},${yTop}`);
+      // 영역을 완성하기 위해 우측에서 좌측으로 역순으로 좌표를 연결합니다.
+      bottomPoints.unshift(`${x},${yBottom}`);
+    }
+
+    // M(시작점 이동) -> L(선 연결) -> Z(패스 닫기) 형태로 다각형 영역을 그리는 경로를 완성합니다.
+    return `M ${topPoints.join(' L ')} L ${bottomPoints.join(' L ')} Z`;
+  };
+
+  const getTopPath = (ci) => {
+    if (n === 1) {
+      const x = xScale(0);
+      const halfWidth = Math.min(56, plotWidth * 0.12);
+      const y = yScale(stackedCounts[ci][0]);
+      return `M ${x - halfWidth},${y} L ${x + halfWidth},${y}`;
+    }
+
+    return `M ${Array.from({ length: n }, (_, i) => `${xScale(i)},${yScale(stackedCounts[ci][i])}`).join(' L ')}`;
+  };
+
+  // Y축 눈금선 (5등분). 데이터가 작을 때 같은 숫자가 반복되지 않도록 중복을 제거합니다.
+  const yTicks = Array.from(new Set(
+    Array.from({ length: 5 }, (_, i) => Math.round((maxCount / 4) * i))
+  ));
+
+  // 요약 카드용 연산
   const totals = topTags.map((tag, ci) => ({
     tag, color: COLORS[ci],
     sum: tagCounts[tag].reduce((a, b) => a + b, 0),
-    avgD: tagDensity[tag].reduce((a, b) => a + b, 0) / tagDensity[tag].length,
     lastCount: tagCounts[tag].at(-1),
-    lastD: tagDensity[tag].at(-1),
+    lastRatio: getMonthlyRatio(tag, n - 1),
   })).filter(t => !hiddenTags.has(t.tag));
 
-  const topSum     = [...totals].sort((a, b) => b.sum - a.sum)[0];
-  const topConsist = [...totals].sort((a, b) => b.avgD - a.avgD)[0];
-  const topThis    = [...totals].sort((a, b) => b.lastCount - a.lastCount)[0];
+  const topSum          = [...totals].sort((a, b) => b.sum - a.sum)[0];
+  const topThis         = [...totals].sort((a, b) => b.lastCount - a.lastCount || b.lastRatio - a.lastRatio || b.sum - a.sum)[0];
+  const topMonthlyRatio = [...totals].sort((a, b) => b.lastRatio - a.lastRatio || b.lastCount - a.lastCount)[0];
 
+  // 범례 클릭 시 활성/비활성 전환 토글 함수
   const toggleTag = tag => {
     setHiddenTags(prev => {
       const next = new Set(prev);
@@ -246,9 +368,23 @@ function InterestLineChart({ interests, months, onMonthsChange }) {
     });
   };
 
+  // 마우스 이동 시 호버 중인 월(Month) 인덱스 계산 핸들러
   const handleMouseMove = e => {
     const rect = e.currentTarget.getBoundingClientRect();
     const svgX = ((e.clientX - rect.left) / rect.width) * W;
+    const svgY = ((e.clientY - rect.top) / rect.height) * H;
+
+    const isInsidePlot =
+      svgX >= PAD.left &&
+      svgX <= W - PAD.right &&
+      svgY >= PAD.top &&
+      svgY <= H - PAD.bottom;
+
+    if (!isInsidePlot) {
+      setHoveredIdx(null);
+      return;
+    }
+
     if (n <= 1) { setHoveredIdx(0); return; }
     let closest = 0;
     let minDist = Infinity;
@@ -261,7 +397,7 @@ function InterestLineChart({ interests, months, onMonthsChange }) {
 
   return (
     <div>
-      {/* 범례 + 밀도 안내 */}
+      {/* 범례 + 그래프 안내 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {topTags.map((tag, i) => {
@@ -283,12 +419,12 @@ function InterestLineChart({ interests, months, onMonthsChange }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--ink-3)' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <svg width="32" height="8"><line x1="0" y1="4" x2="32" y2="4" stroke="#aaa" strokeWidth="6" strokeLinecap="round"/></svg>
-            꾸준히 작성
+            <svg width="32" height="8"><rect x="0" y="2" width="32" height="5" rx="2.5" fill="#aaa" opacity="0.45"/></svg>
+            영역 높이 = 작성량
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <svg width="32" height="8"><line x1="0" y1="4" x2="32" y2="4" stroke="#aaa" strokeWidth="1.5" strokeLinecap="round"/></svg>
-            집중 작성
+            <svg width="32" height="8"><rect x="0" y="2" width="8" height="5" rx="2.5" fill="#1a3a5c"/><rect x="12" y="2" width="8" height="5" rx="2.5" fill="#3d8b5e"/><rect x="24" y="2" width="8" height="5" rx="2.5" fill="#c8733a"/></svg>
+            색상 = 학습 주제
           </span>
         </div>
       </div>
@@ -297,11 +433,11 @@ function InterestLineChart({ interests, months, onMonthsChange }) {
       <div style={{ position: 'relative' }}>
         <svg
           viewBox={`0 0 ${W} ${H}`} width="100%" height={H}
-          style={{ overflow: 'visible', cursor: 'crosshair' }}
+          style={{ overflow: 'visible', cursor: 'crosshair', display: 'block', maxWidth: W, margin: '0 auto' }}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => setHoveredIdx(null)}
         >
-          {/* Y 눈금선 */}
+          {/* Y축 가로 눈금선 */}
           {yTicks.map(v => (
             <g key={v}>
               <line x1={PAD.left} y1={yScale(v)} x2={W - PAD.right} y2={yScale(v)}
@@ -311,7 +447,7 @@ function InterestLineChart({ interests, months, onMonthsChange }) {
             </g>
           ))}
 
-          {/* X 라벨 */}
+          {/* X축 월 라벨 */}
           {monthLabels.map((label, i) => (
             <text key={i} x={xScale(i)} y={H - 6} textAnchor="middle"
               fontSize={10} fill={hoveredIdx === i ? '#1a3a5c' : '#bbb'} fontWeight={hoveredIdx === i ? 600 : 400}>
@@ -319,42 +455,34 @@ function InterestLineChart({ interests, months, onMonthsChange }) {
             </text>
           ))}
 
-          {/* 호버 수직선 */}
+          {/* 호버 시 세로 점선 가이드라인 */}
           {hoveredIdx !== null && (
             <line x1={xScale(hoveredIdx)} y1={PAD.top} x2={xScale(hoveredIdx)} y2={H - PAD.bottom}
               stroke="#ddd" strokeWidth={1} strokeDasharray="4,3" />
           )}
 
-          {/* 태그별 라인 */}
-          {topTags.map((tag, ci) => {
-            if (hiddenTags.has(tag)) return null;
-            const counts = tagCounts[tag];
-            const density = tagDensity[tag];
-            const color = COLORS[ci];
+          {/* 태그별 누적 영역 렌더링 */}
+          {activeTags.map((tag, ci) => {
+            const originalColorIdx = topTags.indexOf(tag);
+            const color = COLORS[originalColorIdx];
+            const areaD = getAreaPath(ci);
+
             return (
               <g key={tag}>
-                {/* 선 세그먼트 (두께 가변) */}
-                {counts.map((_, i) => {
-                  if (i === 0) return null;
-                  return (
-                    <line key={i}
-                      x1={xScale(i - 1)} y1={yScale(counts[i - 1])}
-                      x2={xScale(i)}     y2={yScale(counts[i])}
-                      stroke={color}
-                      strokeWidth={strokeW((density[i - 1] + density[i]) / 2)}
-                      strokeLinecap="round"
-                      opacity={0.85}
-                    />
-                  );
-                })}
-                {/* 점 */}
-                {counts.map((v, i) => (
-                  <circle key={i}
-                    cx={xScale(i)} cy={yScale(v)} r={hoveredIdx === i ? 6 : 4}
-                    fill={color} stroke="#fff" strokeWidth={2}
-                    opacity={v === 0 ? 0 : 1}
-                  />
-                ))}
+                {/* 1. 누적 영역 채우기 패스 */}
+                <path
+                  d={areaD}
+                  fill={color}
+                  opacity={0.35} // 겹치거나 누적된 아래 영역이 은은하게 보이도록 반투명 처리
+                />
+                {/* 2. 영역 경계를 더 선명하게 보여줄 상단 라인 패스 */}
+                <path
+                  d={getTopPath(ci)}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={2}
+                  opacity={0.8}
+                />
               </g>
             );
           })}
@@ -377,12 +505,12 @@ function InterestLineChart({ interests, months, onMonthsChange }) {
                 </text>
                 {visibleTags.map((tag, i) => {
                   const ci = topTags.indexOf(tag);
-                  const pct = Math.round(tagDensity[tag][hoveredIdx] * 100);
+                  const ratio = getMonthlyRatio(tag, hoveredIdx);
                   return (
                     <g key={tag}>
                       <rect x={bx + 10} y={PAD.top + 22 + i * 18} width={8} height={8} rx={2} fill={COLORS[ci]} />
                       <text x={bx + 22} y={PAD.top + 30 + i * 18} fontSize={10} fill="#333">
-                        {tag}: {tagCounts[tag][hoveredIdx]}개 · 밀도 {pct}%
+                        {tag}: {tagCounts[tag][hoveredIdx]}개 · {ratio}%
                       </text>
                     </g>
                   );
@@ -397,9 +525,9 @@ function InterestLineChart({ interests, months, onMonthsChange }) {
       {totals.length > 0 && (
         <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
           {[
-            { label: '가장 많이 쓴 주제', t: topSum,     sub: `${topSum?.sum ?? 0}개` },
-            { label: '가장 꾸준한 주제', t: topConsist, sub: `평균 밀도 ${Math.round((topConsist?.avgD ?? 0) * 100)}%` },
-            { label: '이번 달 1위',      t: topThis,    sub: `${topThis?.lastCount ?? 0}개 · 밀도 ${Math.round((topThis?.lastD ?? 0) * 100)}%` },
+            { label: '누적 최다 주제',     t: topSum,          sub: `${topSum?.sum ?? 0}개` },
+            { label: '이번 달 최다 주제',  t: topThis,         sub: `${topThis?.lastCount ?? 0}개 · ${topThis?.lastRatio ?? 0}%` },
+            { label: '이번 달 비중 1위',   t: topMonthlyRatio, sub: `${topMonthlyRatio?.lastRatio ?? 0}% · ${topMonthlyRatio?.lastCount ?? 0}개` },
           ].map(({ label, t, sub }) => t ? (
             <div key={label} style={{
               flex: 1, background: 'var(--paper-2)', borderRadius: 10, padding: '10px 14px',
@@ -598,7 +726,7 @@ function DashboardScreen({ onNav }) {
             ))}
           </div>
         } />
-        <InterestLineChart interests={interests} months={interestMonths} onMonthsChange={setInterestMonths} />
+        <InterestStackedAreaChart interests={interests} months={interestMonths} onMonthsChange={setInterestMonths} />
       </Card>
 
     </div>

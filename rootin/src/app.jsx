@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
 import { TilEditorProvider } from '@/components/til/til-editor-context';
+import { LogoutConfirmModal } from '@/components/LogoutConfirmModal.jsx';
 
 // App shell — sidebar + topbar + route-based screen routing
 
@@ -29,6 +30,7 @@ function AppShell() {
   const [editorInitialPotId, setEditorInitialPotId] = useState(null);
   const [editorInitialTil, setEditorInitialTil] = useState(null);
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
   const [gardenRefreshKey, setGardenRefreshKey] = useState(0);
   // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
@@ -174,12 +176,7 @@ function AppShell() {
       <RootinSidebarLeft
         current={screen.startsWith('pot') ? 'garden' : screen}
         onNav={handleNav}
-        onLogout={() => {
-          import('./api/auth.js').then(({ logout }) => logout().catch(() => {}));
-          clearUser();
-          setAuthed(false);
-          navigate('/landing', { replace: true });
-        }}
+        onLogout={() => setLogoutModalOpen(true)}
       />
       <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
         {screen !== 'editor' && (
@@ -243,6 +240,18 @@ function AppShell() {
         />
       )}
     </SidebarProvider>
+    {logoutModalOpen && (
+      <LogoutConfirmModal
+        onConfirm={() => {
+          import('./api/auth.js').then(({ logout }) => logout().catch(() => {}));
+          clearUser();
+          setAuthed(false);
+          setLogoutModalOpen(false);
+          navigate('/landing', { replace: true });
+        }}
+        onClose={() => setLogoutModalOpen(false)}
+      />
+    )}
     </TilEditorProvider>
   );
 }

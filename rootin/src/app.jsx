@@ -7,6 +7,7 @@ import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
 import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens-rest.jsx';
 import { LandingScreen } from './screens-landing.jsx';
+import { NotFoundScreen } from './screens-error.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb';
@@ -228,7 +229,7 @@ function AppShell() {
             <Route path="/collection" element={<CollectionScreen />} />
             <Route path="/ai" element={<AIScreen />} />
             <Route path="/profile" element={<ProfileScreen />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<NotFoundScreen />} />
           </Routes>
         </div>
       </SidebarInset>

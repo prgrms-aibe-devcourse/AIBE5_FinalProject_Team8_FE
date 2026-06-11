@@ -28,11 +28,47 @@ describe('generateSummary', () => {
       body: JSON.stringify({ potId: 'pot-001' }),
     });
   });
+
+  it('tilIds가 있으면 body에 포함된다', async () => {
+    await generateSummary('pot-001', [10, 20]);
+
+    expect(request).toHaveBeenCalledWith('/api/v1/ai/summary', {
+      method: 'POST',
+      body: JSON.stringify({ potId: 'pot-001', tilIds: [10, 20] }),
+    });
+  });
+
+  it('tilIds가 빈 배열이면 body에 포함하지 않는다', async () => {
+    await generateSummary('pot-001', []);
+
+    expect(request).toHaveBeenCalledWith('/api/v1/ai/summary', {
+      method: 'POST',
+      body: JSON.stringify({ potId: 'pot-001' }),
+    });
+  });
 });
 
 describe('generateQuiz', () => {
   it('/api/v1/ai/quiz 경로로 POST 요청을 보낸다', async () => {
     await generateQuiz('pot-001', 5);
+
+    expect(request).toHaveBeenCalledWith('/api/v1/ai/quiz', {
+      method: 'POST',
+      body: JSON.stringify({ potId: 'pot-001', count: 5 }),
+    });
+  });
+
+  it('tilIds가 있으면 body에 포함된다', async () => {
+    await generateQuiz('pot-001', 5, [10, 20]);
+
+    expect(request).toHaveBeenCalledWith('/api/v1/ai/quiz', {
+      method: 'POST',
+      body: JSON.stringify({ potId: 'pot-001', count: 5, tilIds: [10, 20] }),
+    });
+  });
+
+  it('tilIds가 빈 배열이면 body에 포함하지 않는다', async () => {
+    await generateQuiz('pot-001', 5, []);
 
     expect(request).toHaveBeenCalledWith('/api/v1/ai/quiz', {
       method: 'POST',

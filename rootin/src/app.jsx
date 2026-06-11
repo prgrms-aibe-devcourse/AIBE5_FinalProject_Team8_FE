@@ -30,7 +30,12 @@ function AppShell() {
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
   // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
-  const [leftOpen, setLeftOpen] = useState(true);
+  // 좌측 사이드바 열림 상태는 SidebarProvider가 controlled라 새로고침 시 쿠키(sidebar_state)에서 복원
+  const [leftOpen, setLeftOpen] = useState(() => {
+    if (typeof document === 'undefined') return true;
+    const m = document.cookie.match(/(?:^|;\s*)sidebar_state=(true|false)/);
+    return m ? m[1] === 'true' : true;
+  });
   const [rightOpen, setRightOpen] = useState(() => {
     const v = typeof localStorage !== 'undefined' ? localStorage.getItem('rootin.tilRightOpen') : null;
     return v === null ? true : v === 'true';
@@ -164,12 +169,13 @@ function AppShell() {
     <SidebarProvider
       open={focusMode ? false : leftOpen}
       onOpenChange={setLeftOpen}
-      style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper)', minWidth: 1180 }}
+      style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper)', minWidth: 1180, '--sidebar-width': '18rem' }}
       data-screen-label={screen}
     >
       <RootinSidebarLeft
         current={screen.startsWith('pot') ? 'garden' : screen}
         onNav={handleNav}
+        onForceShow={() => { setFocusMode(false); setLeftOpen(true); }}
         onLogout={() => {
           import('./api/auth.js').then(({ logout }) => logout().catch(() => {}));
           clearUser();

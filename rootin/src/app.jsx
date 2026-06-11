@@ -16,6 +16,7 @@ import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
 import { TilEditorProvider } from '@/components/til/til-editor-context';
 import { LogoutConfirmModal } from '@/components/LogoutConfirmModal.jsx';
+import { logout, clearTokens } from './api/auth.js';
 
 // App shell — sidebar + topbar + route-based screen routing
 
@@ -242,15 +243,16 @@ function AppShell() {
     </SidebarProvider>
     {logoutModalOpen && (
       <LogoutConfirmModal
-        onConfirm={() => {
-          import('./api/auth.js').then(({ logout, clearTokens }) => {
-            logout().catch(() => {}); // 서버 세션 무효화 (best-effort)
-            clearTokens();            // 토큰은 무조건 즉시 제거
-          });
-          clearUser();
-          setAuthed(false);
-          setLogoutModalOpen(false);
-          navigate('/landing', { replace: true });
+        onConfirm={async () => {
+          try {
+            await logout().catch(() => {}); // 서버 세션 무효화 (best-effort)
+          } finally {
+            clearTokens();
+            clearUser();
+            setAuthed(false);
+            setLogoutModalOpen(false);
+            navigate('/landing', { replace: true });
+          }
         }}
         onClose={() => setLogoutModalOpen(false)}
       />

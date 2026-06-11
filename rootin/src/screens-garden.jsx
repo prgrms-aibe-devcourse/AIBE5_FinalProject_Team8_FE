@@ -7,6 +7,7 @@ import { useUser } from './context/UserContext.jsx';
 import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { tilCountToStage, STAGE_META } from './plants.jsx';
+import { inferSpecies } from './utils/plant.js';
 
 // Garden + Pot Detail screens — pixel-art edition with 정원 꾸미기 mode
 
@@ -123,11 +124,6 @@ function growthStageToPixelStage(growthStage) {
   return GROWTH_STAGE_TO_PIXEL_STAGE[growthStage] ?? 'seed';
 }
 
-function inferSpecies(plantName = '') {
-  if (plantName.includes('달빛')) return 'moonlight';
-  if (plantName.includes('버섯')) return 'mushroom';
-  return 'seed';
-}
 
 function getStageEmoji(stage) {
   const stageEmojis = {
@@ -2927,10 +2923,8 @@ function EditPotModal({ pot, onClose, onUpdated, onDeleteRequest }) {
   );
 }
 
-const HARVEST_SPECIES_MAP = { '기본 씨앗': 'seed', '달빛씨앗': 'moonlight', '버섯씨앗': 'mushroom' };
-
 function HarvestResult({ result, onClose, potLevel }) {
-  const nextSpecies = HARVEST_SPECIES_MAP[result.nextPlantName] ?? 'seed';
+  const nextSpecies = inferSpecies(result.nextPlantName);
   const isNextRare  = result.nextRarity === '희귀';
   return (
     <>

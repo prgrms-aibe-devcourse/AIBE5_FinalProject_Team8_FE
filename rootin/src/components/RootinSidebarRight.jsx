@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronRight, ChevronDown, Sprout, FileText, Pencil, Lightbulb, Sparkles, Flame, Loader2, Plus } from 'lucide-react';
 import { getMyTils, getTil, getDraft } from '@/api/til.js';
 import { cn } from '@/lib/utils';
+import { inferSpecies } from '@/utils/plant.js';
 
 const PANEL_WIDTH = 344;
 
@@ -34,11 +35,6 @@ const GROWTH_STAGE_LABEL = {
   FULL_BLOOM: '만개',
 };
 
-function inferSpecies(plantName = '') {
-  if (plantName.includes('달빛')) return 'moonlight';
-  if (plantName.includes('버섯')) return 'mushroom';
-  return 'seed';
-}
 
 function calculateEstimatedExp(contentLength, streakDays) {
   if (contentLength <= 0) return 0;

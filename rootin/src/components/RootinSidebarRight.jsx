@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronRight, ChevronDown, Sprout, FileText, Pencil, Lightbulb, Sparkles, Flame, Loader2, Plus } from 'lucide-react';
 import { getMyTils, getTil, getDraft } from '@/api/til.js';
 import { cn } from '@/lib/utils';
+import { PLANT_NAME_TO_SPECIES, inferSpecies } from '@/utils/plant.js';
 
 const PANEL_WIDTH = 344;
 
@@ -34,20 +35,6 @@ const GROWTH_STAGE_LABEL = {
   FULL_BLOOM: '만개',
 };
 
-const PLANT_NAME_TO_SPECIES = {
-  '기본 씨앗':  'seed',
-  '버섯씨앗':   'mushroom',
-  '선인장씨앗': 'cactus',
-  '불꽃씨앗':   'fire',
-  '얼음씨앗':   'ice',
-  '달빛씨앗':   'moonlight',
-  '번개씨앗':   'bolt',
-  '흑장미씨앗': 'rose',
-};
-
-function inferSpecies(plantName = '') {
-  return PLANT_NAME_TO_SPECIES[plantName] ?? 'seed';
-}
 
 function calculateEstimatedExp(contentLength, streakDays) {
   if (contentLength <= 0) return 0;

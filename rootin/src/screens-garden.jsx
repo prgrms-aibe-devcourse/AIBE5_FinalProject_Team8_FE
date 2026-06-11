@@ -7,6 +7,7 @@ import { useUser } from './context/UserContext.jsx';
 import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { tilCountToStage, STAGE_META } from './plants.jsx';
+import { PLANT_NAME_TO_SPECIES, inferSpecies } from './utils/plant.js';
 
 // Garden + Pot Detail screens — pixel-art edition with 정원 꾸미기 mode
 
@@ -123,20 +124,6 @@ function growthStageToPixelStage(growthStage) {
   return GROWTH_STAGE_TO_PIXEL_STAGE[growthStage] ?? 'seed';
 }
 
-const PLANT_NAME_TO_SPECIES = {
-  '기본 씨앗':  'seed',
-  '버섯씨앗':   'mushroom',
-  '선인장씨앗': 'cactus',
-  '불꽃씨앗':   'fire',
-  '얼음씨앗':   'ice',
-  '달빛씨앗':   'moonlight',
-  '번개씨앗':   'bolt',
-  '흑장미씨앗': 'rose',
-};
-
-function inferSpecies(plantName = '') {
-  return PLANT_NAME_TO_SPECIES[plantName] ?? 'seed';
-}
 
 function getStageEmoji(stage) {
   const stageEmojis = {

@@ -2927,7 +2927,7 @@ function HarvestModal({ pot, onClose, onHarvested }) {
           /* 수확 확인 화면 */
           <>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-              <PottedPlant species={pot.species} stage="full" size={142} glow={pot.species === 'moonlight'} potLevel={pot.level} />
+              <PottedPlant species={pot.species} stage={pot.stage ?? 'full'} size={142} glow={pot.species === 'moonlight'} potLevel={pot.level} />
             </div>
             <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>수확하기</div>
             <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>

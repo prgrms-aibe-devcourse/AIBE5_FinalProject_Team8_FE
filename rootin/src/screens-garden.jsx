@@ -123,10 +123,19 @@ function growthStageToPixelStage(growthStage) {
   return GROWTH_STAGE_TO_PIXEL_STAGE[growthStage] ?? 'seed';
 }
 
+const PLANT_NAME_TO_SPECIES = {
+  '기본 씨앗':  'seed',
+  '버섯씨앗':   'mushroom',
+  '선인장씨앗': 'cactus',
+  '불꽃씨앗':   'fire',
+  '얼음씨앗':   'ice',
+  '달빛씨앗':   'moonlight',
+  '번개씨앗':   'bolt',
+  '흑장미씨앗': 'rose',
+};
+
 function inferSpecies(plantName = '') {
-  if (plantName.includes('달빛')) return 'moonlight';
-  if (plantName.includes('버섯')) return 'mushroom';
-  return 'seed';
+  return PLANT_NAME_TO_SPECIES[plantName] ?? 'seed';
 }
 
 function getStageEmoji(stage) {

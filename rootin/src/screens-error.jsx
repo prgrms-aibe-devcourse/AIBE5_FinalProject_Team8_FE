@@ -51,11 +51,12 @@ function PixelButton({ children, variant = 'primary', onClick }) {
 }
 
 // 공유 레이아웃 — 아케이드 화면 카드(타이틀바 + 본문 + 스캔라인)
-function ErrorArcade({ code, codeColor, statusBar, species, stage, glow, heading, message, actions }) {
+// minHeight: 앱 셸 안(404)에서는 '100%', 라우터 밖 단독 렌더(500)에서는 '100vh'로 세로 중앙 정렬
+function ErrorArcade({ code, codeColor, statusBar, species, stage, glow, heading, message, actions, minHeight = '100%' }) {
   return (
     <div
       style={{
-        minHeight: '100%',
+        minHeight,
         flex: 1,
         display: 'flex',
         alignItems: 'center',
@@ -210,6 +211,7 @@ export function ServerErrorScreen({ onReload, onHome }) {
       code="500"
       codeColor="var(--danger)"
       statusBar="SYSTEM ERROR"
+      minHeight="100vh"
       species="fire"
       stage="bloom"
       glow

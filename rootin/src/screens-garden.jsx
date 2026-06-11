@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, TILS } from './data.jsx';
 import { harvestPot, getGardenState, updateGardenTheme, updateGardenLayout } from './api/garden.js';
 import { createPot, deletePot, getGardenDashboard, getPots, updatePot } from './api/pot.js';
@@ -184,6 +184,10 @@ function getHarvestStatus(canHarvest) {
   return canHarvest ? '수확 가능' : '수확 불가';
 }
 
+function resolveWateredToday(wateredToday, lastWateredAt) {
+  return Boolean(wateredToday) || isTodayDateTime(lastWateredAt);
+}
+
 function toGardenPot(apiPot) {
   const growthStage = apiPot.growthStage;
   const stage = growthStageToPixelStage(growthStage);
@@ -202,7 +206,7 @@ function toGardenPot(apiPot) {
     color: '#a8d5b5',
     createdAt: '',
     lastWateredAt: apiPot.lastWateredAt ?? null,
-    waterToday: apiPot.wateredToday ?? isTodayDateTime(apiPot.lastWateredAt),
+    waterToday: resolveWateredToday(apiPot.wateredToday, apiPot.lastWateredAt),
     plantName: apiPot.plantName,
     growthStage,
     plantGrowthPercentage: 0,
@@ -229,7 +233,7 @@ function toDashboardPot(dashboard) {
     nextLevelExpRequired: dashboard.nextLevelExpRequired ?? 0,
     streakDays: dashboard.streakDays ?? 0,
     lastWateredAt: dashboard.lastWateredAt ?? null,
-    waterToday: dashboard.wateredToday ?? isTodayDateTime(dashboard.lastWateredAt),
+    waterToday: resolveWateredToday(dashboard.wateredToday, dashboard.lastWateredAt),
     plantName: dashboard.plant?.name,
     growthStage,
     plantGrowthPercentage: dashboard.plant?.growthPercentage ?? 0,
@@ -273,14 +277,20 @@ function getKstDateParts(date = new Date()) {
 }
 
 function getKstDateString(date = new Date()) {
-  const { year, month, day } = getKstDateParts(date);
-  return [year, String(month).padStart(2, '0'), String(day).padStart(2, '0')].join('-');
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
 }
 
 function getMsUntilKstMidnight() {
   const now = new Date();
   const { year, month, day } = getKstDateParts(now);
-  const nextKstMidnightUtc = Date.UTC(year, month - 1, day + 1, -9, 0, 0, 0);
+  const kstOffsetMs = 9 * 60 * 60 * 1000;
+  // KST 다음 날 00:00을 UTC 기준 timestamp로 환산합니다.
+  const nextKstMidnightUtc = Date.UTC(year, month - 1, day + 1, 0, 0, 0, 0) - kstOffsetMs;
   return Math.max(0, nextKstMidnightUtc - now.getTime());
 }
 
@@ -972,7 +982,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
   };
 
   // 백엔드 정원 정보를 한 번에 불러오는 비동기 함수입니다.
-  const loadGardenState = async (silent = false) => {
+  const loadGardenState = useCallback(async (silent = false) => {
     const requestId = ++requestIdRef.current;
     if (!silent) {
       loadingRequestIdRef.current = requestId;
@@ -985,7 +995,6 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         getPots().catch(() => []),
       ]);
       if (!mountedRef.current || requestId !== requestIdRef.current) return;
-      setPotsError(null);
 
       // 1. 서버 테마를 프론트 테마 ID로 변환하여 적용합니다.
       const feTheme = BE_THEME_TO_FE_THEME[data.theme] ?? 'meadow';
@@ -1069,8 +1078,9 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
       setDecorations(activeDecs);
       lastFetchDateRef.current = getKstDateString();
 
-    } catch {
+    } catch (err) {
       if (!mountedRef.current || requestId !== requestIdRef.current) return;
+      console.error('정원 정보를 불러오지 못했습니다.', err);
       if (!silent) {
         setPots([]);
         setAllHarvestedPlants([]);
@@ -1083,12 +1093,12 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         loadingRequestIdRef.current = 0;
       }
     }
-  };
+  }, []);
 
   // 컴포넌트 마운트 및 refreshKey 변경 시 정원 상태를 서버에서 조회해 옵니다.
   useEffect(() => {
     loadGardenState(false);
-  }, [refreshKey]);
+  }, [refreshKey, loadGardenState]);
 
   // 다음 자정 + 랜덤 딜레이(0~60초) 시점에 데이터를 재조회합니다.
   useEffect(() => {
@@ -1110,7 +1120,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
     return () => {
       if (timerId) clearTimeout(timerId);
     };
-  }, []);
+  }, [loadGardenState]);
 
   // 비활성 탭이었다가 다시 브라우저로 진입했을 때, 날짜가 바뀌었다면 재조회합니다.
   useEffect(() => {
@@ -1127,7 +1137,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [loadGardenState]);
 
   // '꾸미기 완료' 버튼을 눌렀을 때, 배경 테마와 화분/식물의 배치 정보를 일괄 수집하여 백엔드에 전송합니다.
   const handleSaveLayout = async () => {

@@ -269,6 +269,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState(null);
+  const [partialError, setPartialError] = useState(false);
   const [keyword, setKeyword]         = useState('');
   const [selectedTag, setSelectedTag] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -291,7 +292,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
       tags: Array.isArray(t.tags) ? t.tags.map(tag => String(tag).trim()).filter(Boolean) : [],
     });
 
-    getMyTils({ potId, page: 0, size: PAGE_SIZE, sort: 'latest' })
+    getMyTils({ potId, page: 0, size: PAGE_SIZE, sort: 'latest', signal: controller.signal })
       .then(async first => {
         if (!active) return;
         const total = first?.totalElements ?? 0;
@@ -312,6 +313,9 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
           )
         );
         if (!active) return;
+
+        const hadPartialFailure = rest.some(r => r.status === 'rejected');
+        setPartialError(hadPartialFailure);
 
         const all = [
           firstContent,
@@ -496,6 +500,13 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
             {selectedIds.size >= TIL_IDS_MAX_SIZE && ' (최대)'}
           </span>
         </div>
+
+        {/* 부분 로드 실패 안내 */}
+        {partialError && (
+          <div style={{ padding: '6px 10px', borderRadius: 7, background: '#fff8e1', border: '0.5px solid #ffe082', fontSize: 11.5, color: '#b8860b' }}>
+            일부 TIL을 불러오지 못했어요. 목록이 불완전할 수 있습니다.
+          </div>
+        )}
 
         {/* TIL 목록 */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }} className="scrollbar">
@@ -1010,7 +1021,9 @@ function AIScreen() {
           title={resultMode === 'quiz' ? `복습 문제 (${quizCount}문항)` : 'TIL 요약 결과지'}
           action={generated ? (
             <div style={{ display: 'flex', gap: 8 }}>
-              <Btn variant="secondary" size="sm" onClick={() => handleGenerate(lastTilIds)}>다시 생성</Btn>
+              {lastTilIds.length > 0 && (
+                <Btn variant="secondary" size="sm" onClick={() => handleGenerate(lastTilIds)}>다시 생성</Btn>
+              )}
               <Btn variant="primary" size="sm" onClick={handleSave}>
                 {saved ? '✓ 저장됨' : '결과 저장'}
               </Btn>

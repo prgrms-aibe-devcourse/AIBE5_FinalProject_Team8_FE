@@ -597,19 +597,44 @@ function DashboardScreen({ onNav }) {
   }, [interestMonths]);
 
   useEffect(() => {
+    // getQuests()는 포인트 적립을 수행하므로, 완료 후 포인트를 재조회한다 (성공/실패 무관)
+    let active = true;
+    const questsP = getQuests();
+
     Promise.allSettled([
       getSummary(),
       getWeekly(),
       getDistribution(),
-      getQuests(),
-      getPointSummary(),
-    ]).then(([sumRes, weekRes, distRes, questRes, pointRes]) => {
+      questsP,
+    ]).then(([sumRes, weekRes, distRes, questRes]) => {
+      if (!active) return;
       if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
       if (weekRes.status === 'fulfilled')  setWeekly(transformWeekly(weekRes.value?.weeklyData ?? []));
       if (distRes.status === 'fulfilled')  setDistribution(distRes.value?.distribution ?? []);
       if (questRes.status === 'fulfilled') setQuests(questRes.value);
-      if (pointRes.status === 'fulfilled') setCurrentPoint(pointRes.value?.currentPoint ?? 0);
+    // allSettled 자체는 reject되지 않음. then() 내부 동기 오류만 여기서 잡힘
+    }).catch(error => {
+      console.error('상태 업데이트 중 오류:', error);
     });
+
+    // 퀘스트 완료 여부와 무관하게 포인트 잔액 갱신
+    questsP
+      .catch(error => {
+        console.error('퀘스트 조회 중 오류 발생:', error);
+        return null;
+      })
+      .finally(() => {
+        if (!active) return;
+        getPointSummary()
+          .then(pointRes => {
+            if (active && pointRes != null) setCurrentPoint(pointRes.currentPoint ?? 0);
+          })
+          .catch(error => {
+            console.error('포인트 조회 중 오류 발생:', error);
+          });
+      });
+
+    return () => { active = false; };
   }, []);
 
   const streak     = summary?.currentStreak  ?? 0;

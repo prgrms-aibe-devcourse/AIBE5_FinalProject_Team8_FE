@@ -193,9 +193,8 @@ const WEEKLY = [
 
 const TODAY_GOALS = [
   { id: 'g1', label: 'TIL 1개 작성하기', done: true, point: 50 },
-  { id: 'g2', label: '연속 기록 이어가기', done: true, point: 30 },
-  { id: 'g3', label: '500자 이상 작성', done: false, point: 20 },
-  { id: 'g4', label: '주말에도 한 줄 기록', done: false, point: 10 },
+  { id: 'g2', label: '태그 달고 기록하기', done: true, point: 30 },
+  { id: 'g3', label: '200자 이상 작성', done: false, point: 20 },
 ];
 
 const TEMPLATES = [

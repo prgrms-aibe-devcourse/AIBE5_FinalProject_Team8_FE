@@ -479,12 +479,17 @@ function DashboardScreen({ onNav }) {
       if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
       if (weekRes.status === 'fulfilled')  setWeekly(transformWeekly(weekRes.value?.weeklyData ?? []));
       if (distRes.status === 'fulfilled')  setDistribution(distRes.value?.distribution ?? []);
-      if (questRes.status === 'fulfilled') setQuests(questRes.value);
-      // 퀘스트 포인트 적립 완료 후 포인트 재조회
-      return getPointSummary();
+      if (questRes.status === 'fulfilled') {
+        setQuests(questRes.value);
+        // 퀘스트 포인트 적립 완료 후 포인트 재조회
+        return getPointSummary();
+      }
+      return Promise.resolve(null);
     }).then(pointRes => {
-      setCurrentPoint(pointRes?.currentPoint ?? 0);
-    }).catch(() => {});
+      if (pointRes) setCurrentPoint(pointRes?.currentPoint ?? 0);
+    }).catch(error => {
+      console.error('데이터 로딩 중 오류 발생:', error);
+    });
   }, []);
 
   const streak     = summary?.currentStreak  ?? 0;

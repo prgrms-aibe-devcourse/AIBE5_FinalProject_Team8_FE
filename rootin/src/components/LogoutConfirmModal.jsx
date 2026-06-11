@@ -62,7 +62,7 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
               정말 로그아웃 할까요?
             </h2>
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.6, textAlign: 'left' }}>
-              로그아웃하면 다시 로그인해야 Rootin을 이용할 수 있어요.
+              로그아웃하면 다시 로그인해야<br />Rootin을 이용할 수 있어요.
             </div>
           </div>
           <button

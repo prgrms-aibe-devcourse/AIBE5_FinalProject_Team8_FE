@@ -242,9 +242,11 @@ function AppShell() {
     </SidebarProvider>
     {logoutModalOpen && (
       <LogoutConfirmModal
-        onConfirm={async () => {
-          const { logout } = await import('./api/auth.js');
-          await logout();
+        onConfirm={() => {
+          import('./api/auth.js').then(({ logout, clearTokens }) => {
+            logout().catch(() => {}); // 서버 세션 무효화 (best-effort)
+            clearTokens();            // 토큰은 무조건 즉시 제거
+          });
           clearUser();
           setAuthed(false);
           setLogoutModalOpen(false);

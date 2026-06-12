@@ -853,6 +853,7 @@ function AIScreen() {
         {
           id: saved_res.resultId,
           type: resultMode,
+          potId,
           title,
           date,
           quizCount: resultMode === 'quiz' ? quizCount : undefined,

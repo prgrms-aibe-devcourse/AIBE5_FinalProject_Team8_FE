@@ -393,9 +393,13 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const isIndeterminate = useMemo(() => !isAllSelected && allFilteredIds.some(id => selectedIds.has(id)), [isAllSelected, allFilteredIds, selectedIds]);
 
   // 교차 필터 상황에서 전체 선택 가능 여부 — 이미 선택된 filtered 항목 제외 후 슬롯 확인
-  const canSelectAll = useMemo(() => {
+  const { canSelectAll, addableCount } = useMemo(() => {
     const alreadySelected = allFilteredIds.filter(id => selectedIds.has(id)).length;
-    return selectedIds.size - alreadySelected + allFilteredIds.length <= TIL_IDS_MAX_SIZE;
+    const outsideSelected = selectedIds.size - alreadySelected;
+    return {
+      canSelectAll: outsideSelected + allFilteredIds.length <= TIL_IDS_MAX_SIZE,
+      addableCount: TIL_IDS_MAX_SIZE - outsideSelected,
+    };
   }, [allFilteredIds, selectedIds]);
 
   const toggleAll = useCallback(() => {
@@ -516,14 +520,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
                 onChange={toggleAll}
                 disabled={filtered.length === 0}
               />
-              {canSelectAll
-                ? `전체 선택 (${filtered.length}개)`
-                : (() => {
-                    const alreadySelected = allFilteredIds.filter(id => selectedIds.has(id)).length;
-                    const addable = TIL_IDS_MAX_SIZE - (selectedIds.size - alreadySelected);
-                    return `추가 가능한 ${addable}개만 선택됩니다`;
-                  })()
-              }
+              {canSelectAll ? `전체 선택 (${filtered.length}개)` : `추가 가능한 ${addableCount}개만 선택됩니다`}
             </label>
           ) : (
             <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>

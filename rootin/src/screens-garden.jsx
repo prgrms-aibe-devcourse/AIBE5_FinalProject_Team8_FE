@@ -2099,6 +2099,11 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
     };
   }, [selectedTil]);
 
+  const refreshDashboard = useCallback(async () => {
+    const updatedDashboard = await getGardenDashboard(potId);
+    setDashboard(updatedDashboard);
+  }, [potId]);
+
   const pot = dashboard ? toDashboardPot(dashboard) : fallbackPot;
 
   if (dashboardLoading && !pot) {
@@ -2186,11 +2191,6 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
       potId: til.potId ?? pot.id,
     });
   };
-  const refreshDashboard = useCallback(async () => {
-    const updatedDashboard = await getGardenDashboard(pot.id);
-    setDashboard(updatedDashboard);
-  }, [pot.id]);
-
   const handleDeleteTil = async () => {
     if (!selectedTil?.id) return;
     await deleteTil(selectedTil.id);

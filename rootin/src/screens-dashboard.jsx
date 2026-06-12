@@ -811,22 +811,28 @@ function DashboardScreen({ onNav }) {
 
   // 잔디 — 항상 1년치 데이터
   useEffect(() => {
+    let active = true;
     getGrass(12).then(data => {
+      if (!active) return;
       const cells = data?.cells ?? [];
       setGrassState(buildGrassState(cells));
       setGrassCells(cells);
     }).catch(error => {
       console.error('잔디 그래프 조회 중 오류 발생:', error);
     });
+    return () => { active = false; };
   }, []);
 
   // 관심사 기간 변경 시 재요청
   useEffect(() => {
+    let active = true;
     getInterests(interestMonths).then(data => {
+      if (!active) return;
       setInterests(data?.interests ?? []);
     }).catch(error => {
       console.error('시기별 학습 주제 흐름 조회 중 오류 발생:', error);
     });
+    return () => { active = false; };
   }, [interestMonths]);
 
   useEffect(() => {

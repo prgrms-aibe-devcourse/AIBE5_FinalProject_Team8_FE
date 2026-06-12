@@ -1,4 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+let reissuePromise = null;
 
 async function parseResponseBody(res) {
   const text = await res.text();
@@ -6,7 +7,7 @@ async function parseResponseBody(res) {
   return JSON.parse(text);
 }
 
-async function reissueAccessToken() {
+async function requestNewAccessToken() {
   const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) return null;
 
@@ -31,6 +32,16 @@ async function reissueAccessToken() {
   }
 
   return tokenData.accessToken;
+}
+
+async function reissueAccessToken() {
+  if (!reissuePromise) {
+    reissuePromise = requestNewAccessToken().finally(() => {
+      reissuePromise = null;
+    });
+  }
+
+  return reissuePromise;
 }
 
 /**

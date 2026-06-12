@@ -258,6 +258,13 @@ function CollectionScreen() {
 const TIL_MODAL_PAGE_SIZE = 10;
 const TIL_IDS_MAX_SIZE = 200; // BE AiPolicy.TIL_IDS_MAX_SIZE 와 동기화 — AI에 전달 가능한 선택 최대 개수
 
+const formatDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+};
+
 /**
  * AI 학습에 포함할 TIL을 선택하는 확인 모달
  * Props:
@@ -382,8 +389,14 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
 
   // 전체 선택: 현재 필터된 TIL 전체 기준
   const allFilteredIds  = useMemo(() => filtered.map(t => t.id), [filtered]);
-  const isAllSelected   = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
-  const isIndeterminate = !isAllSelected && allFilteredIds.some(id => selectedIds.has(id));
+  const isAllSelected   = useMemo(() => allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id)), [allFilteredIds, selectedIds]);
+  const isIndeterminate = useMemo(() => !isAllSelected && allFilteredIds.some(id => selectedIds.has(id)), [isAllSelected, allFilteredIds, selectedIds]);
+
+  // 교차 필터 상황에서 전체 선택 가능 여부 — 이미 선택된 filtered 항목 제외 후 슬롯 확인
+  const canSelectAll = useMemo(() => {
+    const alreadySelected = allFilteredIds.filter(id => selectedIds.has(id)).length;
+    return selectedIds.size - alreadySelected + allFilteredIds.length <= TIL_IDS_MAX_SIZE;
+  }, [allFilteredIds, selectedIds]);
 
   const toggleAll = useCallback(() => {
     setSelectedIds(prev => {
@@ -413,13 +426,6 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
 
   const handleConfirm = () => {
     onConfirm(Array.from(selectedIds));
-  };
-
-  const formatDate = (iso) => {
-    if (!iso) return '';
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return '';
-    return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
   };
 
   return (
@@ -502,7 +508,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
         {/* 전체 선택 + 카운트 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid var(--rule)', paddingBottom: 8 }}>
           {((partialError ? tils.length : totalElements) <= TIL_IDS_MAX_SIZE || (!!(keyword.trim() || selectedTag) && filtered.length <= TIL_IDS_MAX_SIZE)) ? (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--ink-2)' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canSelectAll ? 'pointer' : 'default', fontSize: 12.5, color: 'var(--ink-2)' }}>
               <input
                 type="checkbox"
                 checked={isAllSelected}
@@ -510,7 +516,14 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
                 onChange={toggleAll}
                 disabled={filtered.length === 0}
               />
-              전체 선택 ({filtered.length}개)
+              {canSelectAll
+                ? `전체 선택 (${filtered.length}개)`
+                : (() => {
+                    const alreadySelected = allFilteredIds.filter(id => selectedIds.has(id)).length;
+                    const addable = TIL_IDS_MAX_SIZE - (selectedIds.size - alreadySelected);
+                    return `추가 가능한 ${addable}개만 선택됩니다`;
+                  })()
+              }
             </label>
           ) : (
             <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
@@ -738,7 +751,7 @@ function AIScreen() {
     // 보유 포인트 — UserContext에서 초기화됨 (별도 getMe() 호출 불필요)
   }, []);
 
-  // 페이지 진입 시 보관함 목록 로딩
+  // 페이지 진입 시 보관함 목록 로딩 — pot 이름은 렌더 시점에 pots에서 resolve
   useEffect(() => {
     fetchResults()
       .then(data => {
@@ -747,16 +760,14 @@ function AIScreen() {
           const content = typeof r.content === 'string'
             ? (() => { try { return JSON.parse(r.content); } catch { return null; } })()
             : r.content;
+          const d = new Date(r.createdAt);
           return {
             id: r.resultId,
             type: r.type.toLowerCase(),   // 'QUIZ' → 'quiz'
             potId: r.potId,
-            pot: pots.find(p => p.id === r.potId) ?? null,
             content,
-            title: r.type === 'QUIZ'
-              ? `${pots.find(p => p.id === r.potId)?.title ?? r.potId} 화분 복습 문제`
-              : `${pots.find(p => p.id === r.potId)?.title ?? r.potId} 화분 요약본`,
-            date: new Date(r.createdAt).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace('. ', '.').replace('.', '').slice(0, 5),
+            tilIds: r.tilIds ?? [],
+            date: `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`,
             quizCount: r.type === 'QUIZ' ? content?.quizzes?.length : undefined,
           };
         });
@@ -765,13 +776,14 @@ function AIScreen() {
       .catch(() => {
         // 보관함 로딩 실패는 조용히 무시 (빈 목록 유지)
       });
-  }, [pots]);
+  }, []);
 
   // 보관함 항목 클릭 — 결과창에 바인딩
   const handleSelectSavedItem = (item) => {
     setMode(item.type);
     setResultMode(item.type);
-    if (item.pot) setPotId(item.pot.id);
+    const pot = pots.find(p => p.id === item.potId) ?? null;
+    if (pot) setPotId(pot.id);
     if (item.quizCount != null) setQuizCount(item.quizCount);
     setAiResult(item.content ?? null);
     setLastTilIds(item.tilIds ?? []);
@@ -785,6 +797,8 @@ function AIScreen() {
     setLastTilIds(tilIds);
     handleGenerate(tilIds);
   };
+
+  const handleModalClose = useCallback(() => setModalOpen(false), []);
 
   // 생성 버튼 — mode에 따라 summary/quiz API 호출
   const handleGenerate = async (tilIds) => {
@@ -840,7 +854,7 @@ function AIScreen() {
           type: resultMode,
           title,
           date,
-          quizCount: mode === 'quiz' ? quizCount : undefined,
+          quizCount: resultMode === 'quiz' ? quizCount : undefined,
           tilIds: lastTilIds,
           pot: selectedPot,
           content: aiResult,
@@ -965,7 +979,7 @@ function AIScreen() {
           <Btn
             variant="green" size="lg"
             style={{ width: '100%', marginTop: 14, opacity: potId ? 1 : 0.45, cursor: potId ? 'pointer' : 'not-allowed' }}
-            onClick={() => potId && setModalOpen(true)}
+            onClick={() => potId && !generating && setModalOpen(true)}
           >
             {generating ? '생성 중...' : (mode === 'quiz' ? `🌱 복습 문제 ${quizCount}개 만들기` : '✨ 요약 생성하기')} · {mode === 'quiz' ? quizCount * 10 : 50} 포인트 사용
           </Btn>
@@ -993,7 +1007,12 @@ function AIScreen() {
                   저장된 결과지가 없습니다.
                 </div>
             ) : (
-                savedResults.map(item => (
+                savedResults.map(item => {
+                  const itemPot = pots.find(p => p.id === item.potId);
+                  const itemTitle = item.title ?? (item.type === 'quiz'
+                    ? `${itemPot?.title ?? item.potId} 화분 복습 문제`
+                    : `${itemPot?.title ?? item.potId} 화분 요약본`);
+                  return (
                     <div
                         key={item.id}
                         onClick={() => handleSelectSavedItem(item)}
@@ -1004,7 +1023,7 @@ function AIScreen() {
                         }}
                     >
                   <span style={{ fontSize: 12.5, color: 'var(--ink)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
-                    {item.type === 'quiz' ? '📝 ' : '✨ '} {item.title}
+                    {item.type === 'quiz' ? '📝 ' : '✨ '} {itemTitle}
                   </span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                         <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{item.date}</span>
@@ -1021,7 +1040,8 @@ function AIScreen() {
                         >✕</button>
                       </div>
                     </div>
-                ))
+                  );
+                })
             )}
           </Card>
         </div>
@@ -1071,7 +1091,7 @@ function AIScreen() {
       <AiTilSelectModal
         potId={potId}
         onConfirm={handleModalConfirm}
-        onClose={() => setModalOpen(false)}
+        onClose={handleModalClose}
       />
     )}
     </>

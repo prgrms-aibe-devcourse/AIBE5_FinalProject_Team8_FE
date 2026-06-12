@@ -187,8 +187,8 @@ function WeeklyBar({ weekly }) {
   const max = Math.max(...weekly.map(w => w.count), 1);
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, height: 166, marginTop: 'auto', paddingTop: 14 }}>
-      {weekly.map((w, i) => (
-        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%' }}>
+      {weekly.map(w => (
+        <div key={w.day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%' }}>
           <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid var(--rule)' }}>
             <div style={{
               width: '100%',
@@ -332,37 +332,50 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [hiddenTags, setHiddenTags] = useState(new Set());
 
+  const emptyState = (title, description) => (
+    <div style={{
+      minHeight: 278,
+      border: '1px solid var(--line)',
+      borderRadius: 8,
+      background: 'linear-gradient(180deg, rgba(233, 245, 235, 0.8), rgba(255, 255, 255, 0.9))',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      padding: 28,
+    }}>
+      <div>
+        <div style={{ fontSize: 30, marginBottom: 10 }}>🌱</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
+          {title}
+        </div>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+          {description}
+        </div>
+      </div>
+    </div>
+  );
+
   // 데이터가 아예 없거나 빈 배열일 때의 방어 처리
   if (!interests || interests.length === 0) {
-    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>관심사 데이터가 없습니다.</div>;
+    return emptyState(
+      '아직 흐름을 비교하기엔 기록이 조금 부족해요.',
+      <>
+        2개월 이상 TIL을 쌓으면<br />
+        학습 주제가 어떻게 변했는지 보여드릴게요.
+      </>
+    );
   }
 
   const n = interests.length;
 
   if (n < 2) {
-    return (
-      <div style={{
-        minHeight: 278,
-        border: '1px solid var(--line)',
-        borderRadius: 8,
-        background: 'linear-gradient(180deg, rgba(233, 245, 235, 0.8), rgba(255, 255, 255, 0.9))',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        padding: 28,
-      }}>
-        <div>
-          <div style={{ fontSize: 30, marginBottom: 10 }}>🌱</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
-            아직 흐름을 비교하기엔 기록이 조금 부족해요.
-          </div>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-            2개월 이상 TIL을 쌓으면<br />
-            학습 주제가 어떻게 변했는지 보여드릴게요.
-          </div>
-        </div>
-      </div>
+    return emptyState(
+      '아직 흐름을 비교하기엔 기록이 조금 부족해요.',
+      <>
+        2개월 이상 TIL을 쌓으면<br />
+        학습 주제가 어떻게 변했는지 보여드릴게요.
+      </>
     );
   }
 

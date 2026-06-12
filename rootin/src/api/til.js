@@ -39,6 +39,12 @@ export async function getTil(tilId) {
   return res.data;
 }
 
+// DELETE /api/v1/tils/{tilId}
+// 발행된 TIL을 삭제합니다. (204 No Content)
+export async function deleteTil(tilId) {
+  await request(`/api/v1/tils/${tilId}`, { method: 'DELETE' });
+}
+
 // PUT /api/v1/tils/{tilId}
 // 발행된 TIL의 제목, 본문, 태그를 수정합니다.
 export async function updateTil(tilId, { title, content, tags }) {
@@ -110,6 +116,6 @@ export async function createTemplate({ title, content }) {
 
 // 템플릿 삭제
 // DELETE /api/v1/til-templates/{templateId}  → 204
-export function deleteTemplate(templateId) {
-  return request(`/api/v1/til-templates/${templateId}`, { method: 'DELETE' });
+export async function deleteTemplate(templateId) {
+  await request(`/api/v1/til-templates/${templateId}`, { method: 'DELETE' });
 }

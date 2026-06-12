@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, TILS } from './data.jsx';
 import { harvestPot, getGardenState, updateGardenTheme, updateGardenLayout } from './api/garden.js';
 import { createPot, deletePot, getGardenDashboard, getPots, updatePot } from './api/pot.js';
-import { getMyTils, getTil } from './api/til.js';
+import { getMyTils, getTil, deleteTil } from './api/til.js';
 import { useUser } from './context/UserContext.jsx';
 import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
@@ -2029,6 +2029,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   const [tilPage, setTilPage] = useState(0);
   const [tilPageSize, setTilPageSize] = useState(10);
   const [tilTotalPages, setTilTotalPages] = useState(0);
+  const [tilsRefreshKey, setTilsRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!potId) return;
@@ -2085,7 +2086,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
     return () => {
       active = false;
     };
-  }, [potId, user?.userId, refreshKey, tilPage, tilPageSize]);
+  }, [potId, user?.userId, refreshKey, tilPage, tilPageSize, tilsRefreshKey]);
 
   useEffect(() => {
     if (!selectedTil) return;
@@ -2097,6 +2098,11 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
       document.body.style.overflow = previousOverflow;
     };
   }, [selectedTil]);
+
+  const refreshDashboard = useCallback(async () => {
+    const updatedDashboard = await getGardenDashboard(potId);
+    setDashboard(updatedDashboard);
+  }, [potId]);
 
   const pot = dashboard ? toDashboardPot(dashboard) : fallbackPot;
 
@@ -2185,10 +2191,22 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
       potId: til.potId ?? pot.id,
     });
   };
+  const handleDeleteTil = async () => {
+    if (!selectedTil?.id) return;
+    await deleteTil(selectedTil.id);
+    setSelectedTil(null);
+    setTilPage(0);
+    setTilsRefreshKey(k => k + 1);
+    try {
+      await refreshDashboard();
+    } catch (err) {
+      console.error('dashboard 갱신 실패:', err);
+      // 목록은 이미 갱신됐으므로 사용자에게 별도 에러를 노출하지 않음
+    }
+  };
   const handleHarvested = async () => {
     try {
-      const updatedDashboard = await getGardenDashboard(pot.id);
-      setDashboard(updatedDashboard);
+      await refreshDashboard();
     } catch {
       setDashboardError('수확 후 화분 정보를 다시 불러오지 못했어요. 새로고침 후 확인해 주세요.');
     }
@@ -2489,6 +2507,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
           loading={tilDetailLoading}
           onClose={() => setSelectedTil(null)}
           onEdit={() => handleEditTil(selectedTil)}
+          onDelete={handleDeleteTil}
         />
       )}
       {showEditPot && (
@@ -2506,8 +2525,29 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   );
 }
 
-function TilDetailModal({ til, loading, onClose, onEdit }) {
+function TilDetailModal({ til, loading, onClose, onEdit, onDelete }) {
   const contentHtml = til.content?.trim();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  const handleDeleteConfirm = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await onDelete();
+    } catch (err) {
+      setDeleteError(err?.body?.message ?? 'TIL을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
+      setDeleting(false);
+    }
+  };
+
+  const handleClose = () => {
+    if (deleting) return;
+    setConfirmDelete(false);
+    setDeleteError(null);
+    onClose();
+  };
 
   return (
     <div style={{
@@ -2521,7 +2561,7 @@ function TilDetailModal({ til, loading, onClose, onEdit }) {
       backdropFilter: 'blur(4px)',
       padding: 24,
       overscrollBehavior: 'contain',
-    }} onClick={onClose}>
+    }} onClick={handleClose}>
       <div onClick={e => e.stopPropagation()} style={{
         width: 'min(760px, 100%)',
         height: 'min(720px, calc(100vh - 48px))',
@@ -2574,7 +2614,7 @@ function TilDetailModal({ til, loading, onClose, onEdit }) {
                 )}
               </div>
             </div>
-            <button type="button" onClick={onClose} style={{
+            <button type="button" onClick={handleClose} style={{
               width: 34,
               height: 34,
               borderRadius: 10,
@@ -2632,19 +2672,55 @@ function TilDetailModal({ til, loading, onClose, onEdit }) {
         </div>
 
         <div style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: 10,
-          padding: '16px 22px',
           borderTop: '0.5px solid var(--rule)',
           background: 'var(--paper)',
         }}>
-          <Btn type="button" variant="secondary" size="md" onClick={onClose}>
-            닫기
-          </Btn>
-          <Btn type="button" variant="green" size="md" icon={Icon.edit} onClick={onEdit}>
-            수정하기
-          </Btn>
+          {confirmDelete && (
+            <div style={{
+              padding: '12px 22px',
+              background: '#fff3f5',
+              borderBottom: '0.5px solid #f7c1c1',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+            }}>
+              <span style={{ fontSize: 13, color: '#b8536a', fontWeight: 500 }}>
+                이 TIL을 정말 삭제할까요? 삭제 후에는 복구할 수 없어요.
+              </span>
+              {deleteError && (
+                <span style={{ fontSize: 12, color: '#b8536a' }}>{deleteError}</span>
+              )}
+              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                <Btn type="button" variant="secondary" size="sm" onClick={() => { setConfirmDelete(false); setDeleteError(null); }} disabled={deleting}>
+                  취소
+                </Btn>
+                <Btn type="button" variant="danger" size="sm" onClick={handleDeleteConfirm} disabled={deleting}>
+                  {deleting ? '삭제 중...' : '삭제 확인'}
+                </Btn>
+              </div>
+            </div>
+          )}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 10,
+            padding: '16px 22px',
+          }}>
+            <Btn type="button" variant="danger" size="md" onClick={() => setConfirmDelete(true)} disabled={loading || confirmDelete || deleting}>
+              삭제
+            </Btn>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <Btn type="button" variant="secondary" size="md" onClick={handleClose} disabled={deleting}>
+                닫기
+              </Btn>
+              <Btn type="button" variant="green" size="md" icon={Icon.edit} onClick={onEdit} disabled={loading || deleting}>
+                수정하기
+              </Btn>
+            </div>
+          </div>
         </div>
       </div>
     </div>

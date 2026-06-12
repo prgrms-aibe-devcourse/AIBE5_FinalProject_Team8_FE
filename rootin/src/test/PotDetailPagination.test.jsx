@@ -21,6 +21,7 @@ vi.mock('../api/garden.js', () => ({
 vi.mock('../api/til.js', () => ({
   getMyTils: vi.fn(),
   getTil: vi.fn(),
+  deleteTil: vi.fn(),
 }));
 
 // 테스트용 대시보드 fixture

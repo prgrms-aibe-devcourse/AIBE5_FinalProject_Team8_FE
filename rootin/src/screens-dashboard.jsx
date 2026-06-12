@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, Pill, Btn, StatTile, SectionHeader, Icon } from './ui.jsx';
 import { Plant } from './plants.jsx';
 import { getSummary, getGrass, getWeekly, getDistribution, getInterests, getQuests } from './api/dashboard.js';
@@ -6,21 +6,36 @@ import { getPointSummary } from './api/points.js';
 
 // ─── 변환 유틸 ────────────────────────────────────────────────
 
+const GRASS_WEEKS = 52;
+const STREAK_CHAR_COUNT_CAP = 1200;
+const STREAK_MAX_BAR_HEIGHT = 82;
+
+function getGrassStartDate(referenceDate = new Date(), weeks = GRASS_WEEKS) {
+  const start = new Date(referenceDate);
+  start.setDate(referenceDate.getDate() - referenceDate.getDay() - (weeks - 1) * 7);
+  return start;
+}
+
+function buildGrassState(cells = []) {
+  const startDate = getGrassStartDate();
+  return {
+    grid: buildGrassGrid(cells, startDate),
+    startDate,
+  };
+}
+
 // BE cells([{date, tilCount, charCount, level}]) → 52주×7일 2D 배열 (0~4) — 항상 1년 고정
-function buildGrassGrid(cells = []) {
+function buildGrassGrid(cells = [], startDate = getGrassStartDate()) {
   const levelMap = {};
-  cells.forEach(c => { levelMap[c.date] = c.level; });
+  cells.forEach(c => {
+    levelMap[String(c.date ?? '').slice(0, 10)] = c.level;
+  });
 
-  const WEEKS = 52;
-  const today = new Date();
-  const start = new Date(today);
-  start.setDate(today.getDate() - today.getDay() - (WEEKS - 1) * 7);
-
-  return Array.from({ length: WEEKS }, (_, w) =>
+  return Array.from({ length: GRASS_WEEKS }, (_, w) =>
     Array.from({ length: 7 }, (_, d) => {
-      const dt = new Date(start);
-      dt.setDate(start.getDate() + w * 7 + d);
-      return levelMap[dt.toISOString().split('T')[0]] ?? 0;
+      const dt = new Date(startDate);
+      dt.setDate(startDate.getDate() + w * 7 + d);
+      return levelMap[formatDateKey(dt)] ?? 0;
     })
   );
 }
@@ -36,17 +51,14 @@ function transformWeekly(weeklyData = []) {
 
 // ─── 컴포넌트 ──────────────────────────────────────────────────
 
-function GrassGraph({ data }) {
+function GrassGraph({ data, startDate }) {
   const colors = ['#eef2ee', '#cfe8d6', '#9dd0b0', '#5fb088', '#2e6b48'];
   const weekDays = ['', '월', '', '수', '', '금', ''];
   const cellSize = 14;
   const gap = 4;
 
   // 각 주(column)의 시작일로 월 레이블 계산
-  const WEEKS = data.length;
-  const today = new Date();
-  const start = new Date(today);
-  start.setDate(today.getDate() - today.getDay() - (WEEKS - 1) * 7);
+  const start = new Date(startDate ?? getGrassStartDate(new Date(), data.length || GRASS_WEEKS));
   const monthLabels = data.map((_, w) => {
     const cur = new Date(start);
     cur.setDate(start.getDate() + w * 7);
@@ -102,21 +114,125 @@ function GrassGraph({ data }) {
   );
 }
 
-function StreakChart() {
-  const days = [];
-  for (let i = 0; i < 21; i++) {
-    const active = i >= 9;
-    days.push({ active, h: active ? 18 + Math.sin(i * 0.8) * 6 + ((i * 7 + 3) % 8) : 0 });
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatShortDate(dateKey) {
+  const [, month, day] = dateKey.split('-');
+  return `${month}.${day}`;
+}
+
+function buildRecentStreakDays(cells = [], maxDays = 30) {
+  const cellMap = new Map(
+    cells.map(cell => [String(cell.date ?? '').slice(0, 10), {
+      tilCount: Number(cell.tilCount) || 0,
+      charCount: Number(cell.charCount) || 0,
+      level: Number(cell.level) || 0,
+    }])
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: maxDays }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (maxDays - 1 - index));
+    const dateKey = formatDateKey(date);
+    const record = cellMap.get(dateKey) ?? { tilCount: 0, charCount: 0 };
+
+    return {
+      date: dateKey,
+      tilCount: record.tilCount,
+      charCount: record.charCount,
+      active: record.level > 0 || record.tilCount > 0 || record.charCount > 0,
+    };
+  });
+}
+
+function calculateCurrentStreakFromCells(cells = []) {
+  const activeDates = new Set(
+    cells
+      .filter(cell =>
+        (Number(cell.level) || 0) > 0 ||
+        (Number(cell.tilCount) || 0) > 0 ||
+        (Number(cell.charCount) || 0) > 0
+      )
+      .map(cell => String(cell.date ?? '').slice(0, 10))
+      .filter(Boolean)
+  );
+
+  if (activeDates.size === 0) return 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cursor = new Date(today);
+
+  if (!activeDates.has(formatDateKey(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
   }
+
+  let count = 0;
+
+  while (activeDates.has(formatDateKey(cursor))) {
+    count += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return count;
+}
+
+function StreakActivityChart({ days }) {
+  const maxCharCount = Math.max(...days.map(day => Math.min(day.charCount, STREAK_CHAR_COUNT_CAP)), 1);
+  const todayKey = formatDateKey(new Date());
+  const minActiveBarHeight = 9;
+
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 60 }}>
-      {days.map((d, i) => (
-        <div key={i} style={{
-          flex: 1, height: d.active ? `${d.h + 18}px` : '4px',
-          background: d.active ? 'linear-gradient(180deg, #3d8b5e, #2e6b48)' : 'var(--rule)',
-          borderRadius: 3, opacity: d.active ? 1 : 0.6,
-        }} />
-      ))}
+    <div style={{
+      marginTop: 14,
+      padding: '13px 12px 9px',
+      borderRadius: 16,
+      background: 'linear-gradient(180deg, #fbfaf6 0%, #f4f7f0 100%)',
+      border: '0.5px solid var(--rule)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 11.5, color: 'var(--ink-2)', fontWeight: 600 }}>최근 30일 작성량</span>
+        <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>글자수 기준</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 104 }}>
+        {days.map(day => {
+          const cappedCharCount = Math.min(day.charCount, STREAK_CHAR_COUNT_CAP);
+          const ratio = cappedCharCount / maxCharCount;
+          const height = day.active
+            ? Math.max(minActiveBarHeight, Math.round(Math.sqrt(ratio) * STREAK_MAX_BAR_HEIGHT))
+            : 4;
+          const isToday = day.date === todayKey;
+
+          return (
+            <div
+              key={day.date}
+              title={`${formatShortDate(day.date)} · ${day.charCount.toLocaleString()}자`}
+              style={{
+                flex: 1,
+                height,
+                minWidth: 0,
+                borderRadius: day.active ? '5px 5px 2px 2px' : 3,
+                background: day.active ? 'linear-gradient(180deg, #3d8b5e, #2e6b48)' : 'var(--rule)',
+                opacity: day.active ? 1 : 0.65,
+                outline: isToday && day.active ? '1px solid rgba(46, 107, 72, 0.28)' : 'none',
+                outlineOffset: 2,
+              }}
+            />
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+        <span>30일 전</span>
+        <span>오늘</span>
+      </div>
     </div>
   );
 }
@@ -124,10 +240,10 @@ function StreakChart() {
 function WeeklyBar({ weekly }) {
   const max = Math.max(...weekly.map(w => w.count), 1);
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, height: 130 }}>
-      {weekly.map((w, i) => (
-        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%' }}>
-          <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, height: 166, marginTop: 'auto', paddingTop: 14 }}>
+      {weekly.map(w => (
+        <div key={w.day} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%' }}>
+          <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid var(--rule)' }}>
             <div style={{
               width: '100%',
               height: `${(w.count / max) * 100}%`,
@@ -151,49 +267,127 @@ function WeeklyBar({ weekly }) {
 }
 
 function PotDistribution({ distribution }) {
+  const emptyState = (
+    <div style={{
+      minHeight: 150,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      border: '0.5px dashed var(--rule-2)',
+      borderRadius: 14,
+      background: 'linear-gradient(180deg, #fbfaf6 0%, #f6f4ed 100%)',
+      color: 'var(--ink-3)',
+      padding: '22px 18px',
+    }}>
+      <div style={{ fontSize: 24, marginBottom: 8 }}>🌱</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--ink-2)' }}>
+        아직 주제 비율이 없어요
+      </div>
+      <div style={{ marginTop: 6, fontSize: 12.5, lineHeight: 1.5 }}>
+        화분에 TIL을 작성하면<br />주제별 비율이 이곳에 표시됩니다.
+      </div>
+    </div>
+  );
+
   if (!distribution || distribution.length === 0) {
-    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>TIL 데이터가 없습니다.</div>;
+    return emptyState;
   }
-  const total = distribution.reduce((s, p) => s + p.tilCount, 0);
+
+  const normalizePotName = name => {
+    const value = String(name ?? '').trim();
+    if (!value || value === 'undefined' || value === 'null') return '이름 없는 화분';
+    return value;
+  };
+
+  const positiveDistribution = distribution
+    .map(p => ({
+      ...p,
+      potName: normalizePotName(p.potName),
+      tilCount: Number(p.tilCount) || 0,
+      ratio: Number(p.ratio) || 0,
+    }))
+    .filter(p => p.tilCount > 0)
+    .sort((a, b) => b.tilCount - a.tilCount || b.ratio - a.ratio);
+
+  if (positiveDistribution.length === 0) {
+    return emptyState;
+  }
+
+  const visiblePots = positiveDistribution.slice(0, 5);
+  const hiddenPots = positiveDistribution.slice(5);
+  const total = positiveDistribution.reduce((s, p) => s + p.tilCount, 0);
+  const hiddenTilCount = hiddenPots.reduce((s, p) => s + p.tilCount, 0);
+  const formatRatio = count => {
+    const ratio = total > 0 ? (count / total) * 100 : 0;
+    return Number.isInteger(ratio) ? String(ratio) : ratio.toFixed(1).replace(/\.0$/, '');
+  };
+  const displayDistribution = hiddenTilCount > 0
+    ? [
+        ...visiblePots,
+        {
+          potId: '__others__',
+          potName: '기타',
+          tilCount: hiddenTilCount,
+        },
+      ]
+    : visiblePots;
+
   let acc = 0;
-  const segs = distribution.map(p => {
+  const segs = displayDistribution.map(p => {
     const pct = total > 0 ? p.tilCount / total : 0;
     const start = acc;
     acc += pct;
-    return { ...p, pct, start };
+    return { ...p, ratio: formatRatio(p.tilCount), pct, start };
   });
   const R = 56;
   const circumference = 2 * Math.PI * R;
-  const colors = ['var(--ink)', 'var(--moss)', 'var(--amber)', 'var(--leaf)'];
+  const hasHiddenItems = hiddenPots.length > 0;
+  const colors = ['#1f4f3a', '#2563eb', '#d97706', '#7c3aed', '#db2777', '#9ca3af'];
+  const getSegmentKey = (segment, index) => segment.potId ?? `${segment.potName}-${index}`;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-      <svg width="140" height="140" viewBox="0 0 140 140">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+      <svg width="144" height="144" viewBox="0 0 140 140" style={{ flex: '0 0 144px' }}>
         <circle cx="70" cy="70" r={R} fill="none" stroke="var(--rule)" strokeWidth="14" />
         {segs.map((s, i) => {
           const len = s.pct * circumference;
           const dash = `${len} ${circumference - len}`;
           const offset = -s.start * circumference;
           return (
-            <circle key={s.potId} cx="70" cy="70" r={R} fill="none"
-              stroke={colors[i % 4]} strokeWidth="14"
+            <circle key={getSegmentKey(s, i)} cx="70" cy="70" r={R} fill="none"
+              stroke={colors[i % colors.length]} strokeWidth="14"
               strokeDasharray={dash} strokeDashoffset={offset}
               transform="rotate(-90 70 70)" strokeLinecap="butt"
             />
           );
         })}
         <text x="70" y="68" textAnchor="middle" style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, fill: 'var(--ink)' }}>{total}</text>
-        <text x="70" y="84" textAnchor="middle" style={{ fontFamily: 'var(--font-body)', fontSize: 10, fill: 'var(--ink-3)' }}>총 TIL</text>
+        <text x="70" y="84" textAnchor="middle" style={{ fontFamily: 'var(--font-body)', fontSize: 10, fill: 'var(--ink-3)' }}>{hasHiddenItems ? 'TOP 5+' : '총 TIL'}</text>
       </svg>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {segs.map((s, i) => (
-          <div key={s.potId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 3, background: colors[i % 4] }} />
-            <span style={{ color: 'var(--ink)' }}>{s.potName}</span>
-            <span style={{ marginLeft: 'auto', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+          <div key={getSegmentKey(s, i)} style={{ display: 'grid', gridTemplateColumns: '12px minmax(0, 1fr) auto', alignItems: 'center', gap: 10, fontSize: 14 }}>
+            <div style={{ width: 11, height: 11, borderRadius: 3, background: colors[i % colors.length] }} />
+            <span title={s.potName} style={{
+              color: 'var(--ink)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+            }}>
+              {s.potName}
+            </span>
+            <span style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 12.5, whiteSpace: 'nowrap' }}>
               {s.tilCount}개 · {s.ratio}%
             </span>
           </div>
         ))}
+        {hasHiddenItems && (
+          <div style={{ marginTop: 2, fontSize: 11.5, color: 'var(--ink-3)' }}>
+            상위 {visiblePots.length}개 화분과 기타 항목을 표시해요.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -206,43 +400,46 @@ const W = 700, H = 220;
 const PAD = { top: 14, right: 16, bottom: 36, left: 40 };
 const normalizeTag = tag => String(tag ?? '').trim();
 
-function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
+function InterestStackedAreaChart({ interests }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [hiddenTags, setHiddenTags] = useState(new Set());
 
-  // 데이터가 아예 없거나 빈 배열일 때의 방어 처리
-  if (!interests || interests.length === 0) {
-    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>관심사 데이터가 없습니다.</div>;
+  const emptyState = (title, description) => (
+    <div style={{
+      minHeight: 278,
+      border: '1px solid var(--line)',
+      borderRadius: 8,
+      background: 'linear-gradient(180deg, rgba(233, 245, 235, 0.8), rgba(255, 255, 255, 0.9))',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      padding: 28,
+    }}>
+      <div>
+        <div style={{ fontSize: 30, marginBottom: 10 }}>🌱</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
+          {title}
+        </div>
+        <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+          {description}
+        </div>
+      </div>
+    </div>
+  );
+
+  // 데이터가 없거나 1개월뿐이면 변화 추이를 비교할 수 없으므로 같은 안내 화면을 보여줍니다.
+  if (!interests || interests.length < 2) {
+    return emptyState(
+      '아직 흐름을 비교하기엔 기록이 조금 부족해요.',
+      <>
+        2개월 이상 TIL을 쌓으면<br />
+        학습 주제가 어떻게 변했는지 보여드릴게요.
+      </>
+    );
   }
 
   const n = interests.length;
-
-  if (n < 2) {
-    return (
-      <div style={{
-        minHeight: 278,
-        border: '1px solid var(--line)',
-        borderRadius: 8,
-        background: 'linear-gradient(180deg, rgba(233, 245, 235, 0.8), rgba(255, 255, 255, 0.9))',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        padding: 28,
-      }}>
-        <div>
-          <div style={{ fontSize: 30, marginBottom: 10 }}>🌱</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink)', marginBottom: 6 }}>
-            아직 흐름을 비교하기엔 기록이 조금 부족해요.
-          </div>
-          <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-            2개월 이상 TIL을 쌓으면<br />
-            학습 주제가 어떻게 변했는지 보여드릴게요.
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // 1. 상위 5개 태그 추출 및 'undefined' 방어 처리
   const tagTotals = {};
@@ -266,7 +463,13 @@ function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
     .map(([tag]) => tag);
 
   if (topTags.length === 0) {
-    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>표시할 학습 주제 데이터가 없습니다.</div>;
+    return emptyState(
+      '아직 흐름을 비교하기엔 기록이 조금 부족해요.',
+      <>
+        2개월 이상 TIL을 쌓으면<br />
+        학습 주제가 어떻게 변했는지 보여드릴게요.
+      </>
+    );
   }
 
   // 월별 라벨 추출 (예: '2026-05' -> '05월')
@@ -597,7 +800,8 @@ function GoalRow({ goal }) {
 
 function DashboardScreen({ onNav }) {
   const [summary, setSummary]           = useState(null);
-  const [grassGrid, setGrassGrid]       = useState(buildGrassGrid([]));
+  const [grassState, setGrassState]     = useState(() => buildGrassState([]));
+  const [grassCells, setGrassCells]     = useState([]);
   const [weekly, setWeekly]             = useState([]);
   const [distribution, setDistribution] = useState([]);
   const [interests, setInterests]           = useState([]);
@@ -608,15 +812,21 @@ function DashboardScreen({ onNav }) {
   // 잔디 — 항상 1년치 데이터
   useEffect(() => {
     getGrass(12).then(data => {
-      setGrassGrid(buildGrassGrid(data?.cells ?? []));
-    }).catch(() => {});
+      const cells = data?.cells ?? [];
+      setGrassState(buildGrassState(cells));
+      setGrassCells(cells);
+    }).catch(error => {
+      console.error('잔디 그래프 조회 중 오류 발생:', error);
+    });
   }, []);
 
   // 관심사 기간 변경 시 재요청
   useEffect(() => {
     getInterests(interestMonths).then(data => {
       setInterests(data?.interests ?? []);
-    }).catch(() => {});
+    }).catch(error => {
+      console.error('시기별 학습 주제 흐름 조회 중 오류 발생:', error);
+    });
   }, [interestMonths]);
 
   useEffect(() => {
@@ -660,7 +870,11 @@ function DashboardScreen({ onNav }) {
     return () => { active = false; };
   }, []);
 
-  const streak     = summary?.currentStreak  ?? 0;
+  const recentStreakDays = useMemo(() => buildRecentStreakDays(grassCells, 30), [grassCells]);
+  const fallbackStreak = useMemo(() => calculateCurrentStreakFromCells(grassCells), [grassCells]);
+  const apiStreak  = summary?.currentStreak  ?? 0;
+  // API 캐시가 늦게 갱신될 수 있어 잔디 셀 기반 로컬 계산값으로 현재 스트릭을 보정합니다.
+  const streak     = Math.max(apiStreak, fallbackStreak);
   const bestStreak = summary?.longestStreak  ?? 0;
   const totalTil   = summary?.totalTilCount  ?? 0;
   const totalChar  = summary?.totalCharCount ?? 0;
@@ -703,7 +917,7 @@ function DashboardScreen({ onNav }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
         <Card padding={22}>
           <SectionHeader eyebrow="활동" title="잔디 그래프" />
-          <GrassGraph data={grassGrid} />
+          <GrassGraph data={grassState.grid} startDate={grassState.startDate} />
         </Card>
 
         <Card padding={22}>
@@ -725,15 +939,13 @@ function DashboardScreen({ onNav }) {
       {/* 3 column stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         <Card padding={22}>
-          <SectionHeader eyebrow="연속 기록" title="Streak" action={<Pill tone="green">최고 {bestStreak}일</Pill>} />
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, color: 'var(--moss-2)', letterSpacing: '-0.03em' }}>{streak}</span>
-            <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>일째</span>
-          </div>
-          <StreakChart />
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-            <span>−21d</span><span>오늘</span>
-          </div>
+          <SectionHeader eyebrow="연속 기록" title="Streak" action={
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <Pill tone="green">현재 {streak}일째</Pill>
+              <Pill tone="green">최고 {bestStreak}일</Pill>
+            </div>
+          } />
+          <StreakActivityChart days={recentStreakDays} />
         </Card>
 
         <Card padding={22}>
@@ -741,7 +953,7 @@ function DashboardScreen({ onNav }) {
           <PotDistribution distribution={distribution} />
         </Card>
 
-        <Card padding={22}>
+        <Card padding={22} style={{ display: 'flex', flexDirection: 'column' }}>
           <SectionHeader eyebrow="이번 주" title="요일별 작성" />
           <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />
         </Card>
@@ -762,7 +974,7 @@ function DashboardScreen({ onNav }) {
             ))}
           </div>
         } />
-        <InterestStackedAreaChart interests={interests} months={interestMonths} onMonthsChange={setInterestMonths} />
+        <InterestStackedAreaChart interests={interests} />
       </Card>
 
     </div>

@@ -6,22 +6,19 @@ import { getPointSummary } from './api/points.js';
 
 // ─── 변환 유틸 ────────────────────────────────────────────────
 
-// months → 주 수 (3개월≈13주, 6개월≈26주, 1년≈52주)
-const MONTHS_TO_WEEKS = { 3: 13, 6: 26, 12: 52 };
-
-// BE cells([{date, tilCount, charCount, level}]) → N주×7일 2D 배열 (0~4)
-function buildGrassGrid(cells = [], months = 3) {
+// BE cells([{date, tilCount, charCount, level}]) → 52주×7일 2D 배열 (0~4) — 항상 1년 고정
+function buildGrassGrid(cells = []) {
   const levelMap = {};
   cells.forEach(c => {
     levelMap[String(c.date ?? '').slice(0, 10)] = c.level;
   });
 
-  const weeks = MONTHS_TO_WEEKS[months] ?? 13;
+  const WEEKS = 52;
   const today = new Date();
   const start = new Date(today);
-  start.setDate(today.getDate() - today.getDay() - (weeks - 1) * 7);
+  start.setDate(today.getDate() - today.getDay() - (WEEKS - 1) * 7);
 
-  return Array.from({ length: weeks }, (_, w) =>
+  return Array.from({ length: WEEKS }, (_, w) =>
     Array.from({ length: 7 }, (_, d) => {
       const dt = new Date(start);
       dt.setDate(start.getDate() + w * 7 + d);
@@ -44,34 +41,61 @@ function transformWeekly(weeklyData = []) {
 function GrassGraph({ data }) {
   const colors = ['#eef2ee', '#cfe8d6', '#9dd0b0', '#5fb088', '#2e6b48'];
   const weekDays = ['', '월', '', '수', '', '금', ''];
-  const cellSize = 12;
-  const gap = 3;
+  const cellSize = 14;
+  const gap = 4;
+
+  // 각 주(column)의 시작일로 월 레이블 계산
+  const WEEKS = data.length;
+  const today = new Date();
+  const start = new Date(today);
+  start.setDate(today.getDate() - today.getDay() - (WEEKS - 1) * 7);
+  const monthLabels = data.map((_, w) => {
+    const cur = new Date(start);
+    cur.setDate(start.getDate() + w * 7);
+    if (w === 0) return (cur.getMonth() + 1) + '월';
+    const prev = new Date(start);
+    prev.setDate(start.getDate() + (w - 1) * 7);
+    return cur.getMonth() !== prev.getMonth() ? (cur.getMonth() + 1) + '월' : null;
+  });
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap, fontFamily: 'var(--font-display)', fontSize: 9, color: 'var(--ink-3)', marginTop: 1 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {/* 요일 레이블 — 월 레이블 행 높이(20px)만큼 상단 패딩 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap, fontFamily: 'var(--font-body)', fontSize: 10.5, fontWeight: 500, color: 'var(--ink-3)', paddingTop: 20 }}>
           {weekDays.map((d, i) => (
-            <div key={i} style={{ width: 14, height: cellSize, lineHeight: `${cellSize}px` }}>{d}</div>
+            <div key={i} style={{ width: 16, height: cellSize, lineHeight: `${cellSize}px` }}>{d}</div>
           ))}
         </div>
-        <div style={{ display: 'flex', gap }}>
-          {data.map((week, wi) => (
-            <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap }}>
-              {week.map((v, di) => (
-                <div key={di} style={{
-                  width: cellSize, height: cellSize, borderRadius: 3,
-                  background: colors[v],
-                  border: v === 0 ? '0.5px solid var(--rule)' : 'none',
-                }} />
-              ))}
-            </div>
-          ))}
+        <div>
+          {/* 월 레이블 행 */}
+          <div style={{ display: 'flex', gap, marginBottom: 5 }}>
+            {monthLabels.map((label, wi) => (
+              <div key={wi} style={{ width: cellSize, fontSize: 10.5, fontFamily: 'var(--font-body)', fontWeight: 500, color: 'var(--ink-2)', overflow: 'visible', whiteSpace: 'nowrap' }}>
+                {label}
+              </div>
+            ))}
+          </div>
+          {/* 잔디 그리드 */}
+          <div style={{ display: 'flex', gap }}>
+            {data.map((week, wi) => (
+              <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap }}>
+                {week.map((v, di) => (
+                  <div key={di} style={{
+                    width: cellSize, height: cellSize, borderRadius: 3,
+                    background: colors[v],
+                    border: v === 0 ? '0.5px solid var(--rule)' : 'none',
+                  }} />
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, fontFamily: 'var(--font-display)', fontSize: 10.5, color: 'var(--ink-3)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, fontFamily: 'var(--font-body)', fontSize: 11.5, fontWeight: 500, color: 'var(--ink-2)' }}>
         <span>적음</span>
         {colors.map((c, i) => (
-          <div key={i} style={{ width: 11, height: 11, borderRadius: 2.5, background: c, border: i === 0 ? '0.5px solid var(--rule)' : 'none' }} />
+          <div key={i} style={{ width: 12, height: 12, borderRadius: 3, background: c, border: i === 0 ? '0.5px solid var(--rule)' : 'none' }} />
         ))}
         <span>많음</span>
         <span style={{ marginLeft: 'auto', color: 'var(--ink-2)' }}>글자수로 농도 표현</span>
@@ -768,8 +792,7 @@ function GoalRow({ goal }) {
 
 function DashboardScreen({ onNav }) {
   const [summary, setSummary]           = useState(null);
-  const [grassMonths, setGrassMonths]   = useState(3);
-  const [grassGrid, setGrassGrid]       = useState(buildGrassGrid([], 3));
+  const [grassGrid, setGrassGrid]       = useState(buildGrassGrid([]));
   const [grassCells, setGrassCells]     = useState([]);
   const [weekly, setWeekly]             = useState([]);
   const [distribution, setDistribution] = useState([]);
@@ -778,16 +801,16 @@ function DashboardScreen({ onNav }) {
   const [quests, setQuests]                 = useState(null);
   const [currentPoint, setCurrentPoint]     = useState(0);
 
-  // 잔디 기간 변경 시 재요청
+  // 잔디 — 항상 1년치 데이터
   useEffect(() => {
-    getGrass(grassMonths).then(data => {
+    getGrass(12).then(data => {
       const cells = data?.cells ?? [];
-      setGrassGrid(buildGrassGrid(cells, grassMonths));
+      setGrassGrid(buildGrassGrid(cells));
       setGrassCells(cells);
     }).catch(error => {
       console.error('잔디 그래프 조회 중 오류 발생:', error);
     });
-  }, [grassMonths]);
+  }, []);
 
   // 관심사 기간 변경 시 재요청
   useEffect(() => {
@@ -882,19 +905,7 @@ function DashboardScreen({ onNav }) {
       {/* Grass + Today goals */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
         <Card padding={22}>
-          <SectionHeader eyebrow="활동" title="잔디 그래프" action={
-            <div style={{ display: 'flex', gap: 4 }}>
-              {[['3개월', 3], ['6개월', 6], ['1년', 12]].map(([label, m]) => (
-                <button key={m} onClick={() => setGrassMonths(m)} style={{
-                  padding: '5px 10px', fontSize: 11.5, borderRadius: 7,
-                  background: grassMonths === m ? 'var(--ink)' : 'transparent',
-                  color: grassMonths === m ? '#fff' : 'var(--ink-2)',
-                  border: grassMonths === m ? 'none' : '0.5px solid var(--rule-2)',
-                  fontFamily: 'var(--font-display)', fontWeight: 500, cursor: 'pointer',
-                }}>{label}</button>
-              ))}
-            </div>
-          } />
+          <SectionHeader eyebrow="활동" title="잔디 그래프" />
           <GrassGraph data={grassGrid} />
         </Card>
 

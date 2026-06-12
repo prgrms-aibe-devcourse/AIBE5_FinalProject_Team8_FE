@@ -523,18 +523,27 @@ function PotCard({ pot, onClick }) {
         )}
       </div>
 
-      <div style={{
-        height: 132,
-        background: rare
-          ? 'radial-gradient(ellipse at center bottom, rgba(168, 197, 235, 0.5), transparent 70%)'
-          : 'radial-gradient(ellipse at center bottom, rgba(168, 213, 181, 0.4), transparent 70%)',
-        display: 'flex', justifyContent: 'center', alignItems: 'flex-end',
-        borderRadius: 10,
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 18, height: 1, background: 'linear-gradient(90deg, transparent, var(--leaf), transparent)' }} />
-        <div style={{ paddingBottom: 6 }}>
+      <div style={{ height: 132, position: 'relative' }}>
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: rare
+            ? 'radial-gradient(ellipse at center bottom, rgba(168, 197, 235, 0.5), transparent 70%)'
+            : 'radial-gradient(ellipse at center bottom, rgba(168, 213, 181, 0.4), transparent 70%)',
+          borderRadius: 10,
+          overflow: 'hidden',
+        }}>
+          <div style={{ position: 'absolute', left: 0, right: 0, bottom: 18, height: 1, background: 'linear-gradient(90deg, transparent, var(--leaf), transparent)' }} />
+        </div>
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          justifyContent: 'center',
+          paddingBottom: 6,
+        }}>
           <PottedPlant species={pot.species} stage={stage} size={112} potLevel={pot.level} />
         </div>
       </div>
@@ -1811,7 +1820,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
       </div>
       <Card padding={0} style={{ overflow: 'hidden' }}>
         <div style={{
-          padding: '34px 24px 24px',
+          padding: '60px 24px 24px',
           background: isRare
             ? 'linear-gradient(180deg, #d8e2f0 0%, #f5f7f5 80%)'
             : 'linear-gradient(180deg, #d4ebdc 0%, #f5f7f5 80%)',

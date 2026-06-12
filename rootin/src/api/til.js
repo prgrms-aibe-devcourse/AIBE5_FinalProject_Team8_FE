@@ -14,20 +14,21 @@ export async function createTil({ title, content, potId, tags }) {
   return res.data;
 }
 
-// GET /api/v1/tils/me?potId=&page=&size=&sort=
+// GET /api/v1/tils/me?potId=&page=&size=&sort=&keyword=&tag=
 // 내 발행 완료 TIL 목록을 조회합니다. potId를 넘기면 특정 화분의 TIL만 가져옵니다.
-export async function getMyTils({ potId, page = 0, size = 10, sort = 'latest' } = {}) {
+// keyword, tag는 BE 구현 후 서버사이드 필터링에 연결 예정
+export async function getMyTils({ potId, page = 0, size = 10, sort = 'latest', keyword, tag, signal } = {}) {
   const params = new URLSearchParams({
     page: String(page),
     size: String(size),
     sort,
   });
 
-  if (potId != null) {
-    params.set('potId', String(potId));
-  }
+  if (potId != null) params.set('potId', String(potId));
+  if (keyword)       params.set('keyword', keyword);
+  if (tag)           params.set('tag', tag);
 
-  const res = await request(`/api/v1/tils/me?${params.toString()}`);
+  const res = await request(`/api/v1/tils/me?${params.toString()}`, { signal });
   return res.data;
 }
 

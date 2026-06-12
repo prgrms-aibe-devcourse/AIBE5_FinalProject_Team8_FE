@@ -2186,6 +2186,11 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
       potId: til.potId ?? pot.id,
     });
   };
+  const refreshDashboard = useCallback(async () => {
+    const updatedDashboard = await getGardenDashboard(pot.id);
+    setDashboard(updatedDashboard);
+  }, [pot.id]);
+
   const handleDeleteTil = async () => {
     if (!selectedTil?.id) return;
     await deleteTil(selectedTil.id);
@@ -2193,16 +2198,15 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
     setTilPage(0);
     setTilsRefreshKey(k => k + 1);
     try {
-      const updatedDashboard = await getGardenDashboard(pot.id);
-      setDashboard(updatedDashboard);
-    } catch {
-      // dashboard 갱신 실패해도 목록은 이미 갱신됐으므로 무시
+      await refreshDashboard();
+    } catch (err) {
+      console.error('dashboard 갱신 실패:', err);
+      // 목록은 이미 갱신됐으므로 사용자에게 별도 에러를 노출하지 않음
     }
   };
   const handleHarvested = async () => {
     try {
-      const updatedDashboard = await getGardenDashboard(pot.id);
-      setDashboard(updatedDashboard);
+      await refreshDashboard();
     } catch {
       setDashboardError('수확 후 화분 정보를 다시 불러오지 못했어요. 새로고침 후 확인해 주세요.');
     }

@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { POTS } from './data.jsx';
 import { getPlants } from './api/collection.js';
 import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
@@ -9,10 +8,8 @@ import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens
 import { LandingScreen } from './screens-landing.jsx';
 import { NotFoundScreen } from './screens-error.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb';
-import { Separator } from '@/components/ui/separator';
-import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { GameBoySidebar } from '@/components/GameBoySidebar.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
 import { TilEditorProvider } from '@/components/til/til-editor-context';
 import { LogoutConfirmModal } from '@/components/LogoutConfirmModal.jsx';
@@ -57,6 +54,9 @@ function AppShell() {
   }, []);
 
   const screen = getScreenFromPath(location.pathname);
+  // 풀스크린 비전-디스플레이 프레임(어두운 룸 + 모니터 베젤)을 적용할 화면.
+  // 게임보이/CRT로 개편된 화면을 여기에 추가하면 양쪽 여백 없이 풀폭 + 테두리가 입혀진다.
+  const framed = screen === 'dashboard' || screen === 'garden';
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
@@ -125,26 +125,6 @@ function AppShell() {
     }
   };
 
-  const titles = {
-    dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
-    editor:     { title: '오늘의 TIL 작성', subtitle: 'New entry' },
-    garden:     { title: '나의 정원', subtitle: 'Garden · 4개의 화분' },
-    'pot-detail': {
-      title: (routePotId ?? potFocus)
-        ? `${POTS.find(p => p.id === (routePotId ?? potFocus))?.emoji ?? '🌱'} ${POTS.find(p => p.id === (routePotId ?? potFocus))?.name ?? '화분 상세'}`
-        : '화분',
-      subtitle: 'Garden / Detail',
-    },
-    collection: {
-      title: '식물 도감',
-      subtitle: collectionStats
-        ? `Collection · ${collectionStats.collected} / ${collectionStats.total} 종 해금`
-        : 'Collection · 식물 도감',
-    },
-    ai:         { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
-    profile:    { title: '내 계정', subtitle: 'Account' },
-  };
-
   if (!authed) {
     return (
       <Routes>
@@ -164,41 +144,27 @@ function AppShell() {
     );
   }
 
-  const meta = titles[screen] || { title: '', subtitle: '' };
-
   return (
     <TilEditorProvider>
     <SidebarProvider
       open={focusMode ? false : leftOpen}
       onOpenChange={setLeftOpen}
-      style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper)', minWidth: 1180 }}
+      style={{
+        display: 'flex', minHeight: '100vh', minWidth: 1180,
+        background: framed ? 'transparent' : 'var(--paper)',
+        position: framed ? 'relative' : undefined,
+        zIndex: framed ? 0 : undefined,
+      }}
       data-screen-label={screen}
     >
-      <RootinSidebarLeft
+      {framed && <><div className="rt-vision-room" /><div className="rt-vision-screen-bg" /></>}
+      <GameBoySidebar
         current={screen.startsWith('pot') ? 'garden' : screen}
         onNav={handleNav}
         onLogout={() => setLogoutModalOpen(true)}
+        forceHidden={focusMode}
       />
       <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
-        {screen !== 'editor' && (
-          <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/dashboard" onClick={(e) => { e.preventDefault(); handleNav('dashboard'); }}>
-                    Rootin
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{meta.title}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </header>
-        )}
         <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -239,6 +205,17 @@ function AppShell() {
           open={rightOpen}
           onToggle={toggleRightPanel}
         />
+      )}
+      {framed && (
+        <div className="rt-vision-frame" aria-hidden="true">
+          <span className="vf-label">ROOTIN VISION-DISPLAY · 16:9 DOT MATRIX</span>
+          <div className="vf-brand">
+            <span className="vf-led" /><span>POWER</span>
+            <span className="vf-word">Rootin</span>
+            <span>DOT-MATRIX VISION DISPLAY™ · MODEL RT-9</span>
+          </div>
+          <div className="vf-grille"><i /><i /><i /><i /><i /><span className="vf-knob" /></div>
+        </div>
       )}
     </SidebarProvider>
     {logoutModalOpen && (

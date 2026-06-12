@@ -4,12 +4,27 @@ import { harvestPot, getGardenState, updateGardenTheme, updateGardenLayout } fro
 import { createPot, deletePot, getGardenDashboard, getPots, updatePot } from './api/pot.js';
 import { getMyTils, getTil } from './api/til.js';
 import { useUser } from './context/UserContext.jsx';
-import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
+import { Icon, Pill, Btn as BaseBtn, Card, SectionHeader, ProgressBar } from './ui.jsx';
+import { RtIcon } from './pixel-icons.jsx';
+import { playSfx } from './lib/sfx.js';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { tilCountToStage, STAGE_META } from './plants.jsx';
 import { inferSpecies } from './utils/plant.js';
+import './garden.css';
 
 // Garden + Pot Detail screens — pixel-art edition with 정원 꾸미기 mode
+
+// variant 성격에 맞는 효과음을 입힌 Btn 래퍼 (이 화면 한정)
+const BTN_SFX = { primary: 'confirm', green: 'confirm', secondary: 'cancel', ghost: 'cancel', danger: 'delete' };
+function Btn({ onClick, variant = 'primary', ...rest }) {
+  return (
+    <BaseBtn
+      variant={variant}
+      onClick={(e) => { playSfx(BTN_SFX[variant] || 'nav'); onClick?.(e); }}
+      {...rest}
+    />
+  );
+}
 
 const GROWTH_STAGE_TO_PIXEL_STAGE = {
   SEED: 'seed',
@@ -491,75 +506,57 @@ function PotCard({ pot, onClick }) {
   const potTier = getPotTier(pot.level);
   const rare = pot.species === 'moonlight';
   const levelProgress = pot.levelProgress ?? ((pot.tilCount ?? 0) / stageMeta.next);
+  const progressPct = Math.round(levelProgress * 100);
   return (
-    <Card padding={20} hoverable onClick={onClick} style={{
-      display: 'flex', flexDirection: 'column', gap: 12,
-      background: rare
-        ? 'linear-gradient(180deg, #ffffff 0%, #eef2fa 100%)'
-        : 'linear-gradient(180deg, #ffffff 0%, #f9faf7 100%)',
-      borderColor: rare ? '#ccd6ec' : undefined,
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick?.(); } }}
+      className="rt-card gb-pot-card"
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>Lv.{pot.level} · {potTier.shortLabel} 화분 · {stageMeta.label}</div>
+          <p className="rt-stat-k" style={{ margin: '0 0 6px' }}>
+            Lv.{pot.level} · {potTier.shortLabel} · {stageMeta.label}
+          </p>
           <div
             title={`${pot.emoji} ${pot.name}`}
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontSize: 17,
-              fontWeight: 600,
-              color: 'var(--ink)',
-              marginTop: 4,
-              ...POT_TITLE_PREVIEW_STYLE,
-            }}
+            className="rt-h3"
+            style={{ margin: 0, fontSize: 17, ...POT_TITLE_PREVIEW_STYLE }}
           >
             {pot.emoji} {pot.name}
           </div>
         </div>
         {pot.waterToday ? (
-          <Pill tone="green"><span style={{ display: 'inline-flex', marginRight: 2 }}>{Icon.drop}</span>물주기 완료</Pill>
+          <span className="rt-badge rt-badge--leaf"><RtIcon name="drop" /> 물주기 완료</span>
         ) : (
-          <Pill tone="warn">물주기 전</Pill>
+          <span className="rt-badge rt-badge--peach">물주기 전</span>
         )}
       </div>
 
-      <div style={{
-        height: 132,
-        background: rare
-          ? 'radial-gradient(ellipse at center bottom, rgba(168, 197, 235, 0.5), transparent 70%)'
-          : 'radial-gradient(ellipse at center bottom, rgba(168, 213, 181, 0.4), transparent 70%)',
-        display: 'flex', justifyContent: 'center', alignItems: 'flex-end',
-        borderRadius: 10,
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <div style={{ position: 'absolute', left: 0, right: 0, bottom: 18, height: 1, background: 'linear-gradient(90deg, transparent, var(--leaf), transparent)' }} />
-        <div style={{ paddingBottom: 6 }}>
-          <PottedPlant species={pot.species} stage={stage} size={112} potLevel={pot.level} />
+      <div className={`gb-pot-stage${rare ? ' gb-pot-stage--rare' : ''}`}>
+        <div style={{ paddingBottom: 8 }}>
+          <PottedPlant species={pot.species} stage={stage} size={112} glow={rare} potLevel={pot.level} />
         </div>
       </div>
 
       <div
         title={pot.intro}
-        style={{
-          fontSize: 12.5,
-          color: 'var(--ink-2)',
-          lineHeight: 1.6,
-          minHeight: 36,
-          ...POT_DESCRIPTION_PREVIEW_STYLE,
-        }}
+        className="rt-small"
+        style={{ lineHeight: 1.6, minHeight: 36, ...POT_DESCRIPTION_PREVIEW_STYLE }}
       >
         {pot.intro}
       </div>
 
       <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--ink-3)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 11, color: 'var(--muted)' }}>
           <span>화분 레벨 진척도</span>
-          <span style={{ color: 'var(--moss-2)' }}>{Math.round(levelProgress * 100)}%</span>
+          <span style={{ color: 'var(--leaf-2)' }}>{progressPct}%</span>
         </div>
-        <ProgressBar value={levelProgress} />
+        <div className="gb-prog"><i style={{ width: `${progressPct}%` }} /></div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -1187,317 +1184,301 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
   };
 
   return (
-    <div className="pot-detail-page" style={{ padding: 32, width: '100%', maxWidth: 1220, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
+    <div className="rt-app gb-garden-page" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', minHeight: '100%' }}>
 
-      {/* Hero with scene */}
-      <Card padding={0} style={{
-        overflow: 'hidden',
-        background: '#fff',
-        border: '0.5px solid var(--rule)',
-        marginBottom: 24,
-      }}>
-        <div style={{ padding: '24px 28px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 0, flex: '1 1 320px' }}>
-            <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>나의 정원</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.02em', marginTop: 4, whiteSpace: 'nowrap' }}>
-              {user?.name ?? ''}님의 정원 · TIL <span style={{ color: 'var(--moss-2)' }}>{user?.totalTil ?? 0}</span>개
-            </h2>
-            <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
-              {potsLoading
-                ? '화분을 불러오는 중이에요.'
-                : `${pots.length}개의 화분이 자라고 있어요. 오늘 ${wateredCount}개의 화분에 물을 줬어요.`}
-            </div>
+      {/* 게임 HUD 플레이어 바 */}
+      <div className="rt-hud">
+        <div className="rt-hud-l">
+          <RtIcon name="person" /> PLAYER : {user?.name ?? '학습자'}
+        </div>
+        <div className="rt-hud-r">
+          <span className="rt-hud-grp"><RtIcon name="sprout" /> 화분 {pots.length}</span>
+          <span className="rt-hud-sep" />
+          <span className="rt-hud-grp"><RtIcon name="drop" /> 물주기 {wateredCount}/{pots.length}</span>
+          <span className="rt-hud-sep" />
+          <span className="rt-hud-grp"><RtIcon name="book" /> TIL {user?.totalTil ?? 0}</span>
+        </div>
+      </div>
+
+      {/* 페이지 헤더 */}
+      <div className="rt-page-head">
+        <span className="rt-tag"><RtIcon name="sprout" /> ROOTIN · 정원</span>
+        <h1 className="rt-page-title">정원 <span className="rt-title-cursor" /></h1>
+        <p className="rt-page-sub">
+          {potsLoading
+            ? '화분을 불러오는 중이에요.'
+            : `${pots.length}개의 화분이 자라고 있어요. 오늘 ${wateredCount}개의 화분에 물을 줬어요.`}
+        </p>
+      </div>
+
+      {/* 게임보이 DMG 콘솔 — 정원 씬 */}
+      <div className="gb-console">
+        <div className="gb-console-head">
+          <div>
+            <span className="rt-tag"><RtIcon name="star" /> MY GARDEN</span>
+            <h2 className="rt-h3" style={{ margin: '10px 0 0' }}>나의 정원 디스플레이</h2>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
-            <Btn variant="secondary" size="md" icon={Icon.plus} onClick={() => setShowCreatePot(true)}>새 화분</Btn>
+            <button className="gb-key gb-key--dark" onClick={() => { playSfx('nav'); setShowCreatePot(true); }}>
+              <RtIcon name="plus" /> 새 화분
+            </button>
             {editMode ? (
-              <Btn variant="green" size="md" icon={Icon.check} onClick={handleSaveLayout} disabled={layoutSaving}>
-                {layoutSaving ? '저장 중...' : '꾸미기 완료'}
-              </Btn>
+              <button className="gb-key gb-key--lcd" onClick={() => { playSfx('confirm'); handleSaveLayout(); }} disabled={layoutSaving}>
+                <RtIcon name="check" /> {layoutSaving ? '저장 중...' : '꾸미기 완료'}
+              </button>
             ) : (
-              <Btn
-                variant="primary"
-                size="md"
+              <button
+                className="gb-key gb-key--ab"
                 onClick={() => {
+                  playSfx('toggle');
                   setEditMode(true);
                   setSelectedGardenPotId(visiblePots[0]?.id ?? null);
                 }}
               >
-                🎨 정원 꾸미기
-              </Btn>
+                <RtIcon name="gear" /> 정원 꾸미기
+              </button>
             )}
           </div>
         </div>
 
-        {/* Scene */}
-        <div style={{ padding: '0 20px 20px' }}>
-          <GardenScene
-            pots={pots}
-            theme={theme}
-            layout={layout}
-            editMode={editMode}
-            onMovePot={movePot}
-            onOpenPot={onOpenPot}
-            potDecorations={potDecorations}
-            selectedPotId={selectedGardenPot?.id ?? null}
-            onSelectPot={setSelectedGardenPotId}
-            hiddenPots={hiddenPots}
-            onHidePot={hidePot}
-          />
+        {/* DMG LCD 패널 */}
+        <div className="gb-garden">
+          <div className="gb-garden-bezel">
+            <div className="gb-garden-beztop">
+              <span className="gb-garden-led" aria-hidden="true" />
+              <span className="gb-garden-cap">DOT&nbsp;MATRIX&nbsp;·&nbsp;MY&nbsp;GARDEN</span>
+            </div>
+            <div className="gb-garden-frame">
+              <span className="gb-garden-stripe" aria-hidden="true">
+                <i className="red" /><i className="blue" />
+              </span>
+              <div className="gb-garden-lcd">
+                <GardenScene
+                  pots={pots}
+                  theme={theme}
+                  layout={layout}
+                  editMode={editMode}
+                  onMovePot={movePot}
+                  onOpenPot={onOpenPot}
+                  potDecorations={potDecorations}
+                  selectedPotId={selectedGardenPot?.id ?? null}
+                  onSelectPot={setSelectedGardenPotId}
+                  hiddenPots={hiddenPots}
+                  onHidePot={hidePot}
+                />
+                <div className="gb-fx gb-fx-scan" aria-hidden="true" />
+                <div className="gb-fx gb-fx-vignette" aria-hidden="true" />
+                <div className="gb-fx gb-fx-glass" aria-hidden="true" />
+              </div>
+            </div>
+          </div>
+        </div>
 
-          {/* Theme switcher / decorate panel — only in edit mode */}
-          {editMode && (
-            <div style={{
-              marginTop: 14, padding: '16px 18px',
-              border: '0.5px solid var(--rule)',
-              borderRadius: 12,
-              background: 'var(--paper-2)',
-              display: 'grid',
-              gridTemplateColumns: 'auto 1px 1fr 1px auto',
-              gap: 22,
-              alignItems: 'flex-start',
-            }}>
-              {/* Backgrounds */}
-              <div>
-                <div className="eyebrow" style={{ marginBottom: 10 }}>배경</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {GARDEN_THEMES.map(t => {
-                    const active = t.id === themeId;
-                    return (
-                      <button key={t.id} onClick={() => setThemeId(t.id)} style={{
-                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                        padding: 6, borderRadius: 8,
-                        background: active ? 'var(--ink)' : '#fff',
-                        color: active ? '#fff' : 'var(--ink-2)',
-                        border: '0.5px solid ' + (active ? 'var(--ink)' : 'var(--rule-2)'),
+        {/* 콘솔 하단 — 브랜드 각인 + 스피커 그릴 */}
+        <div className="gb-console-foot">
+          <div className="gb-brand">
+            <span className="gb-brand-word">Rootin</span>
+            <span className="gb-brand-sub">DOT-MATRIX&nbsp;GARDEN&nbsp;SYSTEM<span className="tm">TM</span></span>
+          </div>
+          <div className="gb-speaker" aria-hidden="true" />
+        </div>
+
+        {/* 꾸미기 패널 — 편집 모드일 때만 */}
+        {editMode && (
+          <div className="gb-panel">
+            {/* 배경 */}
+            <div>
+              <p className="rt-eyebrow" style={{ marginBottom: 10 }}>배경</p>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {GARDEN_THEMES.map(t => {
+                  const active = t.id === themeId;
+                  return (
+                    <button key={t.id} onClick={() => setThemeId(t.id)} className={`gb-chip${active ? ' is-active' : ''}`}>
+                      <span style={{
+                        width: 56, height: 36, borderRadius: 4,
+                        background: t.sky, position: 'relative', overflow: 'hidden',
+                        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.12)',
                       }}>
-                        <div style={{
-                          width: 56, height: 36, borderRadius: 5,
-                          background: t.sky,
-                          position: 'relative', overflow: 'hidden',
-                          border: '0.5px solid rgba(0,0,0,0.08)',
-                        }}>
-                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 10, background: t.ground }} />
-                          <div style={{ position: 'absolute', top: 5, right: 6, width: 7, height: 7, background: t.sunColor }} />
-                        </div>
-                        <div style={{ fontSize: 10.5, fontWeight: 500, fontFamily: 'var(--font-display)' }}>{t.emoji} {t.name}</div>
+                        <span style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 10, background: t.ground }} />
+                        <span style={{ position: 'absolute', top: 5, right: 6, width: 7, height: 7, background: t.sunColor }} />
+                      </span>
+                      {t.emoji} {t.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="gb-panel-sep" />
+
+            {/* 수확한 식물 — 화분 위 꾸미기 */}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+                <p className="rt-eyebrow" style={{ margin: 0 }}>수확한 식물 · 화분 위 꾸미기 ({selectedPotAvailableHarvestedPlants.length})</p>
+                {decorations.length > 0 && (
+                  <button onClick={clearDecorations} className="rt-btn rt-btn--sm rt-btn--ghost">
+                    꾸미기 모두 해제 ({decorations.length})
+                  </button>
+                )}
+              </div>
+              <div className="rt-small" style={{
+                lineHeight: 1.6, padding: '10px 12px', borderRadius: 6, marginBottom: 10,
+                background: selectedGardenPot ? 'var(--paper-card)' : 'var(--amber-soft)',
+                border: `1px solid ${selectedGardenPot ? 'var(--line)' : 'var(--amber)'}`,
+                color: selectedGardenPot ? 'var(--text-body)' : '#8a6322',
+              }}>
+                {selectedGardenPot
+                  ? <>선택된 화분: <b style={{ color: 'var(--leaf-2)' }}>{selectedGardenPot.name}</b>{selectedPotDecoration ? ` · 적용 중: ${selectedPotDecoration.name}` : ' · 기본 식물 표시 중'}</>
+                  : '먼저 정원에 배치된 화분을 선택해 주세요.'}
+                {selectedPotDecoration && (
+                  <button
+                    type="button"
+                    onClick={removeSelectedPotDecoration}
+                    style={{ marginLeft: 8, fontSize: 11, color: 'var(--berry)', fontWeight: 700, fontFamily: 'var(--font-pixel)' }}
+                  >
+                    적용 해제
+                  </button>
+                )}
+              </div>
+              {selectedPotAvailableHarvestedPlants.length === 0 ? (
+                <div className="rt-small" style={{ padding: '12px 14px', background: 'var(--paper-card)', border: '1px dashed var(--line-strong)', borderRadius: 6, color: 'var(--muted)' }}>
+                  {selectedGardenPot
+                    ? '이 화분에서 수확한 식물이 없거나 이미 적용했어요. 해당 화분의 식물을 만개까지 키워 수확하면 여기에 추가됩니다.'
+                    : '먼저 화분을 선택해 주세요.'}
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {selectedPotAvailableHarvestedPlants.map(h => {
+                    const species = inferSpecies(h.name);
+                    const monName = PIXEL_SPECIES[species]?.stages?.full?.name ?? h.name;
+                    const isRare = species === 'moonlight';
+                    return (
+                      <button
+                        key={h.id}
+                        onClick={() => applyHarvestedPlantToPot(h)}
+                        disabled={!selectedGardenPot}
+                        className="gb-chip"
+                        style={{
+                          position: 'relative', minWidth: 92, padding: '10px 10px 8px',
+                          borderColor: isRare ? 'var(--sky)' : undefined,
+                          cursor: selectedGardenPot ? 'pointer' : 'not-allowed',
+                          opacity: selectedGardenPot ? 1 : 0.55,
+                        }}
+                        title={selectedGardenPot ? `${selectedGardenPot.name} 화분 위에 ${monName} 적용` : '화분을 먼저 선택해 주세요'}
+                      >
+                        {isRare && (
+                          <span style={{ position: 'absolute', top: 4, left: 5, fontSize: 9, color: 'var(--sky)' }}>✦</span>
+                        )}
+                        <PixelPlant species={species} stage="full" size={44} />
+                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--leaf)' }}>{monName}</div>
+                        <div style={{ fontSize: 9, color: 'var(--leaf-2)', fontWeight: 700 }}>+ 적용</div>
+                        {h.harvestedAt && (
+                          <div style={{ fontSize: 9, color: 'var(--muted)' }}>{h.harvestedAt.slice(5)}</div>
+                        )}
                       </button>
                     );
                   })}
                 </div>
-              </div>
+              )}
 
-              <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--rule)' }} />
-
-              {/* Inventory: harvested plants */}
-              <div style={{ minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <div className="eyebrow">수확한 식물 · 화분 위 꾸미기 ({selectedPotAvailableHarvestedPlants.length})</div>
-                  {decorations.length > 0 && (
-                    <button onClick={clearDecorations} style={{
-                      fontSize: 11, color: 'var(--ink-3)',
-                      fontFamily: 'var(--font-display)',
-                    }}>꾸미기 모두 해제 ({decorations.length})</button>
-                  )}
-                </div>
-                <div style={{
-                  fontSize: 12,
-                  color: selectedGardenPot ? 'var(--ink-2)' : '#8a5a12',
-                  lineHeight: 1.6,
-                  padding: '10px 12px',
-                  background: selectedGardenPot ? '#fff' : '#fff7ed',
-                  border: `0.5px solid ${selectedGardenPot ? 'var(--rule-2)' : '#f5d3a2'}`,
-                  borderRadius: 8,
-                  marginBottom: 10,
-                }}>
-                  {selectedGardenPot
-                    ? <>선택된 화분: <b style={{ color: 'var(--moss-2)' }}>{selectedGardenPot.name}</b>{selectedPotDecoration ? ` · 적용 중: ${selectedPotDecoration.name}` : ' · 기본 식물 표시 중'}</>
-                    : '먼저 정원에 배치된 화분을 선택해 주세요.'}
-                  {selectedPotDecoration && (
-                    <button
-                      type="button"
-                      onClick={removeSelectedPotDecoration}
-                      style={{
-                        marginLeft: 8,
-                        fontSize: 11,
-                        color: '#b8536a',
-                        fontWeight: 700,
-                        fontFamily: 'var(--font-display)',
-                      }}
-                    >
-                      적용 해제
-                    </button>
-                  )}
-                </div>
-                {selectedPotAvailableHarvestedPlants.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '12px 14px', background: '#fff', border: '0.5px dashed var(--rule-2)', borderRadius: 8 }}>
-                    {selectedGardenPot
-                      ? '이 화분에서 수확한 식물이 없거나 이미 적용했어요. 해당 화분의 식물을 만개까지 키워 수확하면 여기에 추가됩니다.'
-                      : '먼저 화분을 선택해 주세요.'}
-                  </div>
-                ) : (
+              {/* 숨긴 화분 다시 배치 */}
+              {Object.keys(hiddenPots).length > 0 && (
+                <>
+                  <p className="rt-eyebrow" style={{ marginTop: 14, marginBottom: 8 }}>숨긴 화분 · 다시 정원에 배치</p>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {selectedPotAvailableHarvestedPlants.map(h => {
-                      const species = inferSpecies(h.name);
-                      const monName = PIXEL_SPECIES[species]?.stages?.full?.name ?? h.name;
-                      const isRare = species === 'moonlight';
+                    {pots.filter(p => hiddenPots[p.id]).map(p => {
+                      const stage = p.stage ?? tilCountToStage(p.tilCount ?? 0);
                       return (
                         <button
-                          key={h.id}
-                          onClick={() => applyHarvestedPlantToPot(h)}
-                          disabled={!selectedGardenPot}
-                          style={{
-                            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                            padding: '10px 10px 8px',
-                            borderRadius: 10,
-                            background: '#fff',
-                            border: '0.5px solid ' + (isRare ? '#ccc9f0' : 'var(--rule-2)'),
-                            cursor: selectedGardenPot ? 'pointer' : 'not-allowed',
-                            position: 'relative',
-                            transition: 'transform 100ms ease',
-                            minWidth: 92,
-                            opacity: selectedGardenPot ? 1 : 0.55,
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                          onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                          title={selectedGardenPot ? `${selectedGardenPot.name} 화분 위에 ${monName} 적용` : '화분을 먼저 선택해 주세요'}
+                          key={p.id}
+                          onClick={() => showPot(p.id)}
+                          className="gb-chip"
+                          style={{ flexDirection: 'row', gap: 8, padding: '6px 12px 6px 6px', borderStyle: 'dashed' }}
                         >
-                          {isRare && (
-                            <span style={{
-                              position: 'absolute', top: 4, left: 5,
-                              fontSize: 9, color: '#534ab7',
-                            }}>✦</span>
-                          )}
-                          <PixelPlant species={species} stage="full" size={44} />
-                          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{monName}</div>
-                          <div style={{ fontSize: 9, color: 'var(--moss-2)', fontFamily: 'var(--font-display)', fontWeight: 700 }}>+ 적용</div>
-                          {h.harvestedAt && (
-                            <div style={{ fontSize: 9, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{h.harvestedAt.slice(5)}</div>
-                          )}
+                          <PottedPlant species={p.species} stage={stage} size={34} potLevel={p.level} />
+                          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--leaf)' }}>{p.emoji} {p.name}</span>
+                          <span style={{ fontSize: 11, color: 'var(--leaf-2)' }}>+ 배치</span>
                         </button>
                       );
                     })}
                   </div>
-                )}
-
-                {/* Hidden pots — bring back */}
-                {Object.keys(hiddenPots).length > 0 && (
-                  <>
-                    <div className="eyebrow" style={{ marginTop: 14, marginBottom: 8 }}>숨긴 화분 · 다시 정원에 배치</div>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      {pots.filter(p => hiddenPots[p.id]).map(p => {
-                        const stage = p.stage ?? tilCountToStage(p.tilCount ?? 0);
-                        return (
-                          <button
-                            key={p.id}
-                            onClick={() => showPot(p.id)}
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 8,
-                              padding: '6px 12px 6px 6px',
-                              borderRadius: 10,
-                              background: '#fff',
-                              border: '0.5px dashed var(--rule-2)',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <PottedPlant species={p.species} stage={stage} size={34} potLevel={p.level} />
-                            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>
-                              {p.emoji} {p.name}
-                            </span>
-                            <span style={{ fontSize: 11, color: 'var(--moss-2)' }}>+ 배치</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div style={{ width: 1, alignSelf: 'stretch', background: 'var(--rule)' }} />
-
-              <button onClick={resetGarden} style={{
-                padding: '8px 12px', fontSize: 12,
-                color: 'var(--ink-3)', fontFamily: 'var(--font-display)',
-                alignSelf: 'flex-start',
-                whiteSpace: 'nowrap',
-              }}>↺ 정원 초기화</button>
+                </>
+              )}
             </div>
-          )}
-        </div>
-      </Card>
 
-      {/* Pot grid */}
-      <SectionHeader eyebrow="화분" title="키우는 화분" action={
-        <div style={{ display: 'flex', gap: 6, fontSize: 12 }}>
-          <Pill>전체 {pots.length}</Pill>
-          <Pill tone="green">활동 중 {visiblePots.length}</Pill>
+            <div className="gb-panel-sep" />
+
+            <button onClick={resetGarden} className="rt-btn rt-btn--sm rt-btn--ghost" style={{ alignSelf: 'flex-start' }}>
+              ↺ 정원 초기화
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 화분 그리드 */}
+      <div className="rt-section-head" style={{ marginBottom: 0 }}>
+        <div className="rt-sh-top">
+          <span className="rt-tag"><RtIcon name="leaf" /> 화분</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <span className="rt-badge">전체 {pots.length}</span>
+            <span className="rt-badge rt-badge--leaf">활동 중 {visiblePots.length}</span>
+          </div>
         </div>
-      } />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+        <h2 className="rt-h3">키우는 화분</h2>
+      </div>
+
+      <div className="rt-grid rt-grid--3">
         {potsLoading && (
-          <Card padding={24} style={{ minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+          <div className="rt-card" style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
             화분 목록을 불러오는 중이에요.
-          </Card>
+          </div>
         )}
 
         {!potsLoading && potsError && (
-          <Card padding={24} style={{ minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#b8536a', fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>
+          <div className="rt-card" style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--berry)', fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>
             {potsError}
-          </Card>
+          </div>
         )}
 
         {!potsLoading && !potsError && pots.length === 0 && (
-          <Card padding={24} style={{ minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>
+          <div className="rt-card" style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>
             아직 생성된 화분이 없어요.<br />새 화분을 만들어 첫 씨앗을 심어보세요.
-          </Card>
+          </div>
         )}
 
         {!potsLoading && !potsError && pots.map(p => <PotCard key={p.id} pot={p} onClick={() => onOpenPot(p.id)} />)}
 
-        <Card padding={20} hoverable onClick={() => setShowCreatePot(true)} style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 14, minHeight: 320,
-          background: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(168, 213, 181, 0.08) 8px, rgba(168, 213, 181, 0.08) 16px)',
-          border: '0.5px dashed var(--leaf)',
-        }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: '50%',
-            background: '#fff', border: '0.5px dashed var(--leaf)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--moss)',
-          }}>{Icon.plus}</div>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setShowCreatePot(true)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowCreatePot(true); } }}
+          className="rt-card gb-add-card"
+        >
+          <div className="gb-add-bubble"><RtIcon name="plus" /></div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--ink)', fontSize: 14 }}>새 화분 만들기</div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>새로운 주제로 씨앗을 심어요</div>
+            <div className="rt-h3" style={{ margin: 0, fontSize: 15 }}>새 화분 만들기</div>
+            <div className="rt-small rt-muted" style={{ marginTop: 4 }}>새로운 주제로 씨앗을 심어요</div>
           </div>
-        </Card>
+        </div>
       </div>
 
       {!potsLoading && !potsError && pots.length > 0 && (
-        <div style={{
-          marginTop: 28, padding: '16px 22px',
-          background: '#fff', border: '0.5px solid var(--rule)',
-          borderRadius: 12,
-          display: 'flex', alignItems: 'center', gap: 18,
-        }}>
-          <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--paper-2)', color: 'var(--moss-2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="rt-card" style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ width: 40, height: 40, flex: '0 0 auto', borderRadius: 8, background: 'var(--paper-2)', color: 'var(--leaf-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
             {allPotsWatered ? '✨' : '🌱'}
           </div>
-          <div style={{ flex: 1, fontSize: 13, color: 'var(--ink-2)' }}>
+          <div className="rt-small" style={{ flex: 1 }}>
             {allPotsWatered ? (
-              <>
-                오늘 모든 화분에 물주기를 마쳤어요. <b style={{ color: 'var(--ink)' }}>꾸준한 기록이 정원을 더 깊게 자라게 하고 있어요.</b>
-              </>
+              <>오늘 모든 화분에 물주기를 마쳤어요. <b style={{ color: 'var(--leaf)' }}>꾸준한 기록이 정원을 더 깊게 자라게 하고 있어요.</b></>
             ) : (
-              <>
-                <b style={{ color: 'var(--ink)' }}>{attentionPot.name} 화분</b>에 오늘의 TIL을 남기면 경험치가 쌓이고 식물이 자라요.
-              </>
+              <><b style={{ color: 'var(--leaf)' }}>{attentionPot.name} 화분</b>에 오늘의 TIL을 남기면 경험치가 쌓이고 식물이 자라요.</>
             )}
           </div>
           {allPotsWatered ? (
-            <Pill tone="green">오늘 루틴 완료</Pill>
+            <span className="rt-badge rt-badge--leaf">오늘 루틴 완료</span>
           ) : (
-            <Btn variant="secondary" size="sm" onClick={() => onOpenPot(attentionPot.id)}>화분으로 이동</Btn>
+            <button className="rt-btn rt-btn--sm" onClick={() => onOpenPot(attentionPot.id)}>화분으로 이동</button>
           )}
         </div>
       )}
@@ -1555,56 +1536,52 @@ function CreatePotModal({ userId, onClose, onCreated }) {
     }
   };
 
+  const fieldLabel = { display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--leaf-2)', fontFamily: 'var(--font-pixel)', letterSpacing: '1px', textTransform: 'uppercase' };
+  const fieldInput = (invalid) => ({
+    borderRadius: 6,
+    border: `2px solid ${invalid ? 'var(--berry)' : 'var(--line-strong)'}`,
+    background: 'var(--paper)',
+    outline: 'none',
+    fontSize: 13.5,
+    fontFamily: 'var(--font-pixel)',
+    color: 'var(--leaf)',
+  });
+
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(15, 42, 71, 0.38)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 50,
-      backdropFilter: 'blur(4px)',
-    }} onClick={loading ? undefined : onClose}>
-      <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()} style={{
-        width: 460,
-        background: '#fff',
-        borderRadius: 18,
-        padding: '28px 28px 24px',
-        boxShadow: 'var(--shadow-lg)',
-        border: '0.5px solid var(--rule)',
-      }}>
+    <div
+      className="rt-app"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 200,
+        background: 'rgba(28, 32, 18, 0.42)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        backdropFilter: 'blur(4px)',
+      }}
+      onClick={loading ? undefined : onClose}
+    >
+      <form
+        onSubmit={handleSubmit}
+        onClick={e => e.stopPropagation()}
+        className="rt-card"
+        style={{ width: 460, background: 'var(--paper-card)' }}
+      >
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
-            <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>New Pot</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
-              새 화분 만들기
-            </h2>
-            <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.6 }}>
+            <span className="rt-tag"><RtIcon name="sprout" /> NEW POT</span>
+            <h2 className="rt-h3" style={{ margin: '10px 0 0' }}>새 화분 만들기</h2>
+            <div className="rt-small rt-muted" style={{ marginTop: 6, lineHeight: 1.6 }}>
               새로운 학습 주제를 정하고 기본 씨앗을 심어요.
             </div>
           </div>
-          <button type="button" onClick={onClose} disabled={loading} style={{
-            width: 32,
-            height: 32,
-            borderRadius: 8,
-            border: '0.5px solid var(--rule)',
-            color: 'var(--ink-3)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            opacity: loading ? 0.5 : 1,
-          }}>
-            {Icon.close}
+          <button type="button" onClick={onClose} disabled={loading} className="rt-btn rt-btn--ghost rt-btn--sm" style={{ flexShrink: 0, opacity: loading ? 0.5 : 1 }}>
+            <RtIcon name="xmark" />
           </button>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 22 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <span style={fieldLabel}>
               <span>화분 제목</span>
-              <span style={{ color: title.length > POT_TITLE_MAX_LENGTH ? '#b8536a' : 'var(--ink-3)' }}>{title.length}/{POT_TITLE_MAX_LENGTH}</span>
+              <span style={{ color: title.length > POT_TITLE_MAX_LENGTH ? 'var(--berry)' : 'var(--muted)' }}>{title.length}/{POT_TITLE_MAX_LENGTH}</span>
             </span>
             <input
               value={title}
@@ -1613,22 +1590,14 @@ function CreatePotModal({ userId, onClose, onCreated }) {
               placeholder="예: Spring 공부"
               disabled={loading}
               autoFocus
-              style={{
-                height: 42,
-                borderRadius: 10,
-                border: `0.5px solid ${titleInvalid && title.length > 0 ? '#f0c4cc' : 'var(--rule-2)'}`,
-                background: 'var(--paper)',
-                padding: '0 13px',
-                outline: 'none',
-                fontSize: 13.5,
-              }}
+              style={{ height: 42, padding: '0 13px', ...fieldInput(titleInvalid && title.length > 0) }}
             />
           </label>
 
           <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            <span style={fieldLabel}>
               <span>소개글</span>
-              <span style={{ color: descriptionInvalid ? '#b8536a' : 'var(--ink-3)' }}>{descriptionLength}/{POT_DESCRIPTION_MAX_LENGTH}</span>
+              <span style={{ color: descriptionInvalid ? 'var(--berry)' : 'var(--muted)' }}>{descriptionLength}/{POT_DESCRIPTION_MAX_LENGTH}</span>
             </span>
             <textarea
               value={description}
@@ -1636,43 +1605,24 @@ function CreatePotModal({ userId, onClose, onCreated }) {
               maxLength={POT_DESCRIPTION_MAX_LENGTH}
               placeholder="이 화분에 어떤 기록을 모을지 적어보세요."
               disabled={loading}
-              style={{
-                height: 82,
-                resize: 'none',
-                borderRadius: 10,
-                border: `0.5px solid ${descriptionInvalid ? '#f0c4cc' : 'var(--rule-2)'}`,
-                background: 'var(--paper)',
-                padding: '12px 13px',
-                outline: 'none',
-                fontSize: 13.5,
-                lineHeight: 1.6,
-              }}
+              style={{ height: 82, resize: 'none', padding: '12px 13px', lineHeight: 1.6, ...fieldInput(descriptionInvalid) }}
             />
           </label>
         </div>
 
         {error && (
-          <div style={{
-            marginTop: 16,
-            padding: '10px 12px',
-            borderRadius: 9,
-            background: '#fff3f5',
-            border: '0.5px solid #f7c1c1',
-            fontSize: 12.5,
-            color: '#b8536a',
-            lineHeight: 1.5,
-          }}>
+          <div className="rt-small" style={{ marginTop: 16, padding: '10px 12px', borderRadius: 6, background: 'var(--berry-soft)', border: '1px solid var(--berry)', color: 'var(--berry)', lineHeight: 1.5 }}>
             {error}
           </div>
         )}
 
         <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-          <Btn type="button" variant="secondary" size="lg" style={{ flex: 1 }} onClick={onClose} disabled={loading}>
+          <button type="button" className="rt-btn rt-btn--ghost" style={{ flex: 1 }} onClick={onClose} disabled={loading}>
             취소
-          </Btn>
-          <Btn type="submit" variant="green" size="lg" style={{ flex: 1 }} disabled={loading || titleInvalid || descriptionInvalid}>
+          </button>
+          <button type="submit" className="rt-btn rt-btn--primary" style={{ flex: 1 }} disabled={loading || titleInvalid || descriptionInvalid}>
             {loading ? '만드는 중...' : '씨앗 심기'}
-          </Btn>
+          </button>
         </div>
       </form>
     </div>

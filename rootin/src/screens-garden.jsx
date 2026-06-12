@@ -505,9 +505,10 @@ function PotCard({ pot, onClick }) {
           <div
             title={`${pot.emoji} ${pot.name}`}
             style={{
-              fontFamily: 'var(--font-display)',
+              fontFamily: 'var(--font-body)',
               fontSize: 17,
               fontWeight: 600,
+              letterSpacing: '-0.03em',
               color: 'var(--ink)',
               marginTop: 4,
               ...POT_TITLE_PREVIEW_STYLE,
@@ -1439,7 +1440,6 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
       <SectionHeader eyebrow="화분" title="키우는 화분" action={
         <div style={{ display: 'flex', gap: 6, fontSize: 12 }}>
           <Pill>전체 {pots.length}</Pill>
-          <Pill tone="green">활동 중 {visiblePots.length}</Pill>
         </div>
       } />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>

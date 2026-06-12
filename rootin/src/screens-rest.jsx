@@ -401,7 +401,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
       isAllSelected:   total > 0 && selectedCount === total,
       isIndeterminate: selectedCount > 0 && selectedCount < total,
       canSelectAll:    outsideSelected + total <= TIL_IDS_MAX_SIZE,
-      addableCount:    TIL_IDS_MAX_SIZE - selectedIds.size,
+      addableCount:    TIL_IDS_MAX_SIZE - outsideSelected - selectedCount,
     };
   }, [allFilteredIds, selectedIds]);
 
@@ -672,12 +672,9 @@ function PotCard({ pot, selected, onClick }) {
       </div>
 
       {/* 텍스트 */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{pot.title}</span>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Lv.{pot.level}</span>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>· TIL {tilCount}개</span>
-        </div>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pot.title}</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Lv.{pot.level} · TIL {tilCount}개</span>
       </div>
 
       {/* 선택 체크 배지 */}

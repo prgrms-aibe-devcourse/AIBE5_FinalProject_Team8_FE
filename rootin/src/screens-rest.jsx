@@ -401,7 +401,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
       isAllSelected:   total > 0 && selectedCount === total,
       isIndeterminate: selectedCount > 0 && selectedCount < total,
       canSelectAll:    outsideSelected + total <= TIL_IDS_MAX_SIZE,
-      addableCount:    TIL_IDS_MAX_SIZE - outsideSelected,
+      addableCount:    TIL_IDS_MAX_SIZE - outsideSelected - selectedCount,
     };
   }, [allFilteredIds, selectedIds]);
 
@@ -758,14 +758,13 @@ function AIScreen() {
           const content = typeof r.content === 'string'
             ? (() => { try { return JSON.parse(r.content); } catch { return null; } })()
             : r.content;
-          const d = new Date(r.createdAt);
           return {
             id: r.resultId,
             type: r.type.toLowerCase(),   // 'QUIZ' → 'quiz'
             potId: r.potId,
             content,
             tilIds: r.tilIds ?? [],
-            date: `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`,
+            date: formatDate(r.createdAt),
             quizCount: r.type === 'QUIZ' ? content?.quizzes?.length : undefined,
           };
         });
@@ -855,7 +854,6 @@ function AIScreen() {
           date,
           quizCount: resultMode === 'quiz' ? quizCount : undefined,
           tilIds: lastTilIds,
-          pot: selectedPot,
           content: aiResult,
         },
         ...prev,

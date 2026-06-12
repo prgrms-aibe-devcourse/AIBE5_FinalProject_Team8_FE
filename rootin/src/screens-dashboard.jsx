@@ -6,22 +6,35 @@ import { getPointSummary } from './api/points.js';
 
 // ─── 변환 유틸 ────────────────────────────────────────────────
 
+const GRASS_WEEKS = 52;
+const STREAK_CHAR_COUNT_CAP = 1200;
+const STREAK_MAX_BAR_HEIGHT = 82;
+
+function getGrassStartDate(referenceDate = new Date(), weeks = GRASS_WEEKS) {
+  const start = new Date(referenceDate);
+  start.setDate(referenceDate.getDate() - referenceDate.getDay() - (weeks - 1) * 7);
+  return start;
+}
+
+function buildGrassState(cells = []) {
+  const startDate = getGrassStartDate();
+  return {
+    grid: buildGrassGrid(cells, startDate),
+    startDate,
+  };
+}
+
 // BE cells([{date, tilCount, charCount, level}]) → 52주×7일 2D 배열 (0~4) — 항상 1년 고정
-function buildGrassGrid(cells = []) {
+function buildGrassGrid(cells = [], startDate = getGrassStartDate()) {
   const levelMap = {};
   cells.forEach(c => {
     levelMap[String(c.date ?? '').slice(0, 10)] = c.level;
   });
 
-  const WEEKS = 52;
-  const today = new Date();
-  const start = new Date(today);
-  start.setDate(today.getDate() - today.getDay() - (WEEKS - 1) * 7);
-
-  return Array.from({ length: WEEKS }, (_, w) =>
+  return Array.from({ length: GRASS_WEEKS }, (_, w) =>
     Array.from({ length: 7 }, (_, d) => {
-      const dt = new Date(start);
-      dt.setDate(start.getDate() + w * 7 + d);
+      const dt = new Date(startDate);
+      dt.setDate(startDate.getDate() + w * 7 + d);
       return levelMap[formatDateKey(dt)] ?? 0;
     })
   );
@@ -38,17 +51,14 @@ function transformWeekly(weeklyData = []) {
 
 // ─── 컴포넌트 ──────────────────────────────────────────────────
 
-function GrassGraph({ data }) {
+function GrassGraph({ data, startDate }) {
   const colors = ['#eef2ee', '#cfe8d6', '#9dd0b0', '#5fb088', '#2e6b48'];
   const weekDays = ['', '월', '', '수', '', '금', ''];
   const cellSize = 14;
   const gap = 4;
 
   // 각 주(column)의 시작일로 월 레이블 계산
-  const WEEKS = data.length;
-  const today = new Date();
-  const start = new Date(today);
-  start.setDate(today.getDate() - today.getDay() - (WEEKS - 1) * 7);
+  const start = new Date(startDate ?? getGrassStartDate(new Date(), data.length || GRASS_WEEKS));
   const monthLabels = data.map((_, w) => {
     const cur = new Date(start);
     cur.setDate(start.getDate() + w * 7);
@@ -121,6 +131,7 @@ function buildRecentStreakDays(cells = [], maxDays = 30) {
     cells.map(cell => [String(cell.date ?? '').slice(0, 10), {
       tilCount: Number(cell.tilCount) || 0,
       charCount: Number(cell.charCount) || 0,
+      level: Number(cell.level) || 0,
     }])
   );
 
@@ -137,7 +148,7 @@ function buildRecentStreakDays(cells = [], maxDays = 30) {
       date: dateKey,
       tilCount: record.tilCount,
       charCount: record.charCount,
-      active: record.tilCount > 0 || record.charCount > 0,
+      active: record.level > 0 || record.tilCount > 0 || record.charCount > 0,
     };
   });
 }
@@ -145,7 +156,11 @@ function buildRecentStreakDays(cells = [], maxDays = 30) {
 function calculateCurrentStreakFromCells(cells = []) {
   const activeDates = new Set(
     cells
-      .filter(cell => (Number(cell.tilCount) || 0) > 0 || (Number(cell.charCount) || 0) > 0)
+      .filter(cell =>
+        (Number(cell.level) || 0) > 0 ||
+        (Number(cell.tilCount) || 0) > 0 ||
+        (Number(cell.charCount) || 0) > 0
+      )
       .map(cell => String(cell.date ?? '').slice(0, 10))
       .filter(Boolean)
   );
@@ -171,10 +186,8 @@ function calculateCurrentStreakFromCells(cells = []) {
 }
 
 function StreakActivityChart({ days }) {
-  const charCountCap = 1200;
-  const maxCharCount = Math.max(...days.map(day => Math.min(day.charCount, charCountCap)), 1);
+  const maxCharCount = Math.max(...days.map(day => Math.min(day.charCount, STREAK_CHAR_COUNT_CAP)), 1);
   const todayKey = formatDateKey(new Date());
-  const maxBarHeight = 82;
   const minActiveBarHeight = 9;
 
   return (
@@ -191,10 +204,10 @@ function StreakActivityChart({ days }) {
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 104 }}>
         {days.map(day => {
-          const cappedCharCount = Math.min(day.charCount, charCountCap);
+          const cappedCharCount = Math.min(day.charCount, STREAK_CHAR_COUNT_CAP);
           const ratio = cappedCharCount / maxCharCount;
           const height = day.active
-            ? Math.max(minActiveBarHeight, Math.round(Math.sqrt(ratio) * maxBarHeight))
+            ? Math.max(minActiveBarHeight, Math.round(Math.sqrt(ratio) * STREAK_MAX_BAR_HEIGHT))
             : 4;
           const isToday = day.date === todayKey;
 
@@ -317,7 +330,6 @@ function PotDistribution({ distribution }) {
           potId: '__others__',
           potName: '기타',
           tilCount: hiddenTilCount,
-          ratio: Number(formatRatio(hiddenTilCount)),
         },
       ]
     : visiblePots;
@@ -416,8 +428,8 @@ function InterestStackedAreaChart({ interests }) {
     </div>
   );
 
-  // 데이터가 아예 없거나 빈 배열일 때의 방어 처리
-  if (!interests || interests.length === 0) {
+  // 데이터가 없거나 1개월뿐이면 변화 추이를 비교할 수 없으므로 같은 안내 화면을 보여줍니다.
+  if (!interests || interests.length < 2) {
     return emptyState(
       '아직 흐름을 비교하기엔 기록이 조금 부족해요.',
       <>
@@ -428,16 +440,6 @@ function InterestStackedAreaChart({ interests }) {
   }
 
   const n = interests.length;
-
-  if (n < 2) {
-    return emptyState(
-      '아직 흐름을 비교하기엔 기록이 조금 부족해요.',
-      <>
-        2개월 이상 TIL을 쌓으면<br />
-        학습 주제가 어떻게 변했는지 보여드릴게요.
-      </>
-    );
-  }
 
   // 1. 상위 5개 태그 추출 및 'undefined' 방어 처리
   const tagTotals = {};
@@ -461,7 +463,13 @@ function InterestStackedAreaChart({ interests }) {
     .map(([tag]) => tag);
 
   if (topTags.length === 0) {
-    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>표시할 학습 주제 데이터가 없습니다.</div>;
+    return emptyState(
+      '아직 흐름을 비교하기엔 기록이 조금 부족해요.',
+      <>
+        2개월 이상 TIL을 쌓으면<br />
+        학습 주제가 어떻게 변했는지 보여드릴게요.
+      </>
+    );
   }
 
   // 월별 라벨 추출 (예: '2026-05' -> '05월')
@@ -792,7 +800,7 @@ function GoalRow({ goal }) {
 
 function DashboardScreen({ onNav }) {
   const [summary, setSummary]           = useState(null);
-  const [grassGrid, setGrassGrid]       = useState(buildGrassGrid([]));
+  const [grassState, setGrassState]     = useState(() => buildGrassState([]));
   const [grassCells, setGrassCells]     = useState([]);
   const [weekly, setWeekly]             = useState([]);
   const [distribution, setDistribution] = useState([]);
@@ -805,7 +813,7 @@ function DashboardScreen({ onNav }) {
   useEffect(() => {
     getGrass(12).then(data => {
       const cells = data?.cells ?? [];
-      setGrassGrid(buildGrassGrid(cells));
+      setGrassState(buildGrassState(cells));
       setGrassCells(cells);
     }).catch(error => {
       console.error('잔디 그래프 조회 중 오류 발생:', error);
@@ -816,7 +824,9 @@ function DashboardScreen({ onNav }) {
   useEffect(() => {
     getInterests(interestMonths).then(data => {
       setInterests(data?.interests ?? []);
-    }).catch(() => {});
+    }).catch(error => {
+      console.error('시기별 학습 주제 흐름 조회 중 오류 발생:', error);
+    });
   }, [interestMonths]);
 
   useEffect(() => {
@@ -863,6 +873,7 @@ function DashboardScreen({ onNav }) {
   const recentStreakDays = useMemo(() => buildRecentStreakDays(grassCells, 30), [grassCells]);
   const fallbackStreak = useMemo(() => calculateCurrentStreakFromCells(grassCells), [grassCells]);
   const apiStreak  = summary?.currentStreak  ?? 0;
+  // API 캐시가 늦게 갱신될 수 있어 잔디 셀 기반 로컬 계산값으로 현재 스트릭을 보정합니다.
   const streak     = Math.max(apiStreak, fallbackStreak);
   const bestStreak = summary?.longestStreak  ?? 0;
   const totalTil   = summary?.totalTilCount  ?? 0;
@@ -906,7 +917,7 @@ function DashboardScreen({ onNav }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
         <Card padding={22}>
           <SectionHeader eyebrow="활동" title="잔디 그래프" />
-          <GrassGraph data={grassGrid} />
+          <GrassGraph data={grassState.grid} startDate={grassState.startDate} />
         </Card>
 
         <Card padding={22}>

@@ -159,7 +159,7 @@ async function renderAndGenerate() {
   await waitFor(() => expect(screen.getByText('Container Queries 정리')).toBeInTheDocument());
 
   // 첫 번째 TIL 선택
-  fireEvent.click(screen.getByLabelText(/Container Queries 정리/i) ?? screen.getAllByRole('checkbox')[1]);
+  fireEvent.click(screen.getByLabelText(/Container Queries 정리/i));
 
   fireEvent.click(screen.getByRole('button', { name: /개 TIL로 생성/i }));
 

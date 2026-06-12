@@ -51,10 +51,17 @@ function AppShell() {
   const toggleFocusMode = () => setFocusMode((f) => !f);
 
   useEffect(() => {
+    if (!authed) {
+      setCollectionStats(null);
+      return;
+    }
+
     getPlants()
       .then(data => setCollectionStats(data?.stats ?? null))
-      .catch(() => {});
-  }, []);
+      .catch(error => {
+        console.error('식물도감 요약 조회 중 오류 발생:', error);
+      });
+  }, [authed]);
 
   const screen = getScreenFromPath(location.pathname);
   const routePotId = getPotIdFromPath(location.pathname);

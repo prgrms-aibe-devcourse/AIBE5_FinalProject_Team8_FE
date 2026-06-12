@@ -32,39 +32,57 @@ export function UserProvider({ children, initialUser = null, onAuthExpired }) {
   const [loading, setLoading] = useState(!initialUser);
 
   useEffect(() => {
+    let active = true;
+
     if (initialUser) {
       setUser(normalizeUser(initialUser));
       setLoading(false);
-      return;
+      return () => { active = false; };
     }
     const token = localStorage.getItem('accessToken');
     if (!token) {
       setLoading(false);
-      return;
+      return () => { active = false; };
     }
-    import('../api/user.js').then(({ getMe }) =>
-      getMe()
-        .then(async data => {
-          if (data?.userId != null) {
-            localStorage.setItem('userId', data.userId);
-          }
-          try {
-            const { getSummary } = await import('../api/dashboard.js');
-            const summary = await getSummary();
-            data.streak     = summary.currentStreak;
-            data.bestStreak = summary.longestStreak;
-          } catch (_) {}
-          setUser(normalizeUser(data));
-          setLoading(false);
-        })
-        .catch(() => {
+
+    async function loadUser() {
+      try {
+        const { getMe } = await import('../api/user.js');
+        const data = await getMe();
+        if (!active) return;
+        if (data?.userId != null) {
+          localStorage.setItem('userId', data.userId);
+        }
+        try {
+          const { getSummary } = await import('../api/dashboard.js');
+          const summary = await getSummary();
+          data.streak     = summary.currentStreak;
+          data.bestStreak = summary.longestStreak;
+        } catch {
+          // 대시보드 요약 조회 실패는 로그인 상태 판정과 분리합니다.
+        }
+        if (!active) return;
+        setUser(normalizeUser(data));
+      } catch (error) {
+        if (!active) return;
+        if (error?.status === 401) {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
-          setLoading(false);
           onAuthExpired?.();
-        })
-    );
-  }, []);
+          return;
+        }
+        console.error('사용자 정보 조회 중 오류 발생:', error);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadUser();
+
+    return () => { active = false; };
+  }, [initialUser, onAuthExpired]);
 
   /** 로그인 성공 후 외부에서 유저 정보 주입 */
   function setUserFromApi(apiUser) {

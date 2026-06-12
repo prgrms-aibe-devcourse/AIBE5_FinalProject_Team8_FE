@@ -78,40 +78,106 @@ function GrassGraph({ data }) {
   );
 }
 
-function StreakProgress({ streak, bestStreak }) {
-  const safeStreak = Math.max(0, Number(streak) || 0);
-  const safeBest = Math.max(1, Number(bestStreak) || safeStreak || 1);
-  const progress = Math.min(100, Math.round((safeStreak / safeBest) * 100));
-  const hasStreak = safeStreak > 0;
-  const isBestStreak = hasStreak && safeStreak >= safeBest;
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatShortDate(dateKey) {
+  const [, month, day] = dateKey.split('-');
+  return `${month}.${day}`;
+}
+
+function buildRecentStreakDays(cells = [], maxDays = 30) {
+  const cellMap = new Map(
+    cells.map(cell => [String(cell.date ?? '').slice(0, 10), {
+      tilCount: Number(cell.tilCount) || 0,
+      charCount: Number(cell.charCount) || 0,
+    }])
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: maxDays }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (maxDays - 1 - index));
+    const dateKey = formatDateKey(date);
+    const record = cellMap.get(dateKey) ?? { tilCount: 0, charCount: 0 };
+
+    return {
+      date: dateKey,
+      tilCount: record.tilCount,
+      charCount: record.charCount,
+      active: record.tilCount > 0 || record.charCount > 0,
+    };
+  });
+}
+
+function calculateCurrentStreakFromCells(cells = []) {
+  const days = buildRecentStreakDays(cells, 30);
+  let count = 0;
+
+  for (let i = days.length - 1; i >= 0; i--) {
+    if (!days[i].active) break;
+    count += 1;
+  }
+
+  return count;
+}
+
+function StreakActivityChart({ cells }) {
+  const days = buildRecentStreakDays(cells, 30);
+  const charCountCap = 1200;
+  const maxCharCount = Math.max(...days.map(day => Math.min(day.charCount, charCountCap)), 1);
+  const todayKey = formatDateKey(new Date());
+  const maxBarHeight = 82;
+  const minActiveBarHeight = 9;
 
   return (
-    <div style={{ marginTop: 14 }}>
-      <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55, minHeight: 40 }}>
-        {hasStreak
-          ? isBestStreak
-            ? '🔥 최고 기록을 갱신 중이에요!'
-            : '현재 기록이 이어지고 있어요. 오늘도 한 줄을 남기면 흐름이 더 단단해져요.'
-          : '오늘 TIL을 남기면 새로운 연속 기록이 시작돼요.'}
+    <div style={{
+      marginTop: 14,
+      padding: '13px 12px 9px',
+      borderRadius: 16,
+      background: 'linear-gradient(180deg, #fbfaf6 0%, #f4f7f0 100%)',
+      border: '0.5px solid var(--rule)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 11.5, color: 'var(--ink-2)', fontWeight: 600 }}>최근 30일 작성량</span>
+        <span style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>글자수 기준</span>
       </div>
-      <div style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>
-            현재 / 최고 기록
-          </span>
-          <span style={{ fontSize: 11.5, color: 'var(--moss-2)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
-            {safeStreak} / {safeBest}일 · {progress}%
-          </span>
-        </div>
-        <div style={{ height: 9, borderRadius: 999, background: '#eef2ee', overflow: 'hidden' }}>
-          <div style={{
-            width: `${progress}%`,
-            height: '100%',
-            borderRadius: 999,
-            background: 'linear-gradient(90deg, var(--moss), var(--sprout))',
-            transition: 'width 400ms ease',
-          }} />
-        </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 104 }}>
+        {days.map(day => {
+          const cappedCharCount = Math.min(day.charCount, charCountCap);
+          const ratio = cappedCharCount / maxCharCount;
+          const height = day.active
+            ? Math.max(minActiveBarHeight, Math.round(Math.sqrt(ratio) * maxBarHeight))
+            : 4;
+          const isToday = day.date === todayKey;
+
+          return (
+            <div
+              key={day.date}
+              title={`${formatShortDate(day.date)} · ${day.charCount.toLocaleString()}자`}
+              style={{
+                flex: 1,
+                height,
+                minWidth: 0,
+                borderRadius: day.active ? '5px 5px 2px 2px' : 3,
+                background: day.active ? 'linear-gradient(180deg, #3d8b5e, #2e6b48)' : 'var(--rule)',
+                opacity: day.active ? 1 : 0.65,
+                outline: isToday && day.active ? '1px solid rgba(46, 107, 72, 0.28)' : 'none',
+                outlineOffset: 2,
+              }}
+            />
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+        <span>30일 전</span>
+        <span>오늘</span>
       </div>
     </div>
   );
@@ -147,8 +213,32 @@ function WeeklyBar({ weekly }) {
 }
 
 function PotDistribution({ distribution }) {
+  const emptyState = (
+    <div style={{
+      minHeight: 150,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      border: '0.5px dashed var(--rule-2)',
+      borderRadius: 14,
+      background: 'linear-gradient(180deg, #fbfaf6 0%, #f6f4ed 100%)',
+      color: 'var(--ink-3)',
+      padding: '22px 18px',
+    }}>
+      <div style={{ fontSize: 24, marginBottom: 8 }}>🌱</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--ink-2)' }}>
+        아직 주제 비율이 없어요
+      </div>
+      <div style={{ marginTop: 6, fontSize: 12.5, lineHeight: 1.5 }}>
+        화분에 TIL을 작성하면<br />주제별 비율이 이곳에 표시됩니다.
+      </div>
+    </div>
+  );
+
   if (!distribution || distribution.length === 0) {
-    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>TIL 데이터가 없습니다.</div>;
+    return emptyState;
   }
 
   const normalizePotName = name => {
@@ -169,7 +259,7 @@ function PotDistribution({ distribution }) {
     .slice(0, 5);
 
   if (safeDistribution.length === 0) {
-    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>표시할 주제 비율 데이터가 없습니다.</div>;
+    return emptyState;
   }
 
   const total = safeDistribution.reduce((s, p) => s + p.tilCount, 0);
@@ -631,6 +721,7 @@ function DashboardScreen({ onNav }) {
   const [summary, setSummary]           = useState(null);
   const [grassMonths, setGrassMonths]   = useState(3);
   const [grassGrid, setGrassGrid]       = useState(buildGrassGrid([], 3));
+  const [grassCells, setGrassCells]     = useState([]);
   const [weekly, setWeekly]             = useState([]);
   const [distribution, setDistribution] = useState([]);
   const [interests, setInterests]           = useState([]);
@@ -641,7 +732,9 @@ function DashboardScreen({ onNav }) {
   // 잔디 기간 변경 시 재요청
   useEffect(() => {
     getGrass(grassMonths).then(data => {
-      setGrassGrid(buildGrassGrid(data?.cells ?? [], grassMonths));
+      const cells = data?.cells ?? [];
+      setGrassGrid(buildGrassGrid(cells, grassMonths));
+      setGrassCells(cells);
     }).catch(() => {});
   }, [grassMonths]);
 
@@ -693,7 +786,8 @@ function DashboardScreen({ onNav }) {
     return () => { active = false; };
   }, []);
 
-  const streak     = summary?.currentStreak  ?? 0;
+  const apiStreak  = summary?.currentStreak  ?? 0;
+  const streak     = Math.max(apiStreak, calculateCurrentStreakFromCells(grassCells));
   const bestStreak = summary?.longestStreak  ?? 0;
   const totalTil   = summary?.totalTilCount  ?? 0;
   const totalChar  = summary?.totalCharCount ?? 0;
@@ -770,12 +864,13 @@ function DashboardScreen({ onNav }) {
       {/* 3 column stats row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
         <Card padding={22}>
-          <SectionHeader eyebrow="연속 기록" title="Streak" action={<Pill tone="green">최고 {bestStreak}일</Pill>} />
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, color: 'var(--moss-2)', letterSpacing: '-0.03em' }}>{streak}</span>
-            <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>일째</span>
-          </div>
-          <StreakProgress streak={streak} bestStreak={bestStreak} />
+          <SectionHeader eyebrow="연속 기록" title="Streak" action={
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <Pill tone="green">현재 {streak}일째</Pill>
+              <Pill tone="green">최고 {bestStreak}일</Pill>
+            </div>
+          } />
+          <StreakActivityChart cells={grassCells} />
         </Card>
 
         <Card padding={22}>

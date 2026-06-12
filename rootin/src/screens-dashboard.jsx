@@ -78,21 +78,41 @@ function GrassGraph({ data }) {
   );
 }
 
-function StreakChart() {
-  const days = [];
-  for (let i = 0; i < 21; i++) {
-    const active = i >= 9;
-    days.push({ active, h: active ? 18 + Math.sin(i * 0.8) * 6 + ((i * 7 + 3) % 8) : 0 });
-  }
+function StreakProgress({ streak, bestStreak }) {
+  const safeStreak = Math.max(0, Number(streak) || 0);
+  const safeBest = Math.max(1, Number(bestStreak) || safeStreak || 1);
+  const progress = Math.min(100, Math.round((safeStreak / safeBest) * 100));
+  const hasStreak = safeStreak > 0;
+  const isBestStreak = hasStreak && safeStreak >= safeBest;
+
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 60 }}>
-      {days.map((d, i) => (
-        <div key={i} style={{
-          flex: 1, height: d.active ? `${d.h + 18}px` : '4px',
-          background: d.active ? 'linear-gradient(180deg, #3d8b5e, #2e6b48)' : 'var(--rule)',
-          borderRadius: 3, opacity: d.active ? 1 : 0.6,
-        }} />
-      ))}
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55, minHeight: 40 }}>
+        {hasStreak
+          ? isBestStreak
+            ? '🔥 최고 기록을 갱신 중이에요!'
+            : '현재 기록이 이어지고 있어요. 오늘도 한 줄을 남기면 흐름이 더 단단해져요.'
+          : '오늘 TIL을 남기면 새로운 연속 기록이 시작돼요.'}
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', fontWeight: 600 }}>
+            현재 / 최고 기록
+          </span>
+          <span style={{ fontSize: 11.5, color: 'var(--moss-2)', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>
+            {safeStreak} / {safeBest}일 · {progress}%
+          </span>
+        </div>
+        <div style={{ height: 9, borderRadius: 999, background: '#eef2ee', overflow: 'hidden' }}>
+          <div style={{
+            width: `${progress}%`,
+            height: '100%',
+            borderRadius: 999,
+            background: 'linear-gradient(90deg, var(--moss), var(--sprout))',
+            transition: 'width 400ms ease',
+          }} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -100,10 +120,10 @@ function StreakChart() {
 function WeeklyBar({ weekly }) {
   const max = Math.max(...weekly.map(w => w.count), 1);
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, height: 130 }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8, height: 166, marginTop: 'auto', paddingTop: 14 }}>
       {weekly.map((w, i) => (
         <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%' }}>
-          <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid var(--rule)' }}>
             <div style={{
               width: '100%',
               height: `${(w.count / max) * 100}%`,
@@ -130,9 +150,31 @@ function PotDistribution({ distribution }) {
   if (!distribution || distribution.length === 0) {
     return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>TIL 데이터가 없습니다.</div>;
   }
-  const total = distribution.reduce((s, p) => s + p.tilCount, 0);
+
+  const normalizePotName = name => {
+    const value = String(name ?? '').trim();
+    if (!value || value === 'undefined' || value === 'null') return '이름 없는 화분';
+    return value;
+  };
+
+  const safeDistribution = distribution
+    .map(p => ({
+      ...p,
+      potName: normalizePotName(p.potName),
+      tilCount: Number(p.tilCount) || 0,
+      ratio: Number(p.ratio) || 0,
+    }))
+    .filter(p => p.tilCount > 0)
+    .sort((a, b) => b.tilCount - a.tilCount || b.ratio - a.ratio)
+    .slice(0, 5);
+
+  if (safeDistribution.length === 0) {
+    return <div style={{ textAlign: 'center', color: 'var(--ink-3)', padding: '20px 0', fontSize: 12 }}>표시할 주제 비율 데이터가 없습니다.</div>;
+  }
+
+  const total = safeDistribution.reduce((s, p) => s + p.tilCount, 0);
   let acc = 0;
-  const segs = distribution.map(p => {
+  const segs = safeDistribution.map(p => {
     const pct = total > 0 ? p.tilCount / total : 0;
     const start = acc;
     acc += pct;
@@ -140,10 +182,11 @@ function PotDistribution({ distribution }) {
   });
   const R = 56;
   const circumference = 2 * Math.PI * R;
-  const colors = ['var(--ink)', 'var(--moss)', 'var(--amber)', 'var(--leaf)'];
+  const hasHiddenItems = distribution.length > safeDistribution.length;
+  const colors = ['#1f4f3a', '#2563eb', '#d97706', '#7c3aed', '#db2777'];
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-      <svg width="140" height="140" viewBox="0 0 140 140">
+    <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+      <svg width="144" height="144" viewBox="0 0 140 140" style={{ flex: '0 0 144px' }}>
         <circle cx="70" cy="70" r={R} fill="none" stroke="var(--rule)" strokeWidth="14" />
         {segs.map((s, i) => {
           const len = s.pct * circumference;
@@ -151,25 +194,38 @@ function PotDistribution({ distribution }) {
           const offset = -s.start * circumference;
           return (
             <circle key={s.potId} cx="70" cy="70" r={R} fill="none"
-              stroke={colors[i % 4]} strokeWidth="14"
+              stroke={colors[i % colors.length]} strokeWidth="14"
               strokeDasharray={dash} strokeDashoffset={offset}
               transform="rotate(-90 70 70)" strokeLinecap="butt"
             />
           );
         })}
         <text x="70" y="68" textAnchor="middle" style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700, fill: 'var(--ink)' }}>{total}</text>
-        <text x="70" y="84" textAnchor="middle" style={{ fontFamily: 'var(--font-body)', fontSize: 10, fill: 'var(--ink-3)' }}>총 TIL</text>
+        <text x="70" y="84" textAnchor="middle" style={{ fontFamily: 'var(--font-body)', fontSize: 10, fill: 'var(--ink-3)' }}>{hasHiddenItems ? 'TOP 5' : '총 TIL'}</text>
       </svg>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {segs.map((s, i) => (
-          <div key={s.potId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-            <div style={{ width: 10, height: 10, borderRadius: 3, background: colors[i % 4] }} />
-            <span style={{ color: 'var(--ink)' }}>{s.potName}</span>
-            <span style={{ marginLeft: 'auto', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 11 }}>
+          <div key={s.potId ?? `${s.potName}-${i}`} style={{ display: 'grid', gridTemplateColumns: '12px minmax(0, 1fr) auto', alignItems: 'center', gap: 10, fontSize: 14 }}>
+            <div style={{ width: 11, height: 11, borderRadius: 3, background: colors[i % colors.length] }} />
+            <span title={s.potName} style={{
+              color: 'var(--ink)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              minWidth: 0,
+            }}>
+              {s.potName}
+            </span>
+            <span style={{ color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: 12.5, whiteSpace: 'nowrap' }}>
               {s.tilCount}개 · {s.ratio}%
             </span>
           </div>
         ))}
+        {hasHiddenItems && (
+          <div style={{ marginTop: 2, fontSize: 11.5, color: 'var(--ink-3)' }}>
+            상위 {safeDistribution.length}개 화분만 표시해요.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -719,10 +775,7 @@ function DashboardScreen({ onNav }) {
             <span style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, color: 'var(--moss-2)', letterSpacing: '-0.03em' }}>{streak}</span>
             <span style={{ fontSize: 13, color: 'var(--ink-3)' }}>일째</span>
           </div>
-          <StreakChart />
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-            <span>−21d</span><span>오늘</span>
-          </div>
+          <StreakProgress streak={streak} bestStreak={bestStreak} />
         </Card>
 
         <Card padding={22}>
@@ -730,7 +783,7 @@ function DashboardScreen({ onNav }) {
           <PotDistribution distribution={distribution} />
         </Card>
 
-        <Card padding={22}>
+        <Card padding={22} style={{ display: 'flex', flexDirection: 'column' }}>
           <SectionHeader eyebrow="이번 주" title="요일별 작성" />
           <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />
         </Card>

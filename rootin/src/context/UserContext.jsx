@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef } from 'react';
 
 const UserContext = createContext(null);
 
@@ -30,6 +30,11 @@ function normalizeUser(apiUser) {
 export function UserProvider({ children, initialUser = null, onAuthExpired }) {
   const [user, setUser] = useState(initialUser ? normalizeUser(initialUser) : null);
   const [loading, setLoading] = useState(!initialUser);
+  const onAuthExpiredRef = useRef(onAuthExpired);
+
+  useEffect(() => {
+    onAuthExpiredRef.current = onAuthExpired;
+  }, [onAuthExpired]);
 
   useEffect(() => {
     let active = true;
@@ -68,7 +73,7 @@ export function UserProvider({ children, initialUser = null, onAuthExpired }) {
         if (error?.status === 401) {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
-          onAuthExpired?.();
+          onAuthExpiredRef.current?.();
           return;
         }
         console.error('사용자 정보 조회 중 오류 발생:', error);
@@ -82,7 +87,7 @@ export function UserProvider({ children, initialUser = null, onAuthExpired }) {
     loadUser();
 
     return () => { active = false; };
-  }, [initialUser, onAuthExpired]);
+  }, [initialUser]);
 
   /** 로그인 성공 후 외부에서 유저 정보 주입 */
   function setUserFromApi(apiUser) {

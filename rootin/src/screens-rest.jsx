@@ -4,7 +4,7 @@ import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult }
 import { getPots } from './api/pot.js';
 import { getMyTils } from './api/til.js';
 import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
-import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
+import { PixelPlant } from './pixel-plants.jsx';
 import { Plant, RootinLogo, STAGE_META } from './plants.jsx';
 import { useUser } from './context/UserContext.jsx';
 import { inferSpecies } from './utils/plant.js';
@@ -401,7 +401,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
       isAllSelected:   total > 0 && selectedCount === total,
       isIndeterminate: selectedCount > 0 && selectedCount < total,
       canSelectAll:    outsideSelected + total <= TIL_IDS_MAX_SIZE,
-      addableCount:    TIL_IDS_MAX_SIZE - outsideSelected,
+      addableCount:    TIL_IDS_MAX_SIZE - selectedIds.size,
     };
   }, [allFilteredIds, selectedIds]);
 
@@ -720,6 +720,7 @@ function AIScreen() {
 
   // 저장 완료 피드백용
   const [saved, setSaved] = useState(false);
+  const savedTimerRef = useRef(null);
 
   // TIL 선택 모달
   const [modalOpen, setModalOpen] = useState(false);
@@ -727,6 +728,12 @@ function AIScreen() {
   const [lastTilIds, setLastTilIds] = useState([]);
 
   const selectedPot = pots.find(p => p.id === potId) ?? null;
+
+  useEffect(() => () => {
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current);
+    }
+  }, []);
 
   // 페이지 진입 시 화분 목록 + 사용자 포인트 로딩
   useEffect(() => {
@@ -758,14 +765,13 @@ function AIScreen() {
           const content = typeof r.content === 'string'
             ? (() => { try { return JSON.parse(r.content); } catch { return null; } })()
             : r.content;
-          const d = new Date(r.createdAt);
           return {
             id: r.resultId,
             type: r.type.toLowerCase(),   // 'QUIZ' → 'quiz'
             potId: r.potId,
             content,
             tilIds: r.tilIds ?? [],
-            date: `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`,
+            date: formatDate(r.createdAt),
             quizCount: r.type === 'QUIZ' ? content?.quizzes?.length : undefined,
           };
         });
@@ -855,13 +861,18 @@ function AIScreen() {
           date,
           quizCount: resultMode === 'quiz' ? quizCount : undefined,
           tilIds: lastTilIds,
-          pot: selectedPot,
           content: aiResult,
         },
         ...prev,
       ]);
+      if (savedTimerRef.current) {
+        clearTimeout(savedTimerRef.current);
+      }
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      savedTimerRef.current = setTimeout(() => {
+        setSaved(false);
+        savedTimerRef.current = null;
+      }, 2000);
     } catch {
       setError('저장에 실패했어요. 잠시 후 다시 시도해 주세요.');
     }
@@ -1754,7 +1765,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
         });
       });
       const { googleLogin, googleLogin: _g } = await import('./api/auth.js');
-      const result = await googleLogin({ idToken });
+      await googleLogin({ idToken });
       const { getMe } = await import('./api/user.js');
       const userData = await getMe();
       onAuth(userData);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { POTS } from './data.jsx';
 import { getPlants } from './api/collection.js';
@@ -56,11 +56,21 @@ function AppShell() {
       return;
     }
 
+    let active = true;
+
     getPlants()
-      .then(data => setCollectionStats(data?.stats ?? null))
+      .then(data => {
+        if (active) {
+          setCollectionStats(data?.stats ?? null);
+        }
+      })
       .catch(error => {
-        console.error('식물도감 요약 조회 중 오류 발생:', error);
+        if (active) {
+          console.error('식물도감 요약 조회 중 오류 발생:', error);
+        }
       });
+
+    return () => { active = false; };
   }, [authed]);
 
   const screen = getScreenFromPath(location.pathname);
@@ -332,12 +342,14 @@ function isRoutePath(pathname, route) {
 }
 
 function App() {
+  const handleAuthExpired = useCallback(() => {
+    // 토큰 만료 시 페이지 리로드로 로그아웃 처리
+    window.location.reload();
+  }, []);
+
   return (
     <BrowserRouter>
-      <UserProvider onAuthExpired={() => {
-        // 토큰 만료 시 페이지 리로드로 로그아웃 처리
-        window.location.reload();
-      }}>
+      <UserProvider onAuthExpired={handleAuthExpired}>
         <AppShell />
       </UserProvider>
     </BrowserRouter>

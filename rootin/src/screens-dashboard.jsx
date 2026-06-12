@@ -607,16 +607,20 @@ function DashboardScreen({ onNav }) {
 
   // 잔디 — 항상 1년치 데이터
   useEffect(() => {
+    let active = true;
     getGrass(12).then(data => {
-      setGrassGrid(buildGrassGrid(data?.cells ?? []));
+      if (active) setGrassGrid(buildGrassGrid(data?.cells ?? []));
     }).catch(() => {});
+    return () => { active = false; };
   }, []);
 
   // 관심사 기간 변경 시 재요청
   useEffect(() => {
+    let active = true;
     getInterests(interestMonths).then(data => {
-      setInterests(data?.interests ?? []);
+      if (active) setInterests(data?.interests ?? []);
     }).catch(() => {});
+    return () => { active = false; };
   }, [interestMonths]);
 
   useEffect(() => {

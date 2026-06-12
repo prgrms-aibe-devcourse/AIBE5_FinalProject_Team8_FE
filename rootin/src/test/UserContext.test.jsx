@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { UserProvider, useUser } from '../context/UserContext.jsx';
 
 vi.mock('../api/user.js', () => ({
@@ -39,6 +40,16 @@ function AuthStateDisplay() {
       <span data-testid="loading">{String(loading)}</span>
       <span data-testid="user-id">{user?.userId ?? ''}</span>
     </div>
+  );
+}
+
+function RerenderingProviderWrapper() {
+  const [count, setCount] = useState(0);
+  return (
+    <UserProvider onAuthExpired={() => {}}>
+      <AuthStateDisplay />
+      <button onClick={() => setCount(value => value + 1)}>rerender {count}</button>
+    </UserProvider>
   );
 }
 
@@ -146,5 +157,23 @@ describe('UserContext', () => {
     expect(localStorage.getItem('accessToken')).toBeNull();
     expect(localStorage.getItem('refreshToken')).toBeNull();
     expect(onAuthExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it('부모가 새 onAuthExpired 함수를 넘기며 리렌더링되어도 사용자 정보를 다시 조회하지 않는다', async () => {
+    localStorage.setItem('accessToken', 'tok');
+
+    render(<RerenderingProviderWrapper />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('loading').textContent).toBe('false');
+    });
+
+    expect(getMe).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      screen.getByText(/rerender/).click();
+    });
+
+    expect(getMe).toHaveBeenCalledTimes(1);
   });
 });

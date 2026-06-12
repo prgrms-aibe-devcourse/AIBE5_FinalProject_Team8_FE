@@ -294,7 +294,6 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-
   // 진입 시 화분 TIL 전체 로딩 — 전체 페이지 순회
   useEffect(() => {
     if (!potId) return;
@@ -374,7 +373,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const filtered = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
     return tils.filter(t => {
-      const matchesTag = !selectedTag || t.tags.includes(selectedTag);
+      const matchesTag = !selectedTag || t.tags.map(String).includes(selectedTag);
       const matchesKw  = !kw || t.title.toLowerCase().includes(kw);
       return matchesTag && matchesKw;
     });
@@ -543,8 +542,6 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
             일부 TIL을 불러오지 못했어요. 목록이 불완전할 수 있습니다.
           </div>
         )}
-
-
 
         {/* TIL 목록 */}
         <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }} className="scrollbar">

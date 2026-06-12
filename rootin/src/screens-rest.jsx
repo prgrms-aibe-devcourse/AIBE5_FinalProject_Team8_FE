@@ -388,17 +388,21 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const pageTils    = filtered.slice(currentPage * TIL_MODAL_PAGE_SIZE, (currentPage + 1) * TIL_MODAL_PAGE_SIZE);
 
   // 전체 선택: 현재 필터된 TIL 전체 기준
-  const allFilteredIds  = useMemo(() => filtered.map(t => t.id), [filtered]);
-  const isAllSelected   = useMemo(() => allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id)), [allFilteredIds, selectedIds]);
-  const isIndeterminate = useMemo(() => !isAllSelected && allFilteredIds.some(id => selectedIds.has(id)), [isAllSelected, allFilteredIds, selectedIds]);
+  const allFilteredIds = useMemo(() => filtered.map(t => t.id), [filtered]);
 
-  // 교차 필터 상황에서 전체 선택 가능 여부 — 이미 선택된 filtered 항목 제외 후 슬롯 확인
-  const { canSelectAll, addableCount } = useMemo(() => {
-    const alreadySelected = allFilteredIds.filter(id => selectedIds.has(id)).length;
-    const outsideSelected = selectedIds.size - alreadySelected;
+  // allFilteredIds 단일 순회로 전체선택 관련 파생값 한 번에 계산
+  const { isAllSelected, isIndeterminate, canSelectAll, addableCount } = useMemo(() => {
+    const total = allFilteredIds.length;
+    let selectedCount = 0;
+    for (const id of allFilteredIds) {
+      if (selectedIds.has(id)) selectedCount++;
+    }
+    const outsideSelected = selectedIds.size - selectedCount;
     return {
-      canSelectAll: outsideSelected + allFilteredIds.length <= TIL_IDS_MAX_SIZE,
-      addableCount: TIL_IDS_MAX_SIZE - outsideSelected,
+      isAllSelected:   total > 0 && selectedCount === total,
+      isIndeterminate: selectedCount > 0 && selectedCount < total,
+      canSelectAll:    outsideSelected + total <= TIL_IDS_MAX_SIZE,
+      addableCount:    TIL_IDS_MAX_SIZE - outsideSelected,
     };
   }, [allFilteredIds, selectedIds]);
 
@@ -788,15 +792,6 @@ function AIScreen() {
     setError(null);
   };
 
-  // 모달 확인 — tilIds 받아서 생성 실행
-  const handleModalConfirm = (tilIds) => {
-    setModalOpen(false);
-    setLastTilIds(tilIds);
-    handleGenerate(tilIds);
-  };
-
-  const handleModalClose = useCallback(() => setModalOpen(false), []);
-
   // 생성 버튼 — mode에 따라 summary/quiz API 호출
   const handleGenerate = async (tilIds) => {
     if (!potId) return;
@@ -825,6 +820,15 @@ function AIScreen() {
       setGenerating(false);
     }
   };
+
+  // 모달 확인 — tilIds 받아서 생성 실행
+  const handleModalConfirm = (tilIds) => {
+    setModalOpen(false);
+    setLastTilIds(tilIds);
+    handleGenerate(tilIds);
+  };
+
+  const handleModalClose = useCallback(() => setModalOpen(false), []);
 
   const handlePotChange = (id) => {
     setPotId(id);

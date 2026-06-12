@@ -357,7 +357,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const tagCounts = useMemo(() => {
     const map = new Map();
     tils.forEach(t => t.tags.forEach(tag => {
-      const k = String(tag).trim();
+      const k = tag;
       if (k) map.set(k, (map.get(k) ?? 0) + 1);
     }));
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
@@ -501,7 +501,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
 
         {/* 전체 선택 + 카운트 */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid var(--rule)', paddingBottom: 8 }}>
-          {(totalElements <= TIL_IDS_MAX_SIZE || (!!(keyword.trim() || selectedTag) && filtered.length <= TIL_IDS_MAX_SIZE)) ? (
+          {((partialError ? tils.length : totalElements) <= TIL_IDS_MAX_SIZE || (!!(keyword.trim() || selectedTag) && filtered.length <= TIL_IDS_MAX_SIZE)) ? (
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--ink-2)' }}>
               <input
                 type="checkbox"
@@ -772,7 +772,7 @@ function AIScreen() {
     setMode(item.type);
     setResultMode(item.type);
     if (item.pot) setPotId(item.pot.id);
-    if (item.quizCount) setQuizCount(item.quizCount);
+    if (item.quizCount != null) setQuizCount(item.quizCount);
     setAiResult(item.content ?? null);
     setLastTilIds(item.tilIds ?? []);
     setGenerated(true);
@@ -817,6 +817,7 @@ function AIScreen() {
 
   const handlePotChange = (id) => {
     setPotId(id);
+    setLastTilIds([]);
   };
 
   // 결과 저장 버튼 — POST /ai/results
@@ -840,6 +841,7 @@ function AIScreen() {
           title,
           date,
           quizCount: mode === 'quiz' ? quizCount : undefined,
+          tilIds: lastTilIds,
           pot: selectedPot,
           content: aiResult,
         },

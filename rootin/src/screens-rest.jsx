@@ -1,12 +1,15 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
 import { getPlants } from './api/collection.js';
 import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult } from './api/ai.js';
 import { getPots } from './api/pot.js';
 import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { Plant, RootinLogo, STAGE_META } from './plants.jsx';
+import { RtIcon } from './pixel-icons.jsx';
+import { playSfx } from './lib/sfx.js';
 import { useUser } from './context/UserContext.jsx';
 import { inferSpecies } from './utils/plant.js';
+import './dex.css';
 
 // Collection (식물도감), AI, Profile, Auth screens
 
@@ -24,124 +27,243 @@ const SPECIES_TO_PIXEL = {
 
 const STAGE_KEYS = ['seed', 'sprout', 'leaf', 'bloom', 'full'];
 
-const STAGE_BADGE_STYLE = {
-  seed:   { background: '#fff4e0', color: '#8b6340', border: '#f0dcb5' },
-  sprout: { background: '#ebf5ef', color: '#2e6b48', border: '#d4ebdc' },
-  leaf:   { background: '#e3f2e8', color: '#1d5e38', border: '#c4e0cc' },
-  bloom:  { background: '#ffeef2', color: '#b8536a', border: '#ffd4dc' },
-  full:   { background: '#eef2f8', color: '#1a3a5c', border: '#d8e2ee' },
+// 단계별 강조색 — 올리브 LCD 팔레트 위에 단계마다 다른 게임 뱃지 톤(sprout 토큰 재사용)
+const STAGE_ACCENT = {
+  seed:   { bg: 'var(--amber-soft)', fg: '#9a7322',      dot: 'var(--amber)' },
+  sprout: { bg: '#dbe6bb',           fg: 'var(--leaf-2)', dot: 'var(--leaf-3)' },
+  leaf:   { bg: '#cfe0a8',           fg: 'var(--leaf)',   dot: 'var(--leaf-2)' },
+  bloom:  { bg: 'var(--berry-soft)', fg: 'var(--berry)',  dot: 'var(--berry)' },
+  full:   { bg: 'var(--sky-soft)',   fg: '#3e6580',       dot: 'var(--sky)' },
 };
 
+// 달빛 계열 밤하늘 별 좌표
+const DEX_STAR_POS = [
+  { l: '14%', t: '20%' }, { l: '28%', t: '14%' }, { l: '42%', t: '24%' },
+  { l: '60%', t: '16%' }, { l: '74%', t: '30%' }, { l: '86%', t: '18%' },
+  { l: '20%', t: '40%' }, { l: '52%', t: '38%' }, { l: '90%', t: '44%' },
+];
+
+// 흑장미 계열 떨어지는 꽃잎 (left%, 시작 지연, 낙하 시간)
+const DEX_PETALS = [
+  { l: '12%', d: 0,   dur: 3.6 }, { l: '24%', d: 1.1, dur: 4.4 },
+  { l: '38%', d: 0.5, dur: 3.2 }, { l: '52%', d: 1.9, dur: 4.7 },
+  { l: '66%', d: 0.9, dur: 3.9 }, { l: '79%', d: 2.3, dur: 4.1 },
+  { l: '90%', d: 1.4, dur: 3.4 },
+];
+
+function pixelFor(speciesKey) {
+  return SPECIES_TO_PIXEL[speciesKey] ?? speciesKey;
+}
+
 // ============================
-// 도감 단일 카드 (5열 그리드용)
+// 통계 타일 (달성도)
 // ============================
-function DexCard({ entry, speciesKey, rare }) {
-  const pixelSpecies = SPECIES_TO_PIXEL[speciesKey] ?? speciesKey;
+function DexStatTile({ icon, label, value, total, suffix = '', accent = false }) {
+  const pct = total ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className={`rt-card rt-stat${accent ? ' rt-stat--accent' : ''}`}>
+      <p className="rt-stat-k"><RtIcon name={icon} /> {label}</p>
+      <p className="rt-stat-v">{value}<span className="unit">/ {total}{suffix}</span></p>
+      <div className="gb-dex-meter"><i style={{ width: `${pct}%` }} /></div>
+    </div>
+  );
+}
+
+// ============================
+// 희귀종 전용 배경 — 계열별 무대 연출
+//   moon: 달빛 밤하늘 · bolt: 번개 폭풍 · rose: 흑장미 고딕
+// ============================
+function DexMoonSky() {
+  return (
+    <div className="gb-dex-sky gb-dex-sky--moon" aria-hidden="true">
+      <span className="gb-dex-moon" />
+      {DEX_STAR_POS.map((s, i) => (
+        <span key={i} className="gb-dex-star" style={{ left: s.l, top: s.t, animationDelay: `${(i % 4) * 0.4}s` }} />
+      ))}
+    </div>
+  );
+}
+
+function DexBoltSky() {
+  return (
+    <div className="gb-dex-sky gb-dex-sky--bolt" aria-hidden="true">
+      <span className="gb-dex-flash" />
+      <span className="gb-dex-cloud gb-dex-cloud--1" />
+      <span className="gb-dex-cloud gb-dex-cloud--2" />
+      <span className="gb-dex-zap gb-dex-zap--1" />
+      <span className="gb-dex-zap gb-dex-zap--2" />
+    </div>
+  );
+}
+
+function DexRoseSky() {
+  return (
+    <div className="gb-dex-sky gb-dex-sky--rose" aria-hidden="true">
+      <span className="gb-dex-rose-glow" />
+      {DEX_PETALS.map((p, i) => (
+        <span key={i} className="gb-dex-petal" style={{ left: p.l, animationDelay: `${p.d}s`, animationDuration: `${p.dur}s` }} />
+      ))}
+    </div>
+  );
+}
+
+const DEX_RARE_SKY = { moon: DexMoonSky, bolt: DexBoltSky, rose: DexRoseSky };
+
+function DexRareBackdrop({ speciesKey }) {
+  const Sky = DEX_RARE_SKY[speciesKey] ?? DexMoonSky;
+  return <Sky />;
+}
+
+// ============================
+// 진화 계보 스트립 (선택 종의 5단계)
+// ============================
+function DexEvoStrip({ section, selectedNum, onSelect }) {
+  return (
+    <div className="gb-dex-evo">
+      {section.entries.map((e, i) => {
+        const stageKey = STAGE_KEYS[e.stageIndex] ?? 'seed';
+        const active = e.dexNumber === selectedNum;
+        return (
+          <Fragment key={e.dexNumber}>
+            <div className="gb-dex-evo-step">
+              <button
+                type="button"
+                className={`gb-dex-evo-cell${active ? ' is-active' : ''}${e.collected ? '' : ' is-locked'}`}
+                onClick={() => onSelect(e.dexNumber)}
+                title={e.collected ? `${e.monName} · ${e.stageName}` : `미발견 · ${e.stageName}`}
+              >
+                <PixelPlant species={pixelFor(section.speciesKey)} stage={stageKey} size={32} locked={!e.collected} />
+              </button>
+              <span className="gb-dex-evo-label">{e.stageName}</span>
+            </div>
+            {i < section.entries.length - 1 && <span className="gb-dex-evo-arrow" aria-hidden="true">›</span>}
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function DexInfoRow({ label, value, muted = false }) {
+  return (
+    <div className="gb-dex-info-row">
+      <span className="gb-dex-info-k">{label}</span>
+      <span className={`gb-dex-info-v${muted ? ' is-muted' : ''}`}>{value}</span>
+    </div>
+  );
+}
+
+// ============================
+// 좌측 뷰어 — 선택한 도감 항목 상세
+// ============================
+function DexViewer({ data, onSelect }) {
+  if (!data) return null;
+  const { entry, section } = data;
   const stageKey = STAGE_KEYS[entry.stageIndex] ?? 'seed';
-  const badge = STAGE_BADGE_STYLE[stageKey];
-
-  const collectedBorder = rare
-    ? '0.5px solid #d8e2ee'
-    : '0.5px solid var(--sprout, #9dd0b0)';
+  const accent = STAGE_ACCENT[stageKey];
+  const rare = section.rare;
+  const collected = entry.collected;
+  const rareClass = rare ? ` gb-dex-screen--rare gb-dex-screen--${section.speciesKey}` : '';
 
   return (
-    <div
-      style={{
-        background: entry.collected ? 'var(--card)' : 'var(--paper-2)',
-        border: entry.collected ? collectedBorder : '0.5px solid var(--rule)',
-        borderRadius: 'var(--r-lg, 14px)',
-        padding: '12px 8px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-        cursor: 'pointer', position: 'relative',
-        minHeight: 160,
-        transition: 'transform 0.12s, box-shadow 0.12s',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = '';
-        e.currentTarget.style.boxShadow = '';
-      }}
-    >
-      {/* 도감 번호 */}
-      <div style={{
-        fontSize: 9, color: 'var(--ink-3)',
-        alignSelf: 'flex-start',
-        marginTop: 2,
-        fontFamily: 'var(--font-mono)',
-        letterSpacing: '0.04em',
-      }}>
-        No.{entry.dexNumber}
-      </div>
-
-      {/* 픽셀 아트 */}
-      <div style={{ width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <PixelPlant species={pixelSpecies} stage={stageKey} size={62} locked={!entry.collected} />
-      </div>
-
-      {/* 이름 */}
-      <div style={{
-        fontSize: 11, fontWeight: 600,
-        color: entry.collected ? 'var(--ink)' : 'var(--ink-3)',
-        textAlign: 'center', lineHeight: 1.3,
-        fontFamily: 'var(--font-display)',
-      }}>
-        {entry.collected ? entry.monName : '???'}
-      </div>
-
-      {/* 단계 뱃지 */}
-      {entry.collected ? (
-        <div style={{
-          fontSize: 9, fontWeight: 600,
-          padding: '2px 8px', borderRadius: 999,
-          whiteSpace: 'nowrap',
-          background: badge.background, color: badge.color,
-          border: `0.5px solid ${badge.border}`,
-          fontFamily: 'var(--font-display)',
-        }}>
-          {entry.stageName} 수확
+    <div className="gb-dex-viewer">
+      {/* 뷰어 LCD */}
+      <div className={`gb-dex-screen${rareClass}`}>
+        <div className="gb-dex-screen-bezel">
+          <div className="gb-dex-screen-top">
+            <span className="gb-garden-led" aria-hidden="true" />
+            <span className="gb-dex-screen-cap">DOT&nbsp;MATRIX&nbsp;·&nbsp;DEX&nbsp;VIEWER</span>
+          </div>
+          <div className="gb-dex-screen-frame">
+            <div className="gb-dex-lcd">
+              {rare && <DexRareBackdrop speciesKey={section.speciesKey} />}
+              <span className="gb-dex-noplate">No.{entry.dexNumber}</span>
+              <div className="gb-dex-hero">
+                <PixelPlant
+                  species={pixelFor(section.speciesKey)}
+                  stage={stageKey}
+                  size={168}
+                  locked={!collected}
+                  glow={rare && collected}
+                />
+              </div>
+              {!collected && <span className="gb-dex-qmark">?</span>}
+              <div className="gb-fx gb-fx-scan" aria-hidden="true" />
+              <div className="gb-fx gb-fx-vignette" aria-hidden="true" />
+              <div className="gb-fx gb-fx-glass" aria-hidden="true" />
+            </div>
+          </div>
         </div>
-      ) : (
-        <div style={{ height: 18 }} />
-      )}
+      </div>
+
+      {/* 이름판 */}
+      <div className="gb-dex-plate">
+        <div className="gb-dex-plate-l">
+          <span className="gb-dex-plate-no">No.{entry.dexNumber} · {section.speciesLabel}</span>
+          <h3 className="gb-dex-plate-name">{collected ? entry.monName : '??? ??? ???'}</h3>
+        </div>
+        <div className="gb-dex-plate-r">
+          {collected ? (
+            <span className="gb-dex-stage-badge" style={{ background: accent.bg, color: accent.fg }}>
+              <i style={{ background: accent.dot }} />{entry.stageName} 단계
+            </span>
+          ) : (
+            <span className="gb-dex-stage-badge gb-dex-stage-badge--lock"><RtIcon name="lock" /> 미발견</span>
+          )}
+          <span className={`rt-badge ${rare ? 'rt-badge--sky' : 'rt-badge--leaf'}`}>{rare ? '✦ 희귀종' : '일반종'}</span>
+        </div>
+      </div>
+
+      {/* 진화 계보 */}
+      <DexEvoStrip section={section} selectedNum={entry.dexNumber} onSelect={onSelect} />
+
+      {/* 정보 테이블 */}
+      <div className="gb-dex-info">
+        <DexInfoRow label="도감 번호" value={`No.${entry.dexNumber}`} />
+        <DexInfoRow label="계열 범위" value={section.numRange} />
+        <DexInfoRow label="등급" value={rare ? '희귀종' : '일반종'} />
+        <DexInfoRow label="수확일" value={collected ? entry.harvestedAt : '미발견'} muted={!collected} />
+      </div>
     </div>
   );
 }
 
 // ============================
-// 계열 구분선
+// 우측 색인 — 도감 단일 행
 // ============================
-function DexSectionDivider({ section }) {
+function DexListRow({ entry, speciesKey, selected, onSelect }) {
+  const stageKey = STAGE_KEYS[entry.stageIndex] ?? 'seed';
+  const accent = STAGE_ACCENT[stageKey];
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '28px 0 14px' }}>
-      <span style={{
-        fontSize: 10, fontWeight: 700,
-        color: 'var(--ink-3)',
-        textTransform: 'uppercase', letterSpacing: '0.1em',
-        whiteSpace: 'nowrap',
-        fontFamily: 'var(--font-display)',
-      }}>
-        {section.speciesLabel}
+    <button
+      type="button"
+      className={`gb-dex-row${selected ? ' is-active' : ''}${entry.collected ? '' : ' is-locked'}`}
+      onClick={() => onSelect(entry.dexNumber)}
+    >
+      <span className="gb-dex-row-no">{entry.dexNumber}</span>
+      <span className="gb-dex-row-sprite">
+        <PixelPlant species={pixelFor(speciesKey)} stage={stageKey} size={28} locked={!entry.collected} />
       </span>
-      <Pill tone={section.rare ? 'navy' : 'green'}>
-        {section.rare ? '✦ 희귀종' : '일반종'}
-      </Pill>
-      <div style={{ flex: 1, height: '0.5px', background: 'var(--rule)' }} />
-      <span style={{
-        fontSize: 10, color: 'var(--ink-3)',
-        fontFamily: 'var(--font-mono)',
-        whiteSpace: 'nowrap',
-      }}>{section.numRange}</span>
-    </div>
+      <span className="gb-dex-row-name">{entry.collected ? entry.monName : '??????'}</span>
+      {entry.collected ? (
+        <span className="gb-dex-row-stage" style={{ background: accent.bg, color: accent.fg }}>{entry.stageName}</span>
+      ) : (
+        <span className="gb-dex-row-stage gb-dex-row-stage--lock"><RtIcon name="lock" /></span>
+      )}
+      <span className="gb-dex-row-check">{entry.collected && <RtIcon name="check" />}</span>
+    </button>
   );
 }
 
+// ============================
+// 도감 화면 — 포켓 도감 디바이스 (좌: 뷰어 / 우: 색인)
+// ============================
 function CollectionScreen() {
+  const { user } = useUser();
   const [dex, setDex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [selectedNum, setSelectedNum] = useState(null);
 
   useEffect(() => {
     getPlants()
@@ -150,104 +272,174 @@ function CollectionScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredSections = useMemo(() => {
-    if (!dex?.sections) return [];
-    return dex.sections
-      .map(section => ({
-        ...section,
-        entries: filter === 'all' ? section.entries
-          : filter === 'collected' ? section.entries.filter(e => e.collected)
-          : section.entries.filter(e => !e.collected),
-      }))
-      .filter(section => section.entries.length > 0);
-  }, [dex, filter]);
-
+  const sections = dex?.sections ?? [];
   const stats = dex?.stats;
 
+  // 기본 선택: 첫 수집 항목 → 없으면 001
+  useEffect(() => {
+    if (!dex) return;
+    setSelectedNum(prev => {
+      if (prev) return prev;
+      const all = sections.flatMap(s => s.entries);
+      const firstCollected = all.find(e => e.collected);
+      return firstCollected?.dexNumber ?? all[0]?.dexNumber ?? null;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dex]);
+
+  // 필터링된 섹션 (원본 수집 개수는 보존)
+  const filteredSections = useMemo(() => {
+    return sections.map(s => {
+      const entries = filter === 'all' ? s.entries
+        : filter === 'collected' ? s.entries.filter(e => e.collected)
+        : s.entries.filter(e => !e.collected);
+      return {
+        ...s,
+        entries,
+        collectedCount: s.entries.filter(e => e.collected).length,
+        totalCount: s.entries.length,
+      };
+    }).filter(s => s.entries.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dex, filter]);
+
+  // 필터로 현재 선택이 가려지면 첫 보이는 항목으로 이동
+  useEffect(() => {
+    const visible = filteredSections.flatMap(s => s.entries);
+    if (visible.length && !visible.some(e => e.dexNumber === selectedNum)) {
+      setSelectedNum(visible[0].dexNumber);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
+  const selected = useMemo(() => {
+    for (const s of sections) {
+      const e = s.entries.find(en => en.dexNumber === selectedNum);
+      if (e) return { entry: e, section: s };
+    }
+    return sections[0]?.entries?.[0] ? { entry: sections[0].entries[0], section: sections[0] } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dex, selectedNum]);
+
+  // 등급별 / 완성 계열 집계
+  const summary = useMemo(() => {
+    let commonC = 0, rareC = 0, done = 0;
+    sections.forEach(s => {
+      const c = s.entries.filter(e => e.collected).length;
+      if (s.rare) rareC += c; else commonC += c;
+      if (s.entries.length && c === s.entries.length) done++;
+    });
+    return { commonC, rareC, done, speciesTotal: sections.length };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dex]);
+
+  const collected = stats?.collected ?? 0;
+  const total = stats?.total ?? 40;
+  const commonTotal = stats?.common ?? 25;
+  const rareTotal = stats?.rare ?? 15;
+  const pct = total ? Math.round((collected / total) * 100) : 0;
+  const visibleCount = filteredSections.reduce((n, s) => n + s.entries.length, 0);
+
+  const selectNum = (n) => { playSfx('nav'); setSelectedNum(n); };
+
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1200, margin: '0 auto' }}>
+    <div className="rt-app gb-dex-page" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', minHeight: '100%' }}>
 
-      {/* 헤더 */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, gap: 14, flexWrap: 'wrap' }}>
-        <div>
-          <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>식물 도감</div>
-          <div style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 24, fontWeight: 700,
-            color: 'var(--ink)',
-            marginTop: 4, letterSpacing: '-0.02em',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <svg width="24" height="24" viewBox="0 0 80 80" fill="none">
-              <path d="M22 50 L18 68 L62 68 L58 50 Z" fill="#c8a882"/>
-              <rect x="20" y="44" width="40" height="8" rx="4" fill="#b8946a"/>
-              <rect x="38" y="22" width="4" height="28" rx="2" fill="#a8d5b5"/>
-              <ellipse cx="28" cy="32" rx="12" ry="8" fill="#a8d5b5" transform="rotate(-20 28 32)"/>
-              <ellipse cx="52" cy="26" rx="11" ry="7.5" fill="#3d8b5e" transform="rotate(15 52 26)"/>
-              <circle cx="40" cy="14" r="8" fill="#3d8b5e" opacity="0.9"/>
-              <circle cx="33" cy="9" r="6" fill="#3d8b5e" opacity="0.65"/>
-              <circle cx="47" cy="9" r="6" fill="#4a9066" opacity="0.65"/>
-              <circle cx="40" cy="14" r="2.5" fill="#e8f5ec"/>
-            </svg>
-            키워낸 식물의 수집 도감
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
-            화분에서 수확할 때마다 도감 칸이 채워져요.
-          </div>
-          {stats && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <Pill tone="default">총 {stats.total}칸</Pill>
-              <Pill tone="green">일반 {stats.common}칸</Pill>
-              <Pill tone="navy">희귀 {stats.rare}칸</Pill>
-              <Btn variant="green" size="sm">
-                {stats.collected} / {stats.total} 수집
-              </Btn>
-            </div>
-          )}
+      {/* 게임 HUD 플레이어 바 */}
+      <div className="rt-hud">
+        <div className="rt-hud-l">
+          <RtIcon name="person" /> PLAYER : {user?.name ?? '학습자'} · <span className="rt-hud-lv">도감 {pct}%</span>
         </div>
-
-        {/* 필터 버튼 */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {[
-            { key: 'all',       label: '전체' },
-            { key: 'collected', label: '수집 완료' },
-            { key: 'locked',    label: '미수집' },
-          ].map(({ key, label }) => (
-            <Btn
-              key={key}
-              variant={filter === key ? 'green' : 'secondary'}
-              size="sm"
-              onClick={() => setFilter(key)}
-            >
-              {label}
-            </Btn>
-          ))}
+        <div className="rt-hud-r">
+          <span className="rt-hud-grp"><RtIcon name="book" /> 수집 {collected}/{total}</span>
+          <span className="rt-hud-sep" />
+          <span className="rt-hud-grp"><RtIcon name="star" /> 희귀 {summary.rareC}/{rareTotal}</span>
+          <span className="rt-hud-sep" />
+          <span className="rt-hud-grp"><RtIcon name="trophy" /> 완성 {summary.done}/{summary.speciesTotal}</span>
         </div>
       </div>
 
-      {loading && (
-        <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-          도감을 불러오는 중…
-        </div>
-      )}
+      {/* 달성도 통계 타일 */}
+      <div className="rt-grid rt-grid--4">
+        <DexStatTile icon="book"   label="도감 수집" value={collected}      total={total}      accent />
+        <DexStatTile icon="leaf"   label="일반종"   value={summary.commonC} total={commonTotal} />
+        <DexStatTile icon="star"   label="희귀종"   value={summary.rareC}   total={rareTotal} />
+        <DexStatTile icon="trophy" label="완성 계열" value={summary.done}    total={summary.speciesTotal} suffix="계열" />
+      </div>
 
-      {!loading && filteredSections.length === 0 && (
-        <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-          해당 조건의 식물이 없어요.
-        </div>
-      )}
-
-      {/* 계열별 섹션 */}
-      {!loading && filteredSections.map(section => (
-        <div key={section.speciesKey}>
-          <DexSectionDivider section={section} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 8 }}>
-            {section.entries.map(entry => (
-              <DexCard key={entry.dexNumber} entry={entry} speciesKey={section.speciesKey} rare={section.rare} />
+      {/* 게임보이 DMG 콘솔 — 포켓 도감 디바이스 */}
+      <div className="gb-console gb-dex-console">
+        <div className="gb-console-head">
+          <div>
+            <span className="rt-tag"><RtIcon name="search" /> NATIONAL DEX</span>
+            <h2 className="rt-h3" style={{ margin: '10px 0 0' }}>식물 도감 · No.001–040</h2>
+          </div>
+          <div className="gb-dex-filters">
+            {[
+              { key: 'all',       label: '전체',   icon: null },
+              { key: 'collected', label: '수집',   icon: 'check' },
+              { key: 'locked',    label: '미수집', icon: 'lock' },
+            ].map(({ key, label, icon }) => (
+              <button
+                key={key}
+                className={`gb-key ${filter === key ? 'gb-key--lcd' : 'gb-key--dark'}`}
+                onClick={() => { playSfx('toggle'); setFilter(key); }}
+              >
+                {icon && <RtIcon name={icon} />} {label}
+              </button>
             ))}
           </div>
         </div>
-      ))}
+
+        {loading ? (
+          <div className="gb-dex-loading">도감을 불러오는 중…</div>
+        ) : (
+          <div className="gb-dex-main">
+            {/* 좌측 뷰어 */}
+            <DexViewer data={selected} onSelect={selectNum} />
+
+            {/* 우측 색인 */}
+            <div className="gb-dex-index">
+              <div className="gb-dex-index-head">
+                <span className="rt-tag"><RtIcon name="book" /> 도감 색인</span>
+                <span className="gb-dex-index-count">{visibleCount}종 표시</span>
+              </div>
+              <div className="gb-dex-list scrollbar">
+                {filteredSections.length === 0 ? (
+                  <div className="gb-dex-empty">해당 조건의 식물이 없어요.</div>
+                ) : filteredSections.map(s => (
+                  <div key={s.speciesKey} className="gb-dex-group">
+                    <div className="gb-dex-group-head">
+                      <span className="gb-dex-group-name">{s.speciesLabel}</span>
+                      <span className={`rt-badge ${s.rare ? 'rt-badge--sky' : 'rt-badge--leaf'}`}>{s.rare ? '희귀' : '일반'}</span>
+                      <span className="gb-dex-group-range">{s.numRange}</span>
+                      <span className="gb-dex-group-count">{s.collectedCount}/{s.totalCount}</span>
+                    </div>
+                    {s.entries.map(e => (
+                      <DexListRow
+                        key={e.dexNumber}
+                        entry={e}
+                        speciesKey={s.speciesKey}
+                        selected={e.dexNumber === selectedNum}
+                        onSelect={selectNum}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 콘솔 하단 — 브랜드 각인 + 스피커 그릴 */}
+        <div className="gb-console-foot">
+          <div className="gb-brand">
+            <span className="gb-brand-word">Rootin</span>
+            <span className="gb-brand-sub">DOT-MATRIX&nbsp;DEX&nbsp;SYSTEM<span className="tm">TM</span></span>
+          </div>
+          <div className="gb-speaker" aria-hidden="true" />
+        </div>
+      </div>
     </div>
   );
 }

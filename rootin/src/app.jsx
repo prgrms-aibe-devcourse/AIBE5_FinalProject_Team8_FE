@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getPlants } from './api/collection.js';
 import { DashboardScreen } from './screens-dashboard.jsx';
@@ -56,7 +57,8 @@ function AppShell() {
   const screen = getScreenFromPath(location.pathname);
   // 풀스크린 비전-디스플레이 프레임(어두운 룸 + 모니터 베젤)을 적용할 화면.
   // 게임보이/CRT로 개편된 화면을 여기에 추가하면 양쪽 여백 없이 풀폭 + 테두리가 입혀진다.
-  const framed = screen === 'dashboard' || screen === 'garden';
+  const framed = screen === 'dashboard' || screen === 'garden' || screen === 'pot-detail' || screen === 'collection';
+  const reduceMotion = useReducedMotion();
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
@@ -151,7 +153,8 @@ function AppShell() {
       onOpenChange={setLeftOpen}
       style={{
         display: 'flex', minHeight: '100vh', minWidth: 1180,
-        background: framed ? 'transparent' : 'var(--paper)',
+        // 에디터는 베젤 없는 풀스크린 — 좌측 사이드바 슬롯까지 따뜻한 크림으로 채워 흰 여백 제거
+        background: framed ? 'transparent' : (screen === 'editor' ? '#efe7d3' : 'var(--paper)'),
         position: framed ? 'relative' : undefined,
         zIndex: framed ? 0 : undefined,
       }}
@@ -206,17 +209,30 @@ function AppShell() {
           onToggle={toggleRightPanel}
         />
       )}
-      {framed && (
-        <div className="rt-vision-frame" aria-hidden="true">
-          <span className="vf-label">ROOTIN VISION-DISPLAY · 16:9 DOT MATRIX</span>
-          <div className="vf-brand">
-            <span className="vf-led" /><span>POWER</span>
-            <span className="vf-word">Rootin</span>
-            <span>DOT-MATRIX VISION DISPLAY™ · MODEL RT-9</span>
-          </div>
-          <div className="vf-grille"><i /><i /><i /><i /><i /><span className="vf-knob" /></div>
-        </div>
-      )}
+      {/* 모니터 베젤 — 화면 전환 시 부드럽게 등장/소멸.
+          에디터 진입(framed→false): 베젤이 확대되며 페이드아웃 → 모니터 속으로 빨려들어가는 느낌.
+          에디터 이탈(false→framed): 베젤이 제자리로 모이며 페이드인. */}
+      <AnimatePresence initial={false}>
+        {framed && (
+          <motion.div
+            key="vision-frame"
+            className="rt-vision-frame"
+            aria-hidden="true"
+            initial={reduceMotion ? false : { opacity: 0, scale: 1.12 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.18 }}
+            transition={{ duration: reduceMotion ? 0.12 : 0.55, ease: [0.4, 0, 0.7, 1] }}
+          >
+            <span className="vf-label">ROOTIN VISION-DISPLAY · 16:9 DOT MATRIX</span>
+            <div className="vf-brand">
+              <span className="vf-led" /><span>POWER</span>
+              <span className="vf-word">Rootin</span>
+              <span>DOT-MATRIX VISION DISPLAY™ · MODEL RT-9</span>
+            </div>
+            <div className="vf-grille"><i /><i /><i /><i /><i /><span className="vf-knob" /></div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </SidebarProvider>
     {logoutModalOpen && (
       <LogoutConfirmModal

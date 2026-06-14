@@ -148,23 +148,6 @@
   margin-top: 2px;
 }
 
-/* =================== KEYBOARD HINT =================== */
-.gbsb-hint {
-  position: fixed; left: 50%; bottom: 18px;
-  transform: translateX(-50%);
-  margin: 0; padding: 7px 16px;
-  font-family: "Galmuri9", "Galmuri11", monospace;
-  font-size: 11px; letter-spacing: .5px; color: #8a8576;
-  background: rgba(255,255,255,.5);
-  border: 1px solid rgba(0,0,0,.06);
-  border-radius: 999px;
-  backdrop-filter: blur(2px);
-  white-space: nowrap;
-  z-index: 25;
-  transition: opacity .3s ease;
-}
-.gbsb-hint.is-hidden { opacity: 0; pointer-events: none; }
-
 /* =================== POWER SWITCH =================== */
 .gbsb .power-row {
   display: flex; align-items: center; gap: 8px;

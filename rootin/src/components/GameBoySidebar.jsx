@@ -544,9 +544,6 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
           </button>
         </div>
       </div>
-
-      {/* 키보드 힌트 */}
-      <p className={`gbsb gbsb-hint${slotHidden ? ' is-hidden' : ''}`}>↑↓ 이동 · A 선택 · S 팔레트 · P 전원 · 옆 버튼으로 숨기기</p>
     </>
   );
 }

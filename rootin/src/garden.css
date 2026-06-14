@@ -45,7 +45,7 @@
 
 /* 식물 받침(스테이지) — 카드 안의 미니 LCD 무대 */
 .gb-garden-page .gb-pot-stage {
-  height: 136px; border-radius: var(--r-chip);
+  height: 160px; border-radius: var(--r-chip);
   display: flex; align-items: flex-end; justify-content: center;
   position: relative; overflow: hidden;
   background: linear-gradient(180deg, var(--paper-warm), var(--paper-2));
@@ -57,7 +57,7 @@
   mix-blend-mode: multiply; opacity: .6;
 }
 .gb-garden-page .gb-pot-stage--rare {
-  background: linear-gradient(180deg, var(--sky-soft), var(--paper-2));
+  background: linear-gradient(180deg, #16294a 0%, #0c1830 100%);
 }
 
 /* 픽셀 진행바 */

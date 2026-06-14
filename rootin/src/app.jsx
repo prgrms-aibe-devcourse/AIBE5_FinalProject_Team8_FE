@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { getPlants } from './api/collection.js';
 import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
-import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
+import { GardenScreen, PotDetailScreen, TilDetailScreen } from './screens-garden.jsx';
 import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens-rest.jsx';
 import { LandingScreen } from './screens-landing.jsx';
 import { NotFoundScreen } from './screens-error.jsx';
@@ -49,19 +49,42 @@ function AppShell() {
   const toggleFocusMode = () => setFocusMode((f) => !f);
 
   useEffect(() => {
+    if (!authed) {
+      setCollectionStats(null);
+      return;
+    }
+
+    let active = true;
+
     getPlants()
-      .then(data => setCollectionStats(data?.stats ?? null))
-      .catch(() => {});
-  }, []);
+      .then(data => {
+        if (active) {
+          setCollectionStats(data?.stats ?? null);
+        }
+      })
+      .catch(error => {
+        if (active) {
+          console.error('식물도감 요약 조회 중 오류 발생:', error);
+        }
+      });
+
+    return () => { active = false; };
+  }, [authed]);
 
   const screen = getScreenFromPath(location.pathname);
   // 풀스크린 비전-디스플레이 프레임(어두운 룸 + 모니터 베젤)을 적용할 화면.
   // 게임보이/CRT로 개편된 화면을 여기에 추가하면 양쪽 여백 없이 풀폭 + 테두리가 입혀진다.
-  const framed = screen === 'dashboard' || screen === 'garden' || screen === 'pot-detail' || screen === 'collection';
+  const framed = screen === 'dashboard' || screen === 'garden' || screen === 'pot-detail' || screen === 'collection' || screen === 'ai' || screen === 'profile';
   const reduceMotion = useReducedMotion();
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
+
+  // TIL 작성 페이지에 진입할 때마다 오른쪽 패널(템플릿/임시저장)을 항상 펼친다.
+  // (진입 시점에만 강제로 열고, 이후 세션 내 토글은 그대로 동작)
+  useEffect(() => {
+    if (screen === 'editor') setRightOpen(true);
+  }, [screen]);
 
   const handleNav = (nextScreen) => {
     setFocusMode(false);
@@ -153,8 +176,8 @@ function AppShell() {
       onOpenChange={setLeftOpen}
       style={{
         display: 'flex', minHeight: '100vh', minWidth: 1180,
-        // 에디터는 베젤 없는 풀스크린 — 좌측 사이드바 슬롯까지 따뜻한 크림으로 채워 흰 여백 제거
-        background: framed ? 'transparent' : (screen === 'editor' ? '#efe7d3' : 'var(--paper)'),
+        // 에디터·TIL 상세는 베젤 없는 크림 화면 — 좌측 사이드바 슬롯까지 따뜻한 크림으로 채워 흰 여백 제거
+        background: framed ? 'transparent' : ((screen === 'editor' || screen === 'til-detail') ? '#efe7d3' : 'var(--paper)'),
         position: framed ? 'relative' : undefined,
         zIndex: framed ? 0 : undefined,
       }}
@@ -162,7 +185,7 @@ function AppShell() {
     >
       {framed && <><div className="rt-vision-room" /><div className="rt-vision-screen-bg" /></>}
       <GameBoySidebar
-        current={screen.startsWith('pot') ? 'garden' : screen}
+        current={screen.startsWith('pot') || screen === 'til-detail' ? 'garden' : screen}
         onNav={handleNav}
         onLogout={() => setLogoutModalOpen(true)}
         forceHidden={focusMode}
@@ -190,7 +213,17 @@ function AppShell() {
                 refreshKey={potDetailRefreshKey}
                 onBack={() => navigate('/garden')}
                 onStartTil={openEditorForPot}
-                onEditTil={openEditorForTil}
+                onOpenTil={(potId, tilId) => navigate(`/garden/pots/${potId}/tils/${tilId}`)}
+              />
+            )} />
+            <Route path="/garden/pots/:potId/tils/:tilId" element={(
+              <TilDetailRoute
+                onBack={(potId) => navigate(`/garden/pots/${potId}`)}
+                onEdit={openEditorForTil}
+                onDeleted={(potId) => {
+                  setPotDetailRefreshKey(key => key + 1);
+                  navigate(`/garden/pots/${potId}`);
+                }}
               />
             )} />
             <Route path="/collection" element={<CollectionScreen />} />
@@ -254,7 +287,7 @@ function AppShell() {
   );
 }
 
-function PotDetailRoute({ refreshKey, onBack, onStartTil, onEditTil }) {
+function PotDetailRoute({ refreshKey, onBack, onStartTil, onOpenTil }) {
   const { potId } = useParams();
   const numericPotId = parseRoutePotId(potId);
 
@@ -268,12 +301,32 @@ function PotDetailRoute({ refreshKey, onBack, onStartTil, onEditTil }) {
       refreshKey={refreshKey}
       onBack={onBack}
       onStartTil={onStartTil}
-      onEditTil={onEditTil}
+      onOpenTil={(tilId) => onOpenTil(numericPotId, tilId)}
+    />
+  );
+}
+
+function TilDetailRoute({ onBack, onEdit, onDeleted }) {
+  const { potId, tilId } = useParams();
+  const numericPotId = parseRoutePotId(potId);
+  const numericTilId = parseRoutePotId(tilId);
+
+  if (numericPotId == null || numericTilId == null) {
+    return <Navigate to="/garden" replace />;
+  }
+
+  return (
+    <TilDetailScreen
+      tilId={numericTilId}
+      onBack={() => onBack(numericPotId)}
+      onEdit={onEdit}
+      onDeleted={() => onDeleted(numericPotId)}
     />
   );
 }
 
 function getScreenFromPath(pathname) {
+  if (/^\/garden\/pots\/[^/]+\/tils\/[^/]+$/.test(pathname)) return 'til-detail';
   if (/^\/garden\/pots\/[^/]+$/.test(pathname)) return 'pot-detail';
   if (isRoutePath(pathname, 'editor')) return 'editor';
   if (isRoutePath(pathname, 'garden')) return 'garden';
@@ -318,12 +371,14 @@ function isRoutePath(pathname, route) {
 }
 
 function App() {
+  const handleAuthExpired = useCallback(() => {
+    // 토큰 만료 시 페이지 리로드로 로그아웃 처리
+    window.location.reload();
+  }, []);
+
   return (
     <BrowserRouter>
-      <UserProvider onAuthExpired={() => {
-        // 토큰 만료 시 페이지 리로드로 로그아웃 처리
-        window.location.reload();
-      }}>
+      <UserProvider onAuthExpired={handleAuthExpired}>
         <AppShell />
       </UserProvider>
     </BrowserRouter>

@@ -72,7 +72,14 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
   const [powered, setPowered] = useState(() => LS.get('power', '1') !== '0');
   const [internalHidden, setInternalHidden] = useState(() => LS.get('hidden', '0') === '1');
   const [booting, setBooting] = useState(false);
-  const [scale, setScale] = useState(1);
+  // 첫 렌더에서 바로 뷰포트에 맞는 scale 로 시작한다(lazy init).
+  // useState(1) 로 시작하면 마운트 후 useEffect 에서 scale 이 바뀌며 콘솔 폭이 변하고,
+  // 그 결과 에디터 인셋 폭이 첫 페인트 직후 달라져 본문이 재중앙정렬되며 떨린다.
+  const [scale, setScale] = useState(() =>
+    typeof window === 'undefined'
+      ? 1
+      : Math.max(0.5, Math.min(1, (window.innerHeight - 36) / 786)),
+  );
   const [toastText, setToastText] = useState('');
   const [toastOn, setToastOn] = useState(false);
 
@@ -293,11 +300,15 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
     return () => window.removeEventListener('resize', layout);
   }, []);
 
-  /* 접힘 애니메이션이 콘텐츠를 정확히 x=0 으로 채우도록, 슬롯 실제 폭을 --slot-w 에 반영 */
+  /* 접힘 애니메이션이 콘텐츠를 정확히 x=0 으로 채우도록, 슬롯 실제 폭을 --slot-w 에 반영.
+     :root 에도 반영 → 인셋 쪽 페이지(TIL 상세)가 본문을 화면 중앙으로 보정할 때
+     사이드바와 같은 폭/이징으로 CSS 트랜지션해 움찔거림 없이 따라가게 한다. */
   useEffect(() => {
     const el = slotRef.current;
     if (!el) return;
-    el.style.setProperty('--slot-w', `${Math.round(el.getBoundingClientRect().width)}px`);
+    const w = `${Math.round(el.getBoundingClientRect().width)}px`;
+    el.style.setProperty('--slot-w', w);
+    document.documentElement.style.setProperty('--slot-w', w);
   }, [scale]);
 
   /* ---------- keyboard (입력창에선 무시 — 에디터 충돌 방지) ---------- */

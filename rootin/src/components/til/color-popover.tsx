@@ -85,7 +85,7 @@ export function TextColorPopover({ editor }: { editor: Editor }) {
           />
         </PopoverTrigger>
       </ToolbarTooltip>
-      <PopoverContent align="start" className="w-auto p-3">
+      <PopoverContent align="start" className="rt-pop w-auto p-3">
         <p className="mb-2 px-0.5 text-xs font-medium text-muted-foreground">
           글자색
         </p>
@@ -134,7 +134,7 @@ export function HighlightPopover({ editor }: { editor: Editor }) {
           />
         </PopoverTrigger>
       </ToolbarTooltip>
-      <PopoverContent align="start" className="w-auto p-3">
+      <PopoverContent align="start" className="rt-pop w-auto p-3">
         <div className="mb-2 flex items-center justify-between gap-4 px-0.5">
           <p className="text-xs font-medium text-muted-foreground">배경색</p>
           <button

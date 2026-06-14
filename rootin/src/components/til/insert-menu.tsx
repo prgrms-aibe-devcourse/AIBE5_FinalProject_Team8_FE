@@ -37,6 +37,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ToolbarTooltip, toolbarItemClass } from './toolbar-button'
 import { cn } from '@/lib/utils'
+import { playSfx } from '@/lib/sfx.js'
 
 // 표 크기 그리드 피커 (최대 8×8 hover 선택)
 function TableGridPicker({ onPick }: { onPick: (rows: number, cols: number) => void }) {
@@ -141,7 +142,7 @@ export function InsertMenu({ editor }: { editor: Editor }) {
             <Plus className="size-4" />
           </DropdownMenuTrigger>
         </ToolbarTooltip>
-        <DropdownMenuContent className="min-w-44">
+        <DropdownMenuContent className="rt-pop min-w-44">
           <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
             <ImageIcon className="text-muted-foreground" />
             이미지
@@ -196,7 +197,7 @@ export function InsertMenu({ editor }: { editor: Editor }) {
 
       {/* 동영상 삽입 다이얼로그 */}
       <Dialog open={videoOpen} onOpenChange={setVideoOpen}>
-        <DialogContent>
+        <DialogContent className="rt-pop">
           <DialogHeader>
             <DialogTitle>동영상 삽입</DialogTitle>
             <DialogDescription>YouTube 링크를 붙여넣으면 본문에 임베드돼요.</DialogDescription>
@@ -214,7 +215,7 @@ export function InsertMenu({ editor }: { editor: Editor }) {
             placeholder="https://www.youtube.com/watch?v=…"
           />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setVideoOpen(false)}>
+            <Button variant="ghost" onClick={() => { playSfx('cancel'); setVideoOpen(false) }}>
               취소
             </Button>
             <Button onClick={insertVideo} disabled={!videoUrl.trim()}>
@@ -226,7 +227,7 @@ export function InsertMenu({ editor }: { editor: Editor }) {
 
       {/* 표 삽입 다이얼로그 (그리드 피커) */}
       <Dialog open={tableOpen} onOpenChange={setTableOpen}>
-        <DialogContent className="sm:max-w-xs">
+        <DialogContent className="rt-pop sm:max-w-xs">
           <DialogHeader>
             <DialogTitle>표 삽입</DialogTitle>
             <DialogDescription className="sr-only">행과 열 크기를 선택하세요.</DialogDescription>
@@ -246,7 +247,7 @@ export function InsertMenu({ editor }: { editor: Editor }) {
 
       {/* 수식 삽입 다이얼로그 (LaTeX + 라이브 프리뷰) */}
       <Dialog open={mathOpen} onOpenChange={setMathOpen}>
-        <DialogContent>
+        <DialogContent className="rt-pop">
           <DialogHeader>
             <DialogTitle>수식 삽입</DialogTitle>
             <DialogDescription>LaTeX 문법으로 입력하세요. 예: E = mc^2</DialogDescription>
@@ -268,7 +269,7 @@ export function InsertMenu({ editor }: { editor: Editor }) {
             <span dangerouslySetInnerHTML={{ __html: mathPreview }} />
           </div>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setMathOpen(false)}>
+            <Button variant="ghost" onClick={() => { playSfx('cancel'); setMathOpen(false) }}>
               취소
             </Button>
             <Button onClick={insertMath} disabled={!latex.trim()}>

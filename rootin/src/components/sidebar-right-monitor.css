@@ -1,0 +1,488 @@
+/* =========================================================================
+   ROOTIN — TIL 작성 페이지 오른쪽 사이드바: "사이드 모니터(빈티지 CRT)"
+   좌측 Game Boy(gameboy-sidebar.css)와 색·입체·애니메이션을 통일:
+     · 색 4겹 구조 동일: 크림 셸 → 회청색 베젤 → 검은 스크린프레임 → (메인=콘텐츠 / 미니=초록 LCD)
+     · 좌측 .console 과 동일한 box-shadow(은은히 번짐)
+     · 좌측과 동일한 슬라이드 애니메이션(translateX, .52s cubic-bezier(.7,0,.18,1))
+   핵심 레이아웃: 슬롯을 position:fixed 오버레이로 만들어 에디터 인셋 폭 고정
+        → 패널 여닫을 때 본문 떨림 없음. 슬롯을 디바이스보다 넓게(408) 잡고
+        overflow:hidden 으로 슬라이드 아웃을 담아 가로 스크롤 방지하되,
+        좌측 여백(~79px)을 둬서 그림자는 클립되지 않고 자연스럽게 번짐.
+   내부 콘텐츠/기능은 불변, 오버레이는 pointer-events:none.
+   ========================================================================= */
+
+.rt-monitor-slot,
+.rt-monitor-slot *,
+.rt-monitor-slot *::before,
+.rt-monitor-slot *::after { box-sizing: border-box; }
+
+.rt-monitor-slot {
+  /* 좌측 콘솔과 "동일한" 플라스틱/베젤 색 */
+  --rtm-shell-1: #d8d2c6;
+  --rtm-shell-2: #c4bdb0;
+  --rtm-shell-3: #ada695;
+  --rtm-shell-edge: #8f897a;
+  --rtm-shell-deep: #6f6a5c;
+  --rtm-bezel-1: #6a6a70;
+  --rtm-bezel-2: #44444b;
+  --rtm-bezel-3: #2c2c31;
+  --rtm-screen: #0c0c0e;
+  --rtm-lcd: #9bbc0f;      /* 좌측 dmg 팔레트 LCD (미니독 화면) */
+  --rtm-lcd-ink: #0f380f;
+
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100svh;
+  width: 430px;            /* 디바이스(344) + 우패딩(15) + 그림자 여백(~71) */
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 16px 15px;
+  overflow: hidden;        /* 슬라이드 아웃 담기(가로 스크롤 방지). 그림자는 좌측 여백 안에서 안 잘림 */
+  pointer-events: none;    /* 투명 영역은 에디터 클릭 통과, 디바이스/독만 auto */
+}
+
+/* =================== DEVICE (모니터 본체, 슬라이드 단위) =================== */
+.rt-monitor-device {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 344px;            /* 본문 우측 여백(~400px) 안에서 TIL 제목 가독성 위해 확대 */
+  align-self: flex-end;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  pointer-events: auto;
+  will-change: transform, opacity;
+}
+
+/* ---- 세로형 토글 — 모니터 왼쪽 모서리에 박힘(좌측 .side-toggle 차용) ---- */
+.rt-monitor-handle {
+  position: absolute;
+  top: 50%;
+  left: -15px;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 132px;
+  border: 0;
+  cursor: pointer;
+  padding: 14px 0;
+  border-radius: 9px;
+  background: linear-gradient(255deg, var(--rtm-shell-2) 0%, var(--rtm-shell-1) 30%, var(--rtm-shell-3) 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .6),
+    inset 0 -3px 7px rgba(0, 0, 0, .28),
+    inset 2px 0 5px rgba(0, 0, 0, .18),
+    -3px 4px 9px rgba(0, 0, 0, .26);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  z-index: 4;
+  transition: left .12s ease, filter .15s ease;
+}
+.rt-monitor-handle:hover { filter: brightness(1.05); }
+.rt-monitor-handle:active { left: -12px; filter: brightness(.95); }
+.rt-mh-grip {
+  width: 16px;
+  height: 11px;
+  flex: 0 0 auto;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, .22) 0 1px,
+    rgba(255, 255, 255, .4) 1px 2px,
+    transparent 2px 3px);
+  border-radius: 1px;
+}
+.rt-mh-chevron {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 36%, #4a473d, #2a2823 70%);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .7), inset 0 -1px 0 rgba(255, 255, 255, .12);
+  position: relative;
+}
+.rt-mh-chevron::before {
+  content: "";
+  position: absolute;
+  left: 47%;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid #d8d2c6;
+  border-top: 2px solid #d8d2c6;
+  transform: translate(-50%, -50%) rotate(45deg);   /* ▶ 접기 */
+}
+.rt-mh-cap {
+  font-family: "Galmuri9", "Galmuri11", "DungGeunMo", monospace;
+  font-size: 8px;
+  letter-spacing: 1px;
+  color: var(--rtm-shell-deep);
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  margin-top: 2px;
+}
+
+/* ---- 모니터 본체: 크림 플라스틱 셸 + 좌측과 동일한 box-shadow ---- */
+.rt-monitor-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  padding: 12px 13px 10px;
+  background: linear-gradient(150deg, var(--rtm-shell-1) 0%, var(--rtm-shell-2) 46%, var(--rtm-shell-3) 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .55),
+    inset 0 -8px 18px rgba(0, 0, 0, .22),
+    inset 6px 0 14px rgba(255, 255, 255, .18),
+    inset -8px 0 16px rgba(0, 0, 0, .16),
+    0 30px 60px -18px rgba(0, 0, 0, .7),
+    0 8px 18px rgba(0, 0, 0, .45);
+}
+.rt-monitor-body::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 15px;
+  border: 1px solid rgba(0, 0, 0, .1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  pointer-events: none;
+}
+
+/* ---- 회청색 베젤 (좌측 .bezel 색·입체 차용) — 스크린을 감싸는 층 ---- */
+.rt-monitor-bezel {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 9px;
+  padding: 10px 12px 12px;
+  border-radius: 13px;
+  background: linear-gradient(160deg, var(--rtm-bezel-1), var(--rtm-bezel-2) 40%, var(--rtm-bezel-3));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .1),
+    inset 0 -4px 10px rgba(0, 0, 0, .5),
+    0 2px 5px rgba(0, 0, 0, .35);
+}
+
+/* ---- 베젤 상단: 전원 LED + 캡션 (어두운 베젤 위 → 밝은 글자) ---- */
+.rt-monitor-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 2px 9px;
+  flex: 0 0 auto;
+}
+.rt-monitor-led {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ff9a8f, #d11d1d 60%, #7a0d0d);
+  box-shadow: 0 0 7px 1px rgba(235, 40, 40, .85), inset 0 0 2px rgba(0, 0, 0, .4);
+  flex: 0 0 auto;
+  animation: rtm-led 3.4s ease-in-out infinite;
+}
+@keyframes rtm-led { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+.rt-monitor-cap {
+  margin-left: auto;
+  font-family: "Galmuri9", "Galmuri11", "DungGeunMo", ui-monospace, monospace;
+  font-size: 8px;
+  letter-spacing: .5px;
+  color: #c9c9d0;
+  opacity: .78;
+  text-transform: uppercase;
+}
+
+/* ---- 스크린: 검은 프레임(좌측 .screen-frame #0c0c0e) 안에 밝은 콘텐츠 ---- */
+.rt-monitor-screen {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  border-radius: 6px;
+  padding: 7px;
+  background: var(--rtm-screen);
+  box-shadow:
+    inset 0 0 0 2px rgba(0, 0, 0, .6),
+    inset 0 3px 9px rgba(0, 0, 0, .8);
+}
+.rt-monitor-content {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  border-radius: 3px;
+  background: var(--paper-2);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35);
+  z-index: 1;
+}
+
+/* ---- CRT 오버레이 (클릭/스크롤 통과) ---- */
+.rt-monitor-fx {
+  position: absolute;
+  inset: 7px;
+  border-radius: 3px;
+  pointer-events: none;
+}
+.rt-monitor-scan {
+  z-index: 5;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, .14) 0px,
+    rgba(0, 0, 0, .14) 1px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0) 4px);
+  mix-blend-mode: multiply;
+  opacity: .35;
+}
+.rt-monitor-glass {
+  z-index: 6;
+  background: linear-gradient(125deg,
+    rgba(255, 255, 255, .24) 0%,
+    rgba(255, 255, 255, .07) 16%,
+    rgba(255, 255, 255, 0) 34%,
+    rgba(255, 255, 255, 0) 100%);
+}
+.rt-monitor-vignette {
+  z-index: 7;
+  box-shadow:
+    inset 0 0 24px 6px rgba(0, 0, 0, .16),
+    inset 0 0 5px 1px rgba(0, 0, 0, .26);
+  background: radial-gradient(125% 125% at 50% 50%, transparent 64%, rgba(0, 0, 0, .14) 100%);
+}
+.rt-monitor-screen::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, .9);
+  pointer-events: none;
+  z-index: 8;
+  opacity: 0;
+  animation: rtm-boot .5s ease-out 1;
+}
+@keyframes rtm-boot { 0% { opacity: .85; } 100% { opacity: 0; } }
+
+/* ---- 베젤 하단(크림 셸 위): 브랜드 + 통풍구 ---- */
+.rt-monitor-brandrow {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 5px 2px;
+  flex: 0 0 auto;
+}
+.rt-monitor-brand {
+  font-family: "Galmuri9", "Galmuri11", "DungGeunMo", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--rtm-shell-deep);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .4);
+}
+.rt-monitor-brand i {
+  font-style: normal;
+  font-size: 6px;
+  vertical-align: super;
+  margin-left: 1px;
+  opacity: .7;
+}
+.rt-monitor-vent { display: flex; gap: 3px; }
+.rt-monitor-vent::before,
+.rt-monitor-vent::after {
+  content: "";
+  width: 16px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(var(--rtm-shell-edge), var(--rtm-shell-3));
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, .3), 0 1px 0 rgba(255, 255, 255, .35);
+}
+
+/* =================== 접힘 미니 독 (Game Boy Micro 차용 — 초록 LCD) =================== */
+.rt-monitor-dock {
+  position: absolute;
+  top: 50%;
+  right: 15px;
+  z-index: 5;
+  transform: translateY(-50%) translateX(130%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform .52s cubic-bezier(.7, 0, .18, 1), opacity .34s ease;
+}
+.rt-monitor-dock[data-shown] {
+  transform: translateY(-50%) translateX(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+.rt-mdock {
+  width: 104px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 11px 11px;
+  background: linear-gradient(150deg, var(--rtm-shell-1) 0%, var(--rtm-shell-2) 50%, var(--rtm-shell-3) 100%);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .55),
+    inset 0 -8px 16px rgba(0, 0, 0, .2),
+    inset 5px 0 11px rgba(255, 255, 255, .16),
+    inset -6px 0 12px rgba(0, 0, 0, .14),
+    0 30px 60px -18px rgba(0, 0, 0, .55),
+    0 8px 18px rgba(0, 0, 0, .42);
+}
+/* 새 TIL 작성 — 미니 독 상단 주요 액션 */
+.rt-mdock-new {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  cursor: pointer;
+  padding: 8px 0;
+  border-radius: 10px;
+  background: var(--leaf, #2f4a32);
+  color: var(--paper-card, #f3f1ea);
+  font-family: "Galmuri9", "Galmuri11", "DungGeunMo", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .5px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 3px 6px rgba(0, 0, 0, .3);
+  transition: filter .12s ease, transform .07s ease;
+}
+.rt-mdock-new:hover { filter: brightness(1.1); }
+.rt-mdock-new:active { transform: translateY(1px); }
+.rt-mdock-title {
+  max-width: 100%;
+  font-family: "Galmuri9", "Galmuri11", "DungGeunMo", monospace;
+  font-size: 9.5px;
+  letter-spacing: .3px;
+  color: var(--rtm-shell-deep);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rt-mdock-screen {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  border-radius: 9px;
+  padding: 5px;
+  background: linear-gradient(160deg, var(--rtm-bezel-1), var(--rtm-bezel-2) 45%, var(--rtm-bezel-3));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, .08), inset 0 -3px 7px rgba(0, 0, 0, .5), 0 1px 2px rgba(0, 0, 0, .3);
+  overflow: hidden;
+}
+.rt-mdock-lcd {
+  position: absolute;
+  inset: 5px;
+  border-radius: 3px;
+  background: var(--rtm-lcd);
+  box-shadow: inset 0 0 6px rgba(15, 56, 15, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.rt-mdock-lcd::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .13) 0 1px, transparent 1px 2px);
+  mix-blend-mode: multiply;
+  opacity: .5;
+  pointer-events: none;
+}
+.rt-mdock-lv {
+  font-family: "Galmuri9", "Galmuri11", "DungGeunMo", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--rtm-shell-deep);
+  line-height: 1;
+}
+.rt-mdock-stage {
+  font-family: "Galmuri9", "Galmuri11", "DungGeunMo", monospace;
+  font-size: 10px;
+  color: var(--rtm-shell-deep);
+  opacity: .72;
+  line-height: 1;
+  margin-top: -3px;
+}
+.rt-mdock-exp {
+  width: 100%;
+  height: 9px;
+  border-radius: 3px;
+  background: #b3ab9a;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25), inset 0 1px 2px rgba(0, 0, 0, .3);
+  overflow: hidden;
+}
+.rt-mdock-exp-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--leaf-2, #5d7a4f), var(--leaf-3, #88a05a));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3);
+  transition: width .4s ease;
+}
+.rt-mdock-stats {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: "Galmuri9", "Galmuri11", "DungGeunMo", monospace;
+  font-size: 11px;
+  color: var(--rtm-shell-deep);
+  line-height: 1;
+}
+.rt-mdock-stat {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.rt-mdock-expand {
+  align-self: stretch;
+  margin-top: 1px;
+  border: 0;
+  cursor: pointer;
+  padding: 8px 0 7px;
+  border-radius: 10px;
+  background: linear-gradient(#3c5c22, #233a13);
+  color: #cdd79a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-family: "Galmuri9", "Galmuri11", "DungGeunMo", monospace;
+  font-size: 9.5px;
+  letter-spacing: .5px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 3px 6px rgba(0, 0, 0, .3);
+  animation: rtm-expandpulse 1.9s ease-in-out infinite;
+}
+.rt-mdock-expand-cap { line-height: 1; }
+.rt-mdock-expand:hover { filter: brightness(1.12); }
+.rt-mdock-expand:active { transform: translateY(1px); }
+.rt-mdock-chev {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-right: 9px solid currentColor;   /* ◀ 펼치기 */
+  animation: rtm-dockpoke 1.4s ease-in-out infinite;
+}
+@keyframes rtm-dockpoke { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-3px); } }
+@keyframes rtm-expandpulse {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 3px 6px rgba(0, 0, 0, .3), 0 0 0 0 rgba(60, 92, 34, 0); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 3px 6px rgba(0, 0, 0, .3), 0 0 0 5px rgba(60, 92, 34, .22); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-monitor-led,
+  .rt-mdock-chev,
+  .rt-mdock-expand { animation: none; }
+  .rt-monitor-screen::after { animation: none; content: none; }
+}

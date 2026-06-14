@@ -51,7 +51,7 @@ export function LinkPopover({ editor }: { editor: Editor }) {
           <Link2 className="size-4" />
         </PopoverTrigger>
       </ToolbarTooltip>
-      <PopoverContent align="start" className="w-80 p-2">
+      <PopoverContent align="start" className="rt-pop w-80 p-2">
         <div className="flex items-center gap-1.5">
           <Input
             autoFocus

@@ -36,6 +36,7 @@ import { LinkPopover } from './link-popover'
 import { FontSizeControl } from './font-size-control'
 import { InsertMenu } from './insert-menu'
 import { cn } from '@/lib/utils'
+import { playSfx } from '@/lib/sfx.js'
 import {
   Select,
   SelectContent,
@@ -44,7 +45,7 @@ import {
 } from '@/components/ui/select'
 
 function Divider() {
-  return <span className="mx-0.5 h-5 w-px shrink-0 bg-border/70" aria-hidden />
+  return <span className="mx-0.5 h-5 w-px shrink-0 bg-[var(--line-strong)]" aria-hidden />
 }
 
 const BLOCK_OPTIONS = [
@@ -108,7 +109,7 @@ export function EditorToolbarIsland({
             key="tab"
             type="button"
             aria-label="툴바 펼치기"
-            onClick={() => setCollapsed(false)}
+            onClick={() => { playSfx('toggle'); setCollapsed(false) }}
             initial={{ opacity: 0, y: -8, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.95 }}
@@ -126,9 +127,8 @@ export function EditorToolbarIsland({
             exit={{ opacity: 0, y: -14, scale: 0.96 }}
             transition={{ type: 'spring', damping: 22, stiffness: 320 }}
             className={cn(
-              'pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-0.5',
-              'rounded-2xl border border-primary/10',
-              'bg-secondary/90 px-2 py-1.5 shadow-[var(--shadow-lg)] backdrop-blur-xl',
+              'til-toolbar-bar pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-0.5',
+              'px-2 py-1.5',
             )}
           >
             {/* 블럭 유형 */}
@@ -146,7 +146,7 @@ export function EditorToolbarIsland({
                 </span>
                 <ChevronDown className="size-3.5 shrink-0 opacity-60" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rt-pop">
                 {BLOCK_OPTIONS.map((opt) => {
                   const Icon = opt.icon
                   return (
@@ -298,12 +298,12 @@ export function EditorToolbarIsland({
             <ToolbarButton
               label="집중 모드"
               icon={<Maximize2 className="size-4" />}
-              onClick={() => onToggleFocus?.()}
+              onClick={() => { playSfx('toggle'); onToggleFocus?.() }}
             />
             <ToolbarButton
               label="툴바 접기"
               icon={<ChevronUp className="size-4" />}
-              onClick={() => setCollapsed(true)}
+              onClick={() => { playSfx('toggle'); setCollapsed(true) }}
             />
           </motion.div>
         )}

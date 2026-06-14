@@ -10,12 +10,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronRight, ChevronDown, Sprout, FileText, Pencil, Lightbulb, Sparkles, Flame, Loader2, Plus } from 'lucide-react';
+import { ChevronDown, Sprout, FileText, Pencil, Lightbulb, Sparkles, Flame, Loader2, Plus } from 'lucide-react';
 import { getMyTils, getTil, getDraft } from '@/api/til.js';
 import { cn } from '@/lib/utils';
 import { inferSpecies } from '@/utils/plant.js';
+import { playSfx } from '@/lib/sfx.js';
+import '@/til-editor.css';
+import './sidebar-right-monitor.css';
 
-const PANEL_WIDTH = 344;
+const SLIDE_OUT = 400;  // 접힘 시 디바이스를 우측으로 슬라이드 아웃하는 거리(슬롯 overflow가 담음)
 
 const GROWTH_STAGE_TO_PIXEL_STAGE = {
   SEED: 'seed',
@@ -78,7 +81,7 @@ function PanelCard({ className, children }) {
     <motion.section
       variants={sectionVariants}
       className={cn(
-        'rounded-2xl border border-border/60 bg-card shadow-[var(--shadow-sm)]',
+        'rounded-[var(--r-card)] border-2 border-[var(--leaf)] bg-[var(--paper-card)] shadow-[5px_5px_0_0_var(--leaf)]',
         className,
       )}
     >
@@ -89,7 +92,7 @@ function PanelCard({ className, children }) {
 
 // 현재 편집 대상임을 알리는 라이브 배지 (맥동하는 점 + 라벨)
 function EditingBadge({ label, tone = 'moss' }) {
-  const color = tone === 'amber' ? 'var(--amber)' : 'var(--moss-2)';
+  const color = tone === 'amber' ? 'var(--amber)' : 'var(--leaf-2)';
   return (
     <motion.span
       initial={{ opacity: 0, scale: 0.8 }}
@@ -192,6 +195,7 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
     if (dirty && hasContent) {
       if (!window.confirm('작성 중인 내용이 사라질 수 있어요. 새 TIL을 시작할까요?')) return;
     }
+    playSfx('confirm');
     startNewTil();
     onNewTil?.();
     setDraftResumed(false);
@@ -202,6 +206,7 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
     if (currentTilId && dirty) {
       if (!window.confirm('수정 중인 변경 사항이 사라질 수 있어요. 임시저장본으로 이동할까요?')) return;
     }
+    playSfx('nav');
     resumeDraft(draft);
     onResumeDraft?.(selectedPotId);
     setDraftResumed(true);
@@ -212,6 +217,7 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
     if (currentTilId && String(currentTilId) !== String(til.id) && dirty) {
       if (!window.confirm('저장하지 않은 변경 사항이 사라질 수 있어요. 이동할까요?')) return;
     }
+    playSfx('nav');
     setDraftResumed(false);
     try {
       const d = await getTil(til.id);
@@ -242,31 +248,45 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
   };
 
   return (
-    <aside
-      className="relative shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
-      style={{ width: open ? PANEL_WIDTH : 0 }}
-    >
-      {/* 가장자리 토글 — 접힘/펼침 (항상 접근 가능하도록 aria-hidden 밖에 둠) */}
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-label={open ? '사이드 패널 접기' : '사이드 패널 펼치기'}
-        className="fixed top-1/2 z-40 flex h-14 w-7 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-border bg-card text-muted-foreground shadow-[var(--shadow-md)] transition-[right,box-shadow,color] duration-300 ease-out hover:text-primary hover:shadow-[var(--shadow-lg)]"
-        style={{ right: open ? PANEL_WIDTH : 0 }}
-      >
-        <ChevronRight className={cn('size-4 transition-transform duration-300', open ? '' : 'rotate-180')} />
-      </button>
-
-      {/* 패널 본문 */}
+    <aside className="rt-app rt-app-editor rt-monitor-slot">
+      {/* 모니터 디바이스 — 고정 오버레이라 여닫아도 에디터 인셋이 안 변함(본문 떨림 없음).
+          좌측 Game Boy 와 동일한 슬라이드(translateX)·색·입체. 내부 기능은 불변. */}
       <div
-        className={cn(
-          'h-svh overflow-y-auto scrollbar-subtle border-l border-border/60 bg-[var(--paper-2)] transition-opacity duration-300',
-          open ? 'opacity-100' : 'opacity-0',
-        )}
-        style={{ width: PANEL_WIDTH }}
+        className="rt-monitor-device"
+        style={{
+          transform: open ? 'none' : `translateX(${SLIDE_OUT}px)`,
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? 'auto' : 'none',
+          transition: 'transform 0.52s cubic-bezier(0.7, 0, 0.18, 1), opacity 0.4s ease',
+        }}
         aria-hidden={!open}
       >
+        {/* 세로형 토글 — 모니터 왼쪽 모서리에 박힘(좌측 .side-toggle 차용) */}
+        <button
+          type="button"
+          onClick={() => { playSfx('nav'); onToggle?.(); }}
+          aria-expanded={open}
+          aria-label="사이드 패널 접기"
+          className="rt-monitor-handle"
+        >
+          <span className="rt-mh-grip" aria-hidden="true" />
+          <span className="rt-mh-chevron" aria-hidden="true" />
+          <span className="rt-mh-cap" aria-hidden="true">패널</span>
+        </button>
+
+        {/* 모니터 본체 — 크림 플라스틱 셸(다층 입체) */}
+        <div className="rt-monitor-body">
+          {/* 회청색 베젤 — 좌측과 동일한 색 4겹 구조(셸→베젤→검은프레임→스크린) */}
+          <div className="rt-monitor-bezel">
+            {/* 베젤 상단 — 전원 LED + 캡션 */}
+            <div className="rt-monitor-top">
+              <span className="rt-monitor-led" aria-hidden="true" />
+              <span className="rt-monitor-cap">Rootin · Grow Display</span>
+            </div>
+
+            {/* 스크린 — 검은 프레임 안에 밝은 콘텐츠 + CRT 오버레이 */}
+            <div className="rt-monitor-screen">
+          <div className="rt-monitor-content scrollbar-subtle">
         <motion.div
           className="flex flex-col gap-3.5 p-4 pb-12"
           variants={containerVariants}
@@ -280,8 +300,8 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
             variants={sectionVariants}
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.99 }}
-            className="flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold shadow-[var(--shadow-sm)] transition-shadow duration-200 hover:shadow-[var(--shadow-md)]"
-            style={{ background: 'var(--grad-moss)', color: 'var(--primary-foreground)', fontFamily: 'var(--font-display)' }}
+            className="flex w-full items-center justify-center gap-1.5 rounded-[var(--r-chip)] border-2 border-[var(--leaf)] px-4 py-2.5 text-sm font-semibold text-[color:var(--paper-card)] transition-[transform,box-shadow] duration-150"
+            style={{ background: 'var(--leaf)', boxShadow: '2px 2px 0 0 var(--leaf-2)' }}
           >
             <Plus className="size-4" />
             새 TIL 작성
@@ -289,19 +309,19 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
 
           {/* ① 저장할 화분 선택 */}
           <PanelCard className="p-4">
-            <div className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted-foreground" style={{ fontFamily: 'var(--font-display)' }}>
-              <Sprout className="size-3.5 text-primary" />
+            <div className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[color:var(--leaf-2)]">
+              <Sprout className="size-3.5 text-[var(--leaf-2)]" />
               저장할 화분
             </div>
-            <Select value={selectedPotId ?? undefined} onValueChange={(v) => { setSelectedPotId(v); setDraftResumed(false); }}>
+            <Select value={selectedPotId ?? undefined} onValueChange={(v) => { playSfx('toggle'); setSelectedPotId(v); setDraftResumed(false); }}>
               <SelectTrigger
                 aria-label="화분 선택"
-                className="h-11 w-full gap-2 rounded-xl border-border bg-[var(--paper-2)] px-3.5 text-sm transition-all hover:border-primary/40 hover:bg-card data-[state=open]:border-primary/50 data-[state=open]:bg-card data-[state=open]:shadow-sm"
+                className="h-11 w-full gap-2 rounded-[var(--r-chip)] border-2 border-[var(--leaf)] bg-[var(--paper-card)] px-3.5 text-sm text-[color:var(--leaf)] shadow-[2px_2px_0_0_var(--leaf)] transition-[transform,box-shadow] hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_var(--leaf)] data-[state=open]:shadow-[3px_3px_0_0_var(--leaf)]"
                 disabled={potsLoading}
               >
                 <SelectValue placeholder={potsLoading ? '불러오는 중…' : '화분을 선택하세요'} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rt-pop">
                 {pots.length === 0 ? (
                   <div className="px-2 py-1.5 text-xs text-muted-foreground">화분이 없습니다</div>
                 ) : (
@@ -322,19 +342,19 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
 
           {/* ③ 이 화분의 TIL 목록 + 임시저장본 */}
           <PanelCard className="overflow-hidden">
-            <div className="flex items-center justify-between px-4 pb-2.5 pt-4">
-              <div className="flex items-center gap-1.5 text-sm font-semibold text-foreground" style={{ fontFamily: 'var(--font-display)' }}>
-                <FileText className="size-4 text-primary" />
+            <div className="flex items-center justify-between px-3 pb-2.5 pt-4">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-[color:var(--leaf)]">
+                <FileText className="size-4 text-[var(--leaf-2)]" />
                 이 화분의 TIL
               </div>
               {selectedPotId && !tilsLoading && (
-                <span className="rounded-full bg-[var(--paper-2)] px-2 py-0.5 text-[11px] text-muted-foreground" style={{ fontFamily: 'var(--font-mono)' }}>
+                <span className="rounded-[var(--r-chip)] bg-[var(--paper-warm)] px-2 py-0.5 text-[11px] text-[color:var(--muted-2)]" style={{ fontFamily: 'var(--font-mono)' }}>
                   {tilTotalCount}
                 </span>
               )}
             </div>
 
-            <div className="flex flex-col gap-2 px-4 pb-4">
+            <div className="flex flex-col gap-2 px-3 pb-4">
               {/* 임시저장본 (발행 전) — 클릭 시 이어쓰기. 보는 중이면 활성 표시 */}
               {selectedPotId && draft && (
                 <motion.button
@@ -342,17 +362,11 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
                   onClick={handleResumeDraft}
                   whileHover={{ y: -1 }}
                   whileTap={{ scale: 0.99 }}
-                  className={cn(
-                    'group relative block w-full overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-300',
-                    draftActive ? 'shadow-[var(--shadow-md)]' : 'shadow-[var(--shadow-sm)]',
-                  )}
+                  className="group relative block w-full overflow-hidden rounded-[var(--r-chip)] border-2 px-3 py-2.5 text-left transition-[transform,box-shadow] duration-200"
                   style={{
-                    background: draftActive
-                      ? 'linear-gradient(135deg, color-mix(in oklch, var(--amber) 24%, var(--card)) 0%, color-mix(in oklch, var(--amber) 9%, var(--card)) 100%)'
-                      : 'color-mix(in oklch, var(--amber) 14%, var(--card))',
-                    borderColor: draftActive
-                      ? 'color-mix(in oklch, var(--amber) 62%, transparent)'
-                      : 'color-mix(in oklch, var(--amber) 45%, transparent)',
+                    background: draftActive ? 'var(--amber-soft)' : 'color-mix(in oklch, var(--amber-soft) 55%, var(--paper-card))',
+                    borderColor: 'var(--amber)',
+                    boxShadow: draftActive ? '3px 3px 0 0 var(--amber)' : '2px 2px 0 0 var(--amber)',
                   }}
                 >
                   {draftActive && (
@@ -365,24 +379,24 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
                     />
                   )}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: 'var(--amber)', fontFamily: 'var(--font-display)' }}>
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: '#9a7322' }}>
                       <Pencil className="size-3" />
                       임시저장 · 발행 전
                     </span>
                     {draftActive ? (
                       <EditingBadge label="이어쓰는 중" tone="amber" />
                     ) : (
-                      <span className="text-[11px] text-muted-foreground transition-transform group-hover:translate-x-0.5">이어쓰기 →</span>
+                      <span className="text-[11px] text-[color:var(--muted-2)] transition-transform group-hover:translate-x-0.5">이어쓰기 →</span>
                     )}
                   </div>
-                  <div className="mt-1 truncate text-[13px] font-medium text-foreground" style={{ fontFamily: 'var(--font-display)' }}>
+                  <div className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-[color:var(--leaf)]">
                     {draft.title?.trim() || '(제목 없음)'}
                   </div>
                 </motion.button>
               )}
 
               {!selectedPotId ? (
-                <div className="rounded-xl border border-dashed border-border/70 px-3 py-4 text-center text-xs text-muted-foreground">
+                <div className="rounded-[var(--r-chip)] border-2 border-dashed border-[var(--line-strong)] px-3 py-4 text-center text-xs text-[color:var(--muted-2)]">
                   화분을 먼저 선택하세요.
                 </div>
               ) : tilsLoading ? (
@@ -392,7 +406,7 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
                   <Skeleton className="h-14 w-full rounded-xl" />
                 </div>
               ) : tils.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border/70 px-3 py-4 text-center text-xs text-muted-foreground">
+                <div className="rounded-[var(--r-chip)] border-2 border-dashed border-[var(--line-strong)] px-3 py-4 text-center text-xs text-[color:var(--muted-2)]">
                   아직 이 화분에 발행된 TIL이 없어요.
                 </div>
               ) : (
@@ -410,12 +424,11 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
                         whileHover={{ y: -1 }}
                         whileTap={{ scale: 0.99 }}
                         className={cn(
-                          'relative w-full shrink-0 overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] duration-300',
+                          'relative w-full shrink-0 overflow-hidden rounded-[var(--r-chip)] border-2 px-3 py-2.5 text-left transition-[transform,box-shadow] duration-200',
                           isActive
-                            ? 'border-primary/45 shadow-[var(--shadow-md)]'
-                            : 'border-border/60 bg-[var(--paper-2)] shadow-[var(--shadow-sm)] hover:border-primary/30 hover:bg-card',
+                            ? 'border-[var(--leaf)] bg-[var(--paper-warm)] shadow-[3px_3px_0_0_var(--leaf)]'
+                            : 'border-[var(--line-strong)] bg-[var(--paper-card)] shadow-[2px_2px_0_0_var(--line-strong)] hover:border-[var(--leaf-2)] hover:shadow-[3px_3px_0_0_var(--leaf-2)]',
                         )}
-                        style={isActive ? { background: 'linear-gradient(135deg, color-mix(in oklch, var(--leaf) 72%, var(--card)) 0%, var(--card) 78%)' } : undefined}
                       >
                         {/* 활성 항목 좌측 액센트 레일 — 활성화 시 부드럽게 펼쳐짐 */}
                         {isActive && (
@@ -424,20 +437,20 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
                             animate={{ opacity: 1, scaleY: 1 }}
                             transition={{ type: 'spring', stiffness: 460, damping: 34 }}
                             className="absolute inset-y-1.5 left-0 w-[3px] rounded-full"
-                            style={{ background: 'linear-gradient(180deg, var(--moss) 0%, var(--sprout) 100%)' }}
+                            style={{ background: 'linear-gradient(180deg, var(--leaf) 0%, var(--leaf-3) 100%)' }}
                           />
                         )}
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0 truncate text-[13px] font-medium text-foreground" style={{ fontFamily: 'var(--font-display)' }}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 line-clamp-2 text-[13px] font-medium leading-snug text-[color:var(--leaf)]">
                             {t.title || '(제목 없음)'}
                           </div>
-                          <div className="shrink-0 text-[11px] text-muted-foreground" style={{ fontFamily: 'var(--font-mono)' }}>{t.date}</div>
+                          <div className="mt-px shrink-0 text-[11px] text-[color:var(--muted-2)]" style={{ fontFamily: 'var(--font-mono)' }}>{t.date}</div>
                         </div>
                         {(t.tags.length > 0 || isActive) && (
                           <div className="mt-1.5 flex items-center justify-between gap-2">
                             <div className="flex min-w-0 flex-wrap gap-1">
                               {t.tags.slice(0, 3).map((tag) => (
-                                <span key={tag} className="rounded-md bg-secondary px-1.5 py-px text-[10.5px]" style={{ color: 'var(--moss-2)' }}>#{tag}</span>
+                                <span key={tag} className="rounded-[3px] bg-[var(--paper-2)] px-1.5 py-px text-[10.5px]" style={{ color: 'var(--leaf-2)' }}>#{tag}</span>
                               ))}
                             </div>
                             {isActive && <EditingBadge label="편집 중" tone="moss" />}
@@ -452,7 +465,7 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
                       type="button"
                       onClick={handleLoadMore}
                       disabled={tilsLoadingMore}
-                      className="mt-0.5 flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-border/60 bg-[var(--paper-2)] py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:text-foreground disabled:opacity-60"
+                      className="mt-0.5 flex shrink-0 items-center justify-center gap-1.5 rounded-[var(--r-chip)] border-2 border-[var(--line-strong)] bg-[var(--paper-card)] py-2 text-[12px] font-medium text-[color:var(--muted-2)] transition-colors hover:border-[var(--leaf-2)] hover:text-[color:var(--leaf)] disabled:opacity-60"
                     >
                       {tilsLoadingMore ? (
                         <><Loader2 className="size-3.5 animate-spin" /> 불러오는 중…</>
@@ -469,28 +482,97 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
           {/* ④ 경험치 가중치 팁 */}
           <PanelCard className="p-3.5">
             <div className="flex gap-2.5">
-              <div className="flex size-7 shrink-0 items-center justify-center rounded-lg" style={{ background: 'color-mix(in oklch, var(--sprout) 20%, var(--card))', color: 'var(--moss-2)' }}>
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-[var(--r-chip)]" style={{ background: 'color-mix(in oklch, var(--leaf-3) 30%, var(--paper-card))', color: 'var(--leaf-2)' }}>
                 <Lightbulb className="size-4" />
               </div>
               <div className="min-w-0">
-                <div className="text-xs font-semibold text-foreground" style={{ fontFamily: 'var(--font-display)' }}>경험치 가중치</div>
-                <div className="mt-0.5 text-[11.5px] leading-relaxed text-muted-foreground">
+                <div className="text-xs font-semibold text-[color:var(--leaf)]">경험치 가중치</div>
+                <div className="mt-0.5 text-[11.5px] leading-relaxed text-[color:var(--muted-2)]">
                   글자수 · 연속 작성일에 따라 식물에게 가는 물의 양이 달라져요. 짧아도 매일 쓰는 게 가장 강해요.
                 </div>
               </div>
             </div>
           </PanelCard>
         </motion.div>
+          </div>
+
+          {/* CRT 오버레이 — 클릭/스크롤 통과(pointer-events:none) */}
+          <span className="rt-monitor-fx rt-monitor-scan" aria-hidden="true" />
+          <span className="rt-monitor-fx rt-monitor-glass" aria-hidden="true" />
+          <span className="rt-monitor-fx rt-monitor-vignette" aria-hidden="true" />
+            </div>
+          </div>
+
+          {/* 브랜드 + 통풍구 (크림 셸 위) */}
+          <div className="rt-monitor-brandrow" aria-hidden="true">
+            <span className="rt-monitor-brand">ROOTIN<i>™</i></span>
+            <span className="rt-monitor-vent" />
+          </div>
+        </div>
       </div>
+
+      {/* 접힘 미니 독 — 좌측 Game Boy Micro 차용. 새 TIL + 식물/레벨/연속일 요약 + 펼치기 */}
+      <MiniDock dashboard={selectedPotDashboard} open={open} onToggle={onToggle} onNewTil={handleNewTil} />
     </aside>
+  );
+}
+
+function MiniDock({ dashboard, open, onToggle, onNewTil }) {
+  const hasData = !!dashboard;
+  const growthStage = dashboard?.plant?.growthStage ?? 'SEED';
+  const level = dashboard?.level ?? null;
+  const streak = Math.max(0, Number(dashboard?.streakDays) || 0);
+  const progress = Math.min(100, Math.max(0, Math.round(dashboard?.progressPercentage ?? 0)));
+  const species = inferSpecies(dashboard?.plant?.name ?? '기본 씨앗');
+  const stage = GROWTH_STAGE_TO_PIXEL_STAGE[growthStage] ?? 'seed';
+  const stageLabel = GROWTH_STAGE_LABEL[growthStage] ?? '씨앗';
+
+  return (
+    <div className="rt-monitor-dock" data-shown={!open || undefined} aria-hidden={open}>
+      <div className="rt-mdock">
+        {/* 새 TIL 작성 — 접힌 상태에서도 바로 새 글 시작 */}
+        <button type="button" className="rt-mdock-new" aria-label="새 TIL 작성" onClick={() => onNewTil?.()}>
+          <Plus className="size-4" />
+          새 TIL
+        </button>
+        {hasData && <span className="rt-mdock-title">{dashboard.title}</span>}
+        <div className="rt-mdock-screen">
+          <div className="rt-mdock-lcd">
+            {hasData
+              ? <PixelPlant species={species} stage={stage} size={40} />
+              : <span style={{ fontSize: 28 }}>🌱</span>}
+          </div>
+        </div>
+        <span className="rt-mdock-lv">Lv.{level ?? '–'}</span>
+        <span className="rt-mdock-stage">{hasData ? stageLabel : '화분 선택'}</span>
+        {hasData && (
+          <div className="rt-mdock-exp" role="img" aria-label={`경험치 ${progress}%`}>
+            <div className="rt-mdock-exp-fill" style={{ width: `${progress}%` }} />
+          </div>
+        )}
+        <div className="rt-mdock-stats">
+          <span className="rt-mdock-stat"><Flame className="size-3" style={{ color: 'var(--amber)' }} />{streak}</span>
+          <span className="rt-mdock-stat"><Sparkles className="size-3" style={{ color: 'var(--leaf-2)' }} />{progress}%</span>
+        </div>
+        <button
+          type="button"
+          className="rt-mdock-expand"
+          aria-label="사이드 패널 펼치기"
+          onClick={() => { playSfx('nav'); onToggle?.(); }}
+        >
+          <span className="rt-mdock-chev" aria-hidden="true" />
+          <span className="rt-mdock-expand-cap">펼치기</span>
+        </button>
+      </div>
+    </div>
   );
 }
 
 function StatCell({ label, value, divider }) {
   return (
-    <div className={cn('flex flex-col items-center justify-center px-1', divider && 'border-x border-border/60')}>
-      <div className="text-[13px] font-bold text-foreground" style={{ fontFamily: 'var(--font-display)' }}>{value}</div>
-      <div className="mt-0.5 text-[10px] text-muted-foreground">{label}</div>
+    <div className={cn('flex flex-col items-center justify-center px-1', divider && 'border-x-2 border-[var(--line-strong)]')}>
+      <div className="text-[13px] font-bold text-[color:var(--leaf)]">{value}</div>
+      <div className="mt-0.5 text-[10px] text-[color:var(--muted-2)]">{label}</div>
     </div>
   );
 }
@@ -504,7 +586,7 @@ function PlantHeroCard({ dashboard, loading, contentLength }) {
   if (loading) {
     return (
       <PanelCard className="overflow-hidden">
-        <div className="h-16" style={{ background: 'linear-gradient(135deg, color-mix(in oklch, var(--moss) 20%, var(--card)) 0%, color-mix(in oklch, var(--leaf) 62%, var(--card)) 100%)' }} />
+        <div className="h-16" style={{ background: 'linear-gradient(180deg, var(--paper-warm), var(--paper-2))', boxShadow: 'inset 0 0 0 1px var(--line)' }} />
         <div className="-mt-8 px-5 pb-5">
           <Skeleton className="mx-auto size-20 rounded-2xl" />
           <Skeleton className="mx-auto mt-3 h-3.5 w-2/3 rounded-full" />
@@ -518,9 +600,9 @@ function PlantHeroCard({ dashboard, loading, contentLength }) {
   if (!dashboard) {
     return (
       <PanelCard className="overflow-hidden">
-        <div className="h-16" style={{ background: 'linear-gradient(135deg, color-mix(in oklch, var(--moss) 20%, var(--card)) 0%, color-mix(in oklch, var(--leaf) 62%, var(--card)) 100%)' }} />
+        <div className="h-16" style={{ background: 'linear-gradient(180deg, var(--paper-warm), var(--paper-2))', boxShadow: 'inset 0 0 0 1px var(--line)' }} />
         <div className="-mt-8 px-5 pb-5 text-center">
-          <div className="mx-auto flex size-20 items-center justify-center rounded-2xl border-4 border-card bg-[var(--paper-2)] text-3xl shadow-sm">🌱</div>
+          <div className="mx-auto flex size-20 items-center justify-center rounded-[var(--r-card)] border-4 border-[var(--paper-card)] bg-[var(--paper-2)] text-3xl shadow-[2px_2px_0_0_var(--line-strong)]">🌱</div>
           <div className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
             화분을 선택하면 현재 식물과<br />이번 글의 예상 경험치를 볼 수 있어요.
           </div>
@@ -545,8 +627,8 @@ function PlantHeroCard({ dashboard, loading, contentLength }) {
   return (
     <PanelCard className="overflow-hidden">
       {/* 그라데이션 헤더 + 레벨 배지 */}
-      <div className="relative h-16" style={{ background: 'linear-gradient(135deg, color-mix(in oklch, var(--moss) 22%, var(--card)) 0%, color-mix(in oklch, var(--leaf) 62%, var(--card)) 100%)' }}>
-        <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-card/85 px-2.5 py-1 text-[11px] font-bold shadow-sm backdrop-blur" style={{ color: 'var(--moss-2)', fontFamily: 'var(--font-display)' }}>
+      <div className="relative h-16" style={{ background: 'linear-gradient(180deg, var(--paper-warm), var(--paper-2))', boxShadow: 'inset 0 0 0 1px var(--line)' }}>
+        <div className="rt-badge rt-badge--leaf absolute right-3 top-3 font-bold">
           Lv.{level}
         </div>
       </div>
@@ -556,30 +638,30 @@ function PlantHeroCard({ dashboard, loading, contentLength }) {
         {/* 식물 아바타 (헤더 위로 겹침 + 부유 모션) */}
         <motion.div
           {...floatProps}
-          className="mx-auto flex size-20 items-center justify-center rounded-2xl border-4 border-card bg-[var(--paper-2)] shadow-sm"
+          className="mx-auto flex size-20 items-center justify-center rounded-[var(--r-card)] border-4 border-[var(--paper-card)] bg-[var(--paper-2)] shadow-[2px_2px_0_0_var(--line-strong)]"
         >
           <PixelPlant species={species} stage={stage} size={56} glow={species === 'moonlight'} />
         </motion.div>
 
         <div className="mt-2.5 text-center">
-          <div className="truncate text-sm font-bold text-foreground" style={{ fontFamily: 'var(--font-display)' }}>
+          <div className="truncate text-sm font-bold text-[color:var(--leaf)]">
             {dashboard.title}
           </div>
-          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+          <div className="mt-0.5 text-[11.5px] text-[color:var(--muted-2)]">
             {stageName} · {stageLabel} 중
           </div>
         </div>
 
-        {/* EXP 프로그래스바 */}
+        {/* EXP 프로그래스바 — 픽셀 LCD 바 */}
         <div className="mt-3.5">
-          <div className="mb-1 flex items-center justify-between text-[10.5px] text-muted-foreground" style={{ fontFamily: 'var(--font-mono)' }}>
+          <div className="mb-1 flex items-center justify-between text-[10.5px] text-[color:var(--muted-2)]" style={{ fontFamily: 'var(--font-mono)' }}>
             <span>EXP</span>
             <span>{currentExp} / {nextExp}</span>
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
+          <div className="h-2.5 overflow-hidden rounded-[3px] bg-[var(--paper-2)] shadow-[inset_0_0_0_1px_var(--line-strong)]">
             <motion.div
-              className="h-full rounded-full"
-              style={{ background: 'linear-gradient(90deg, var(--moss) 0%, var(--sprout) 100%)' }}
+              className="h-full"
+              style={{ background: 'var(--leaf-2)', boxShadow: 'inset 0 0 0 1px rgba(20,40,12,.18)' }}
               initial={{ width: 0 }}
               animate={{ width: `${progress}%` }}
               transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
@@ -587,15 +669,15 @@ function PlantHeroCard({ dashboard, loading, contentLength }) {
           </div>
         </div>
 
-        {/* 스탯 그리드 (ProfileCard 어휘) */}
-        <div className="mt-3.5 grid grid-cols-3 rounded-xl border border-border/60 bg-[var(--paper-2)] py-2.5">
+        {/* 스탯 그리드 */}
+        <div className="mt-3.5 grid grid-cols-3 rounded-[var(--r-chip)] border-2 border-[var(--line-strong)] bg-[var(--paper-warm)] py-2.5">
           <StatCell label="레벨" value={`Lv.${level}`} />
           <StatCell label="연속" value={<span className="inline-flex items-center gap-0.5"><Flame className="size-3" style={{ color: 'var(--amber)' }} />{streakDays}일</span>} divider />
           <StatCell label="진척도" value={`${progress}%`} />
         </div>
 
         {/* 이번 글 예상 경험치 */}
-        <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[12px] font-semibold" style={{ background: 'color-mix(in oklch, var(--sprout) 18%, var(--card))', color: 'var(--moss-2)' }}>
+        <div className="mt-3 flex items-center justify-center gap-1.5 rounded-[var(--r-chip)] px-3 py-2 text-[12px] font-semibold" style={{ background: 'var(--amber-soft)', color: '#9a7322' }}>
           <Sparkles className="size-3.5" />
           이번 글로 약 +{estimatedExp} XP
         </div>

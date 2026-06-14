@@ -660,16 +660,22 @@ function DashboardScreen({ onNav }) {
 
   // 잔디 기간 변경 시 재요청
   useEffect(() => {
+    let active = true;
     getGrass(grassMonths).then(data => {
+      if (!active) return;
       setGrassGrid(buildGrassGrid(data?.cells ?? [], grassMonths));
     }).catch(() => {});
+    return () => { active = false; };
   }, [grassMonths]);
 
   // 관심사 기간 변경 시 재요청
   useEffect(() => {
+    let active = true;
     getInterests(interestMonths).then(data => {
+      if (!active) return;
       setInterests(data?.interests ?? []);
     }).catch(() => {});
+    return () => { active = false; };
   }, [interestMonths]);
 
   useEffect(() => {

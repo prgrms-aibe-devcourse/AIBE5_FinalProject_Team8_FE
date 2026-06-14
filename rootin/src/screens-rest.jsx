@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef, useMemo, Fragment } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { getPlants } from './api/collection.js';
 import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult } from './api/ai.js';
 import { getPots } from './api/pot.js';
-import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
+import { getMyTils } from './api/til.js';
+import { Pill, Btn } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { Plant, RootinLogo, STAGE_META } from './plants.jsx';
 import { RtIcon } from './pixel-icons.jsx';
@@ -10,6 +11,8 @@ import { playSfx } from './lib/sfx.js';
 import { useUser } from './context/UserContext.jsx';
 import { inferSpecies } from './utils/plant.js';
 import './dex.css';
+import './ai.css';
+import './profile.css';
 
 // Collection (식물도감), AI, Profile, Auth screens
 
@@ -446,6 +449,340 @@ function CollectionScreen() {
 
 // === AI Screen ===
 
+const TIL_MODAL_PAGE_SIZE = 10;
+const TIL_IDS_MAX_SIZE = 200; // BE AiPolicy.TIL_IDS_MAX_SIZE 와 동기화 — AI에 전달 가능한 선택 최대 개수
+
+const formatDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+};
+
+/**
+ * AI 학습에 포함할 TIL을 선택하는 확인 모달
+ * Props:
+ *   potId      — 조회할 화분 ID
+ *   onConfirm  — (tilIds: number[]) => void
+ *   onClose    — () => void
+ */
+function AiTilSelectModal({ potId, onConfirm, onClose }) {
+  const [tils, setTils]               = useState([]);
+  const [totalElements, setTotalElements] = useState(0);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
+  const [partialError, setPartialError] = useState(false);
+  const [keyword, setKeyword]         = useState('');
+  const [selectedTag, setSelectedTag] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [page, setPage]               = useState(0);
+  const dialogRef                     = useRef(null);
+
+  // 모달 열릴 때 포커스 이동 (스크린 리더 대응)
+  useEffect(() => { dialogRef.current?.focus(); }, []);
+
+  // Escape 키로 모달 닫기
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+
+  // 진입 시 화분 TIL 전체 로딩 — 전체 페이지 순회
+  useEffect(() => {
+    if (!potId) return;
+    let active = true;
+    const controller = new AbortController();
+    setLoading(true);
+    setError(null);
+    setPartialError(false);
+    setTotalElements(0);
+    setTils([]);
+
+    const PAGE_SIZE = 100;
+
+    const toItem = t => ({
+      id: t.tilId,
+      title: t.title,
+      date: t.publishedAt ?? t.createdAt,
+      tags: Array.isArray(t.tags) ? [...new Set(t.tags.map(tag => String(tag).trim()).filter(Boolean))] : [],
+    });
+
+    getMyTils({ potId, page: 0, size: PAGE_SIZE, sort: 'latest', signal: controller.signal })
+      .then(async first => {
+        if (!active) return;
+        const total = first?.totalElements ?? 0;
+        const totalPages = first?.totalPages ?? 1;
+        const firstContent = Array.isArray(first?.content) ? first.content : [];
+
+        setTotalElements(total);
+
+        if (totalPages <= 1) {
+          setTils(firstContent.map(toItem));
+          return;
+        }
+
+        // 나머지 페이지 병렬 fetch — allSettled로 부분 실패 시에도 성공 페이지 활용
+        const rest = await Promise.allSettled(
+          Array.from({ length: totalPages - 1 }, (_, i) =>
+            getMyTils({ potId, page: i + 1, size: PAGE_SIZE, sort: 'latest', signal: controller.signal })
+          )
+        );
+        if (!active) return;
+
+        const hadPartialFailure = rest.some(r => r.status === 'rejected');
+        setPartialError(hadPartialFailure);
+
+        const all = [
+          firstContent,
+          ...rest
+            .filter(r => r.status === 'fulfilled')
+            .map(r => Array.isArray(r.value?.content) ? r.value.content : []),
+        ]
+          .flat()
+          .map(toItem);
+        setTils(all);
+      })
+      .catch(() => {
+        if (active) setError('TIL 목록을 불러오지 못했어요.');
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; controller.abort(); };
+  }, [potId]);
+
+  // 태그 목록 (빈도순)
+  const tagCounts = useMemo(() => {
+    const map = new Map();
+    tils.forEach(t => t.tags.forEach(tag => {
+      const k = tag;
+      if (k) map.set(k, (map.get(k) ?? 0) + 1);
+    }));
+    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  }, [tils]);
+
+  // 클라이언트 필터
+  const filtered = useMemo(() => {
+    const kw = keyword.trim().toLowerCase();
+    return tils.filter(t => {
+      const matchesTag = !selectedTag || t.tags.includes(selectedTag);
+      const matchesKw  = !kw || t.title.toLowerCase().includes(kw);
+      return matchesTag && matchesKw;
+    });
+  }, [tils, keyword, selectedTag]);
+
+  // 필터 변경 시 첫 페이지로 리셋
+  useEffect(() => { setPage(0); }, [keyword, selectedTag]);
+
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / TIL_MODAL_PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages - 1);
+  const pageTils    = filtered.slice(currentPage * TIL_MODAL_PAGE_SIZE, (currentPage + 1) * TIL_MODAL_PAGE_SIZE);
+
+  // 전체 선택: 현재 필터된 TIL 전체 기준
+  const allFilteredIds = useMemo(() => filtered.map(t => t.id), [filtered]);
+
+  // allFilteredIds 단일 순회로 전체선택 관련 파생값 한 번에 계산
+  const { isAllSelected, isIndeterminate, canSelectAll, addableCount } = useMemo(() => {
+    const total = allFilteredIds.length;
+    let selectedCount = 0;
+    for (const id of allFilteredIds) {
+      if (selectedIds.has(id)) selectedCount++;
+    }
+    const outsideSelected = selectedIds.size - selectedCount;
+    return {
+      isAllSelected:   total > 0 && selectedCount === total,
+      isIndeterminate: selectedCount > 0 && selectedCount < total,
+      canSelectAll:    outsideSelected + total <= TIL_IDS_MAX_SIZE,
+      addableCount:    TIL_IDS_MAX_SIZE - outsideSelected,
+    };
+  }, [allFilteredIds, selectedIds]);
+
+  const toggleAll = useCallback(() => {
+    setSelectedIds(prev => {
+      // prev 기반으로 재계산 — 더블클릭 등 동일 틱 중복 호출 방어
+      const isAll = allFilteredIds.length > 0 && allFilteredIds.every(id => prev.has(id));
+      const next = new Set(prev);
+      if (isAll) {
+        allFilteredIds.forEach(id => next.delete(id));
+      } else {
+        for (const id of allFilteredIds) {
+          if (next.size >= TIL_IDS_MAX_SIZE) break;
+          next.add(id);
+        }
+      }
+      return next;
+    });
+  }, [allFilteredIds]);
+
+  const toggleOne = useCallback((id) => {
+    setSelectedIds(prev => {
+      if (!prev.has(id) && prev.size >= TIL_IDS_MAX_SIZE) return prev;
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleConfirm = () => {
+    onConfirm(Array.from(selectedIds));
+  };
+
+  return (
+    <div
+      className="rt-app gb-ai-modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ai-til-modal-title"
+      onClick={e => { if (e.target === e.currentTarget) { playSfx('cancel'); onClose(); } }}
+    >
+      <div ref={dialogRef} tabIndex={-1} className="gb-ai-modal">
+
+        {/* 헤더 */}
+        <div className="gb-ai-modal-head">
+          <div className="gb-ai-modal-titlewrap">
+            <span className="gb-ai-modal-ic" aria-hidden="true"><RtIcon name="book" /></span>
+            <div>
+              <h2 id="ai-til-modal-title" className="gb-ai-modal-title">기록 불러오기</h2>
+              <p className="gb-ai-modal-sub">퀴즈·요약에 사용할 기록을 골라주세요</p>
+            </div>
+          </div>
+          <button type="button" className="gb-ai-modal-close" aria-label="닫기" onClick={() => { playSfx('cancel'); onClose(); }}><RtIcon name="xmark" /></button>
+        </div>
+
+        {/* 검색 */}
+        <div className="gb-ai-modal-search">
+          <span aria-hidden="true"><RtIcon name="search" /></span>
+          <input
+            className="gb-ai-modal-search-input"
+            type="text"
+            placeholder="제목으로 검색..."
+            value={keyword}
+            onChange={e => setKeyword(e.target.value)}
+          />
+        </div>
+
+        {/* 태그 필터 */}
+        {tagCounts.length > 0 && (
+          <div className="gb-ai-modal-tags scrollbar">
+            {tagCounts.map(([tag]) => (
+              <button
+                key={tag}
+                type="button"
+                className={`gb-ai-modal-tag${selectedTag === tag ? ' is-active' : ''}`}
+                onClick={() => { playSfx('toggle'); setSelectedTag(prev => prev === tag ? null : tag); }}
+              >#{tag}</button>
+            ))}
+          </div>
+        )}
+
+        {/* 전체 선택 + 카운트 */}
+        <div className="gb-ai-modal-selbar">
+          {((partialError ? tils.length : totalElements) <= TIL_IDS_MAX_SIZE || (!!(keyword.trim() || selectedTag) && filtered.length <= TIL_IDS_MAX_SIZE)) ? (
+            <label className="gb-ai-modal-selall" style={{ cursor: canSelectAll ? 'pointer' : 'default' }}>
+              <input
+                type="checkbox"
+                checked={isAllSelected}
+                ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                onChange={() => { playSfx('toggle'); toggleAll(); }}
+                disabled={filtered.length === 0}
+              />
+              <span>{canSelectAll ? `전체 선택 (${filtered.length})` : `추가 가능한 ${addableCount}개만 선택`}</span>
+            </label>
+          ) : (
+            <span className="gb-ai-modal-selhint">
+              검색·태그로 {TIL_IDS_MAX_SIZE}개 이하로 좁히면 전체 선택할 수 있어요
+            </span>
+          )}
+          <span className={`gb-ai-modal-count${selectedIds.size >= TIL_IDS_MAX_SIZE ? ' is-max' : ''}`}>
+            {selectedIds.size} / {TIL_IDS_MAX_SIZE} 선택
+          </span>
+        </div>
+
+        {/* 부분 로드 실패 안내 */}
+        {partialError && (
+          <div className="gb-ai-modal-warn">
+            일부 기록을 불러오지 못했어요. 목록이 불완전할 수 있습니다.
+          </div>
+        )}
+
+        {/* 기록 목록 */}
+        <div className="gb-ai-modal-list scrollbar">
+          {loading ? (
+            <div className="gb-ai-modal-msg">기록을 불러오는 중...</div>
+          ) : error ? (
+            <div className="gb-ai-modal-msg is-error">{error}</div>
+          ) : pageTils.length === 0 ? (
+            <div className="gb-ai-modal-msg">
+              {tils.length === 0 ? '이 화분에 기록이 없어요.' : '검색 결과가 없어요.'}
+            </div>
+          ) : (
+            pageTils.map(til => (
+              <label
+                key={til.id}
+                className={`gb-ai-til${selectedIds.has(til.id) ? ' is-selected' : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(til.id)}
+                  onChange={() => { playSfx('coindrop'); toggleOne(til.id); }}
+                  disabled={!selectedIds.has(til.id) && selectedIds.size >= TIL_IDS_MAX_SIZE}
+                />
+                <span className="gb-ai-til-box" aria-hidden="true"><RtIcon name="check" /></span>
+                <span className="gb-ai-til-body">
+                  <span className="gb-ai-til-title">{til.title}</span>
+                  <span className="gb-ai-til-meta">
+                    <span className="gb-ai-til-date">{formatDate(til.date)}</span>
+                    {til.tags.slice(0, 3).map(tag => (
+                      <span key={tag} className="gb-ai-til-tag">#{tag}</span>
+                    ))}
+                  </span>
+                </span>
+              </label>
+            ))
+          )}
+        </div>
+
+        {/* 페이지네이션 */}
+        {totalPages > 1 && (
+          <div className="gb-ai-modal-pager">
+            <button
+              type="button"
+              className="gb-ai-pager-btn"
+              onClick={() => setPage(p => Math.max(0, p - 1))}
+              disabled={currentPage === 0}
+              aria-label="이전 페이지"
+            >◀ 이전</button>
+            <span className="gb-ai-pager-now">{currentPage + 1} / {totalPages}</span>
+            <button
+              type="button"
+              className="gb-ai-pager-btn"
+              onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={currentPage === totalPages - 1}
+              aria-label="다음 페이지"
+            >다음 ▶</button>
+          </div>
+        )}
+
+        {/* 확인 / 취소 */}
+        <div className="gb-ai-modal-foot">
+          <button type="button" className="gb-ai-mbtn gb-ai-mbtn--ghost" onClick={() => { playSfx('cancel'); onClose(); }}>취소</button>
+          <button
+            type="button"
+            className="gb-ai-mbtn gb-ai-mbtn--go"
+            disabled={selectedIds.size === 0}
+            onClick={handleConfirm}
+          >
+            {selectedIds.size === 0 ? '기록을 선택해 주세요' : `${selectedIds.size}개로 만들기`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // growthStage → PixelPlant stage 매핑
 const GROWTH_STAGE_TO_STAGE = {
   SEED: 'seed', SPROUT: 'sprout', MATURE: 'leaf', BLOOM: 'bloom', FULL_BLOOM: 'full',
@@ -454,59 +791,30 @@ const GROWTH_STAGE_TO_STAGE = {
 function PotCard({ pot, selected, onClick }) {
   const species = inferSpecies(pot.plantName);
   const stage = GROWTH_STAGE_TO_STAGE[pot.growthStage] ?? 'seed';
-
-  // TIL 개수: BE 응답의 tilCount 필드 사용, 없으면 미표시
+  // TIL 개수: BE 응답의 tilCount 필드 사용, 없으면 0
   const tilCount = pot.tilCount ?? 0;
 
+  // 정원(스테이지) 타일 — 클릭하면 분석 대상으로 선택된다
   return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '12px 14px', borderRadius: 10, textAlign: 'left', width: '100%',
-        background: selected ? 'var(--paper-2)' : '#fff',
-        border: selected ? '1.5px solid var(--moss)' : '0.5px solid var(--rule)',
-        position: 'relative',
-        transition: 'border-color 0.12s, background 0.12s',
-      }}
-    >
-      {/* 식물 이미지 */}
-      <div style={{
-        width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-        background: selected ? 'var(--paper)' : '#f7f9f7',
-        border: '0.5px solid var(--rule)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <PixelPlant species={species} stage={stage} size={36} />
-      </div>
-
-      {/* 텍스트 */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{pot.title}</span>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Lv.{pot.level}</span>
-          <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>· TIL {tilCount}개</span>
-        </div>
-      </div>
-
-      {/* 선택 체크 배지 */}
-      {selected && (
-        <div style={{
-          width: 20, height: 20, borderRadius: '50%',
-          background: 'var(--moss)', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff',
-        }}>
-          {Icon.check}
-        </div>
-      )}
+    <button type="button" onClick={onClick} className={`gb-ai-stage${selected ? ' is-active' : ''}`}>
+      <span className="gb-ai-stage-pedestal" aria-hidden="true">
+        <PixelPlant species={species} stage={stage} size={34} />
+      </span>
+      <span className="gb-ai-stage-info">
+        <span className="gb-ai-stage-name">{pot.title}</span>
+        <span className="gb-ai-stage-meta">
+          <span className="gb-ai-stage-lv">Lv.{pot.level}</span>
+          <span>기록 {tilCount}장</span>
+        </span>
+      </span>
+      <span className="gb-ai-stage-pick" aria-hidden="true"><RtIcon name="check" /></span>
     </button>
   );
 }
 
 function AIScreen() {
   const { user } = useUser();
-  const [mode, setMode] = useState('quiz'); // quiz | summary — 입력 UI 탭 선택
+  const [mode, setMode] = useState(null); // null | quiz | summary — 선택 전엔 null (① 퀘스트 종류부터 순차 해금)
   const [resultMode, setResultMode] = useState('quiz'); // quiz | summary — 현재 표시 중인 결과 타입
   const [potId, setPotId] = useState(null);
   const [quizCount, setQuizCount] = useState(5);
@@ -529,19 +837,28 @@ function AIScreen() {
 
   // 저장 완료 피드백용
   const [saved, setSaved] = useState(false);
+  const savedTimerRef = useRef(null);
+
+  // TIL 선택 모달
+  const [modalOpen, setModalOpen] = useState(false);
+  // 마지막으로 선택한 tilIds (다시 생성 시 재사용)
+  const [lastTilIds, setLastTilIds] = useState([]);
 
   const selectedPot = pots.find(p => p.id === potId) ?? null;
 
+  useEffect(() => () => {
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current);
+    }
+  }, []);
+
   // 페이지 진입 시 화분 목록 + 사용자 포인트 로딩
   useEffect(() => {
-    // 화분 목록 로딩 — 첫 번째 화분 자동 선택
+    // 화분 목록 로딩 — 자동 선택하지 않음(① 퀘스트 종류 선택 후 ② 정원 단계가 해금되면 사용자가 직접 선택)
     getPots()
       .then(data => {
         const list = Array.isArray(data) ? data : [];
         setPots(list);
-        if (list.length > 0) {
-          setPotId(list[0].id);
-        }
       })
       .catch(() => {
         // 화분 목록 로딩 실패 시 빈 목록 유지
@@ -553,7 +870,7 @@ function AIScreen() {
     // 보유 포인트 — UserContext에서 초기화됨 (별도 getMe() 호출 불필요)
   }, []);
 
-  // 페이지 진입 시 보관함 목록 로딩
+  // 페이지 진입 시 보관함 목록 로딩 — pot 이름은 렌더 시점에 pots에서 resolve
   useEffect(() => {
     fetchResults()
       .then(data => {
@@ -562,16 +879,14 @@ function AIScreen() {
           const content = typeof r.content === 'string'
             ? (() => { try { return JSON.parse(r.content); } catch { return null; } })()
             : r.content;
+          const d = new Date(r.createdAt);
           return {
             id: r.resultId,
             type: r.type.toLowerCase(),   // 'QUIZ' → 'quiz'
             potId: r.potId,
-            pot: pots.find(p => p.id === r.potId) ?? null,
             content,
-            title: r.type === 'QUIZ'
-              ? `${pots.find(p => p.id === r.potId)?.title ?? r.potId} 화분 복습 문제`
-              : `${pots.find(p => p.id === r.potId)?.title ?? r.potId} 화분 요약본`,
-            date: new Date(r.createdAt).toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace('. ', '.').replace('.', '').slice(0, 5),
+            tilIds: r.tilIds ?? [],
+            date: `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`,
             quizCount: r.type === 'QUIZ' ? content?.quizzes?.length : undefined,
           };
         });
@@ -580,21 +895,23 @@ function AIScreen() {
       .catch(() => {
         // 보관함 로딩 실패는 조용히 무시 (빈 목록 유지)
       });
-  }, [pots]);
+  }, []);
 
   // 보관함 항목 클릭 — 결과창에 바인딩
   const handleSelectSavedItem = (item) => {
     setMode(item.type);
     setResultMode(item.type);
-    if (item.pot) setPotId(item.pot.id);
-    if (item.quizCount) setQuizCount(item.quizCount);
+    const pot = pots.find(p => p.id === item.potId) ?? null;
+    if (pot) setPotId(pot.id);
+    if (item.quizCount != null) setQuizCount(item.quizCount);
     setAiResult(item.content ?? null);
+    setLastTilIds(item.tilIds ?? []);
     setGenerated(true);
     setError(null);
   };
 
   // 생성 버튼 — mode에 따라 summary/quiz API 호출
-  const handleGenerate = async () => {
+  const handleGenerate = async (tilIds) => {
     if (!potId) return;
     setGenerating(true);
     setGenerated(false);
@@ -602,15 +919,18 @@ function AIScreen() {
     setError(null);
 
     try {
+      const ids = tilIds ?? lastTilIds;
       const data = mode === 'summary'
-        ? await generateSummary(potId)
-        : await generateQuiz(potId, quizCount);
+        ? await generateSummary(potId, ids)
+        : await generateQuiz(potId, quizCount, ids);
 
       setAiResult(data);
       setRemainPoint(data.remainPoint);
       setResultMode(mode);
       setGenerated(true);
+      playSfx('powerup');   // 결과 도착 — 파워업 부팅음
     } catch (err) {
+      playSfx('error');     // 오류 — 경고음
       if (err.status === 402) {
         setError('포인트가 부족해요. 활동으로 포인트를 적립해 보세요.');
       } else {
@@ -621,8 +941,19 @@ function AIScreen() {
     }
   };
 
+  // 모달 확인 — tilIds 받아서 생성 실행. 결제 순간 코인 분출 + 까-칭 효과음.
+  const handleModalConfirm = (tilIds) => {
+    setModalOpen(false);
+    setLastTilIds(tilIds);
+    playSfx('coin');
+    handleGenerate(tilIds);
+  };
+
+  const handleModalClose = useCallback(() => setModalOpen(false), []);
+
   const handlePotChange = (id) => {
     setPotId(id);
+    setLastTilIds([]);
   };
 
   // 결과 저장 버튼 — POST /ai/results
@@ -643,16 +974,24 @@ function AIScreen() {
         {
           id: saved_res.resultId,
           type: resultMode,
+          potId,
           title,
           date,
-          quizCount: mode === 'quiz' ? quizCount : undefined,
+          quizCount: resultMode === 'quiz' ? quizCount : undefined,
+          tilIds: lastTilIds,
           pot: selectedPot,
           content: aiResult,
         },
         ...prev,
       ]);
+      if (savedTimerRef.current) {
+        clearTimeout(savedTimerRef.current);
+      }
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      savedTimerRef.current = setTimeout(() => {
+        setSaved(false);
+        savedTimerRef.current = null;
+      }, 2000);
     } catch {
       setError('저장에 실패했어요. 잠시 후 다시 시도해 주세요.');
     }
@@ -669,204 +1008,292 @@ function AIScreen() {
     }
   };
 
+  const generateCost = mode === 'quiz' ? quizCount * 10 : mode === 'summary' ? 50 : 0;
+  const canGenerate = !!potId && !generating;
+  const balanceAfter = remainPoint - generateCost;
+  const enough = remainPoint >= generateCost;
+
+  // ── 퀘스트 진행(표시용) — 기존 상태에서 파생, 비즈니스 로직 아님 ──
+  // 순차 해금: ① 퀘스트 종류 선택 → ② 정원 해금 → 정원 선택 → ③ 난이도·④ 출격 해금
+  const modeChosen = mode !== null;
+  const potChosen = !!potId;
+  const quizDiff = quizCount <= 3 ? { key: 'easy', label: '쉬움' }
+    : quizCount <= 6 ? { key: 'normal', label: '보통' }
+    : { key: 'hard', label: '어려움' };
+  const questNodes = mode === 'quiz'
+    ? [
+        { key: 'mode', label: '종류', icon: 'spark', done: modeChosen, unlocked: true },
+        { key: 'pot',  label: '화분',   icon: 'leaf',  done: potChosen, unlocked: modeChosen },
+        { key: 'diff', label: '문항 수', icon: 'gear',  done: potChosen, unlocked: potChosen },
+        { key: 'go',   label: '만들기',   icon: 'flame', done: generated, unlocked: potChosen },
+      ]
+    : [
+        { key: 'mode', label: '종류', icon: 'spark', done: modeChosen, unlocked: true },
+        { key: 'pot',  label: '화분',   icon: 'leaf',  done: potChosen, unlocked: modeChosen },
+        { key: 'go',   label: '만들기',   icon: 'flame', done: generated, unlocked: potChosen },
+      ];
+  const doneCount = questNodes.filter(n => n.done).length;
+  const currentNodeIdx = (() => {
+    const i = questNodes.findIndex(n => !n.done);
+    return i === -1 ? questNodes.length - 1 : i;
+  })();
+  const heroSpecies = inferSpecies(selectedPot?.plantName);
+  const objective = generating
+    ? 'AI가 기록을 분석하는 중...'
+    : generated
+      ? '완성됐어요! 결과를 확인하세요'
+      : !modeChosen
+        ? '먼저 만들 종류를 선택하세요'
+        : !potChosen
+          ? '화분을 선택하세요'
+          : !enough
+            ? '포인트가 부족해요 — 활동으로 모아보세요'
+            : '만들기 버튼을 눌러 시작하세요!';
+
   return (
-    <div style={{ padding: 32, width: '100%', display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24, maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
+    <>
+    <div className="rt-app gb-ai-page">
+      <div className="gb-console">
 
-      {/* Left — source picker */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div>
-        <SectionHeader eyebrow="입력" title="학습 소스 선택" />
-        <Card padding={18} style={{ marginBottom: 16 }}>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>목적</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setMode('quiz')} style={{
-              flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'quiz' ? 'var(--ink)' : '#fff',
-              color: mode === 'quiz' ? '#fff' : 'var(--ink-2)',
-              border: '0.5px solid ' + (mode === 'quiz' ? 'var(--ink)' : 'var(--rule-2)'),
-              fontSize: 12.5, fontWeight: 500, textAlign: 'left',
-            }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 4 }}>📝 복습 문제 생성</div>
-              <div style={{ fontSize: 10.5, opacity: 0.7, lineHeight: 1.5 }}>TIL에서 {quizCount}문제 자동 생성</div>
-            </button>
-            <button onClick={() => setMode('summary')} style={{
-              flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'summary' ? 'var(--ink)' : '#fff',
-              color: mode === 'summary' ? '#fff' : 'var(--ink-2)',
-              border: '0.5px solid ' + (mode === 'summary' ? 'var(--ink)' : 'var(--rule-2)'),
-              fontSize: 12.5, fontWeight: 500, textAlign: 'left',
-            }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 4 }}>✨ TIL 요약</div>
-              <div style={{ fontSize: 10.5, opacity: 0.7, lineHeight: 1.5 }}>핵심 개념을 한 문서로</div>
-            </button>
-          </div>
-          {mode === 'quiz' && (
-            <div style={{
-              marginTop: 12, paddingTop: 12,
-              borderTop: '0.5px solid var(--rule)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>문제 수량</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button
-                  onClick={() => setQuizCount(c => Math.max(1, c - 1))}
-                  style={{
-                    width: 28, height: 28, borderRadius: 7,
-                    border: '0.5px solid var(--rule-2)', background: '#fff',
-                    fontSize: 15, color: 'var(--ink-2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >−</button>
-                <span style={{
-                  width: 28, textAlign: 'center',
-                  fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)',
-                }}>{quizCount}</span>
-                <button
-                  onClick={() => setQuizCount(c => Math.min(10, c + 1))}
-                  style={{
-                    width: 28, height: 28, borderRadius: 7,
-                    border: '0.5px solid var(--rule-2)', background: '#fff',
-                    fontSize: 15, color: 'var(--ink-2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >+</button>
-                <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>최대 10문제</span>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        <Card padding={18}>
-          <div style={{ marginBottom: 12 }}>
-            <div className="eyebrow">화분 선택</div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>
-              학습할 화분을 하나 선택하세요
+        {/* ===== 콘솔 헤드: 카트리지 라벨 · 타이틀 · 코인 HUD ===== */}
+        <div className="gb-ai-head">
+          <div className="gb-ai-id">
+            <span className="gb-ai-cart" aria-hidden="true"><RtIcon name="spark" /></span>
+            <div className="gb-ai-titles">
+              <span className="gb-ai-kicker"><RtIcon name="book" /> 기록으로 만드는 복습 자료</span>
+              <h1 className="gb-ai-title">AI 복습 도우미</h1>
             </div>
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflow: 'auto', paddingRight: 4 }} className="scrollbar">
-            {potsLoading ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                화분 목록을 불러오는 중...
-              </div>
-            ) : pots.length === 0 ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                화분이 없어요. 화분을 먼저 만들어 보세요.
-              </div>
-            ) : (
-              pots.map(p => (
-                <PotCard
-                  key={p.id}
-                  pot={p}
-                  selected={potId === p.id}
-                  onClick={() => handlePotChange(p.id)}
-                />
-              ))
-            )}
+          <div className={`gb-ai-credit${enough ? '' : ' is-low'}`}>
+            <span className="gb-ai-coin" aria-hidden="true">P</span>
+            <span className="gb-ai-credit-meta">
+              <span className="gb-ai-credit-k">보유 포인트</span>
+              <span className="gb-ai-credit-v">{remainPoint}P</span>
+            </span>
           </div>
-
-          <Btn
-            variant="green" size="lg"
-            style={{ width: '100%', marginTop: 14, opacity: potId ? 1 : 0.45, cursor: potId ? 'pointer' : 'not-allowed' }}
-            onClick={handleGenerate}
-          >
-            {generating ? '생성 중...' : (mode === 'quiz' ? `🌱 복습 문제 ${quizCount}개 만들기` : '✨ 요약 생성하기')} · {mode === 'quiz' ? quizCount * 10 : 50} 포인트 사용
-          </Btn>
-          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-3)', textAlign: 'center' }}>
-            현재 보유: <b style={{ color: 'var(--ink)' }}>{remainPoint}P</b> · 포인트는 활동으로 적립돼요
-          </div>
-          {error && (
-            <div style={{
-              marginTop: 8, padding: '10px 14px', borderRadius: 8,
-              background: '#fff3f5', border: '0.5px solid #f7c1c1',
-              fontSize: 12, color: '#b8536a', textAlign: 'center',
-            }}>
-              {error}
-            </div>
-          )}
-        </Card>
-      </div>
-
-        {/* ➕ 추가: 저장된 AI 결과 목록(보관함) UI 신규 배치 */}
-        <div>
-          <SectionHeader eyebrow="보관함" title="저장된 AI 결과" />
-          <Card padding={14} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {savedResults.length === 0 ? (
-                <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 12, color: 'var(--ink-3)' }}>
-                  저장된 결과지가 없습니다.
-                </div>
-            ) : (
-                savedResults.map(item => (
-                    <div
-                        key={item.id}
-                        onClick={() => handleSelectSavedItem(item)}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '10px 12px', borderRadius: 8, background: '#fcfdfb',
-                          border: '0.5px solid var(--rule)', cursor: 'pointer'
-                        }}
-                    >
-                  <span style={{ fontSize: 12.5, color: 'var(--ink)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
-                    {item.type === 'quiz' ? '📝 ' : '✨ '} {item.title}
-                  </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                        <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{item.date}</span>
-                        <button
-                          onClick={(e) => handleDelete(e, item.id)}
-                          aria-label="삭제"
-                          style={{
-                            width: 20, height: 20, borderRadius: 5,
-                            border: '0.5px solid var(--rule-2)', background: '#fff',
-                            fontSize: 11, color: 'var(--ink-3)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                        >✕</button>
-                      </div>
-                    </div>
-                ))
-            )}
-          </Card>
         </div>
 
-      </div>
+        {/* ===== HUD 목표 바 — 현재 퀘스트 목표 + 진행도 ===== */}
+        <div className="gb-ai-objbar">
+          <span className="gb-ai-obj-flag" aria-hidden="true"><RtIcon name="flame" /></span>
+          <span className="gb-ai-obj-text">목표 ▸ <span className="cur">{objective}</span></span>
+          <span className="gb-ai-progress" aria-hidden="true">
+            {questNodes.map((n, i) => (<i key={n.key} className={i < doneCount ? 'on' : ''} />))}
+          </span>
+        </div>
 
-      {/* Right — output */}
-      <div>
-        <SectionHeader
-          eyebrow="AI 결과지"
-          title={resultMode === 'quiz' ? `복습 문제 (${quizCount}문항)` : 'TIL 요약 결과지'}
-          action={generated ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Btn variant="secondary" size="sm" onClick={handleGenerate}>다시 생성</Btn>
-              <Btn variant="primary" size="sm" onClick={handleSave}>
-                {saved ? '✓ 저장됨' : '결과 저장'}
-              </Btn>
-            </div>
-          ) : null}
-        />
+        {/* ===== 본문: 좌 퀘스트 타임라인 / 우 플레이 스크린 ===== */}
+        <div className="gb-ai-main">
 
-        <Card padding={28}>
-          {generating ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '60px 0', color: 'var(--ink-3)' }}>
-              <div style={{ fontSize: 32 }}>🌱</div>
-              <div style={{ fontSize: 13.5, color: 'var(--ink-2)', fontFamily: 'var(--font-display)' }}>AI가 TIL을 분석하고 있어요...</div>
-            </div>
-          ) : !generated ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '60px 0' }}>
-              <div style={{ fontSize: 40, opacity: 0.35 }}>{mode === 'quiz' ? '📝' : '✨'}</div>
-              <div style={{ fontSize: 13.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)' }}>
-                화분을 선택하고 생성 버튼을 눌러주세요
+          {/* ── 좌: 퀘스트 타임라인 (진행 흐름) ── */}
+          <ol className="gb-ai-quest">
+            {questNodes.map((n, i) => (
+              <li key={n.key} className={`gb-ai-node${n.done ? ' is-done' : ''}${i === currentNodeIdx ? ' is-current' : ''}${!n.unlocked ? ' is-locked' : ''}`}>
+                <div className="gb-ai-rail">
+                  <span className="gb-ai-mark" aria-hidden="true">
+                    {!n.unlocked ? <RtIcon name="lock" /> : n.done ? <RtIcon name="check" /> : i === currentNodeIdx ? <RtIcon name={n.icon} /> : (i + 1)}
+                  </span>
+                </div>
+                <div className="gb-ai-node-body rt-card">
+                  {!n.unlocked ? (
+                    <div className="gb-ai-locked">
+                      <span className="gb-ai-locked-ic" aria-hidden="true"><RtIcon name="lock" /></span>
+                      <span className="gb-ai-locked-t">{n.label} 단계 · 잠김</span>
+                      <span className="gb-ai-locked-d">{n.key === 'pot' ? '먼저 종류를 선택하세요' : '먼저 화분을 선택하세요'}</span>
+                    </div>
+                  ) : (<div className="gb-ai-node-content" key={`${n.key}-open`}>
+
+                  {n.key === 'mode' && (
+                    <>
+                      <div className="gb-ai-node-head"><span className="gb-ai-node-title">종류 선택</span><span className="gb-ai-node-sub">무엇을 만들까요?</span></div>
+                      <div className="gb-ai-intent">
+                        <button type="button" className={`gb-ai-quest-opt${mode === 'quiz' ? ' is-active' : ''}`} onClick={() => { playSfx('toggle'); setMode('quiz'); }}>
+                          <span className="gb-ai-quest-ic" aria-hidden="true"><RtIcon name="check" /></span>
+                          <span className="gb-ai-quest-t">복습 퀴즈</span>
+                          <span className="gb-ai-quest-d">4지선다로 이해도 점검</span>
+                        </button>
+                        <button type="button" className={`gb-ai-quest-opt${mode === 'summary' ? ' is-active' : ''}`} onClick={() => { playSfx('toggle'); setMode('summary'); }}>
+                          <span className="gb-ai-quest-ic" aria-hidden="true"><RtIcon name="star" /></span>
+                          <span className="gb-ai-quest-t">핵심 요약</span>
+                          <span className="gb-ai-quest-d">한 편의 정리 노트로</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {n.key === 'pot' && (
+                    <>
+                      <div className="gb-ai-node-head"><span className="gb-ai-node-title">화분 선택</span><span className="gb-ai-node-sub">{selectedPot ? selectedPot.title : '선택 필요'}</span></div>
+                      <div className="gb-ai-stages scrollbar">
+                        {potsLoading ? (
+                          <div className="gb-ai-msg">화분 목록을 불러오는 중...</div>
+                        ) : pots.length === 0 ? (
+                          <div className="gb-ai-msg">화분이 없어요. 먼저 화분을 만들어 보세요.</div>
+                        ) : (
+                          pots.map(p => (
+                            <PotCard
+                              key={p.id}
+                              pot={p}
+                              selected={potId === p.id}
+                              onClick={() => { playSfx('nav'); handlePotChange(p.id); }}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {n.key === 'diff' && (
+                    <>
+                      <div className="gb-ai-node-head"><span className="gb-ai-node-title">문항 수</span><span className="gb-ai-node-sub">최대 10문제</span></div>
+                      <div className="gb-ai-dial">
+                        <button type="button" className="gb-ai-dial-btn" onClick={() => setQuizCount(n2 => Math.max(1, n2 - 1))} disabled={quizCount <= 1} aria-label="문항 줄이기">−</button>
+                        <div className="gb-ai-dial-screen">
+                          <span className="gb-ai-dial-val">{quizCount}<span className="unit">문항</span></span>
+                          <span className="gb-ai-diff" data-diff={quizDiff.key}>{quizDiff.label}</span>
+                        </div>
+                        <button type="button" className="gb-ai-dial-btn" onClick={() => setQuizCount(n2 => Math.min(10, n2 + 1))} disabled={quizCount >= 10} aria-label="문항 늘리기">+</button>
+                      </div>
+                    </>
+                  )}
+
+                  {n.key === 'go' && (
+                    <>
+                      <div className="gb-ai-node-head"><span className="gb-ai-node-title">만들기</span><span className="gb-ai-node-sub">필요 포인트 {generateCost}P</span></div>
+                      <div className="gb-ai-ledger">
+                        <span className="gb-ai-ledger-row"><span>보유 포인트</span><b>{remainPoint}P</b></span>
+                        <span className="gb-ai-ledger-row is-cost"><span>이번 사용</span><b>− {generateCost}P</b></span>
+                        <span className="gb-ai-ledger-row is-total"><span>사용 후 잔여</span><b>{balanceAfter}P</b></span>
+                      </div>
+                      {!enough && <div className="gb-ai-warn"><RtIcon name="lock" /> 포인트가 부족해요. 활동으로 포인트를 모아보세요.</div>}
+                      <button
+                        type="button"
+                        className={`gb-ai-start${canGenerate && enough ? ' is-ready' : ''}`}
+                        onClick={() => { if (canGenerate) { playSfx('confirm'); setModalOpen(true); } }}
+                        disabled={!canGenerate}
+                      >
+                        <span className="gb-ai-start-ic" aria-hidden="true">A</span>
+                        <span>{generating ? '만드는 중…' : '만들기'}</span>
+                        <span className="gb-ai-start-cost">{generateCost}P</span>
+                      </button>
+                    </>
+                  )}
+                  </div>)}
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          {/* ── 우: 플레이 스크린 (LCD) ── */}
+          <section className="gb-ai-screen">
+            <div className="gb-ai-bezel">
+              <div className="gb-ai-bez-top">
+                <span className={`gb-ai-led${generated && !generating ? ' is-on' : ''}`} aria-hidden="true" />
+                <span className="gb-ai-bez-cap">{mode === 'quiz' ? '복습 퀴즈' : mode === 'summary' ? '핵심 요약' : '대기 중'}</span>
+                <span className="gb-ai-bez-cap r">ROOTIN-AI</span>
+              </div>
+              <div className="gb-ai-frame">
+                <div className="gb-ai-lcd">
+                  {generating ? (
+                    <div className="gb-ai-explore">
+                      <span className="gb-ai-explore-hero" aria-hidden="true"><PixelPlant species={heroSpecies} stage="sprout" size={56} /></span>
+                      <div className="gb-ai-explore-t">{mode === 'quiz' ? '복습 퀴즈 만드는 중' : '핵심 요약 만드는 중'}</div>
+                      <div className="gb-ai-loadbar" aria-hidden="true"><i /></div>
+                      <div className="gb-ai-explore-sub">AI가 기록을 분석하고 있어요...</div>
+                    </div>
+                  ) : generated ? (
+                    <div className="gb-ai-result">
+                      <div className="gb-ai-clear">
+                        <span className="gb-ai-clear-badge">{resultMode === 'quiz' ? `${quizCount}문항` : '요약'}</span>
+                        <span className="gb-ai-clear-title">{resultMode === 'quiz' ? '복습 퀴즈가 완성됐어요' : '핵심 요약이 완성됐어요'}</span>
+                        <div className="gb-ai-clear-acts">
+                          {lastTilIds.length > 0 && (
+                            <button type="button" className="gb-ai-act" onClick={() => handleGenerate(lastTilIds)}>다시 만들기</button>
+                          )}
+                          <button type="button" className="gb-ai-act gb-ai-act--save" onClick={handleSave}>{saved ? '✓ 저장됨' : '저장하기'}</button>
+                        </div>
+                      </div>
+                      <div className="gb-ai-result-body scrollbar">
+                        {error && <div className="gb-ai-strip"><RtIcon name="lock" />{error}</div>}
+                        {resultMode === 'quiz' ? (
+                          <QuizResult pot={selectedPot} quizCount={quizCount} quizzes={aiResult?.quizzes ?? null} />
+                        ) : (
+                          <SummaryResult pot={selectedPot} summary={aiResult?.summary ?? null} keyPoints={aiResult?.keyPoints ?? null} />
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="gb-ai-standby">
+                      <div className="gb-ai-gate" aria-hidden="true">
+                        <span className="gb-ai-gate-hero"><PixelPlant species={heroSpecies} stage="sprout" size={56} /></span>
+                      </div>
+                      <div className="gb-ai-standby-t">시작 대기 중</div>
+                      <div className="gb-ai-standby-sub">화분과 종류를 선택하고 만들기를 누르면, 기록을 분석해 복습 퀴즈나 핵심 요약을 만들어 드려요.</div>
+                      <div className="gb-ai-press">▶ 만들기 버튼을 눌러 시작</div>
+                      {error && <div className="gb-ai-strip" style={{ marginTop: 4 }}><RtIcon name="lock" />{error}</div>}
+                    </div>
+                  )}
+                  <span className="gb-fx gb-fx-scan" aria-hidden="true" />
+                  <span className="gb-fx gb-fx-vignette" aria-hidden="true" />
+                  <span className="gb-fx gb-fx-glass" aria-hidden="true" />
+                </div>
               </div>
             </div>
-          ) : resultMode === 'quiz' ? (
-            <QuizResult pot={selectedPot} quizCount={quizCount} quizzes={aiResult?.quizzes ?? null} />
+          </section>
+        </div>
+
+        {/* ===== 전리품 보관함 ===== */}
+        <section className="gb-ai-vault">
+          <div className="gb-ai-vault-head">
+            <RtIcon name="trophy" />
+            <span className="gb-ai-vault-title">저장한 학습 자료</span>
+            <span className="gb-ai-vault-count">{savedResults.length}개</span>
+          </div>
+          {savedResults.length === 0 ? (
+            <div className="gb-ai-vault-empty">아직 저장한 자료가 없어요. 결과를 만들고 저장해 보세요.</div>
           ) : (
-            <SummaryResult pot={selectedPot} summary={aiResult?.summary ?? null} keyPoints={aiResult?.keyPoints ?? null} />
+            <div className="gb-ai-vault-grid">
+              {savedResults.map(item => {
+                const itemPot = pots.find(p => p.id === item.potId);
+                const itemTitle = item.title ?? (item.type === 'quiz'
+                  ? `${itemPot?.title ?? item.potId} 화분 복습 문제`
+                  : `${itemPot?.title ?? item.potId} 화분 요약본`);
+                return (
+                  <article key={item.id} className="gb-ai-loot" onClick={() => { playSfx('nav'); handleSelectSavedItem(item); }}>
+                    <span className={`gb-ai-loot-ic ${item.type === 'quiz' ? 'is-quiz' : 'is-summary'}`} aria-hidden="true">
+                      <RtIcon name={item.type === 'quiz' ? 'check' : 'star'} />
+                    </span>
+                    <span className="gb-ai-loot-body">
+                      <span className="gb-ai-loot-title">{itemTitle}</span>
+                      <span className="gb-ai-loot-meta">{item.type === 'quiz' ? '복습 퀴즈' : '핵심 요약'} · {item.date}</span>
+                    </span>
+                    <button type="button" className="gb-ai-loot-del" aria-label="삭제" onClick={(e) => handleDelete(e, item.id)}><RtIcon name="xmark" /></button>
+                  </article>
+                );
+              })}
+            </div>
           )}
-        </Card>
+        </section>
+
+        {/* ===== 콘솔 발 — 브랜드 + 스피커 ===== */}
+        <div className="gb-console-foot">
+          <div className="gb-brand">
+            <span className="gb-brand-word">Rootin</span>
+            <span className="gb-brand-sub">AI 복습 도우미</span>
+          </div>
+          <span className="gb-speaker" aria-hidden="true" />
+        </div>
       </div>
     </div>
+
+    {modalOpen && (
+      <AiTilSelectModal
+        potId={potId}
+        onConfirm={handleModalConfirm}
+        onClose={handleModalClose}
+      />
+    )}
+    </>
   );
 }
 
@@ -890,62 +1317,42 @@ function QuizResult({ pot, quizCount, quizzes }) {
     setGraded(true);
   }
 
-  function getChoiceStyle(q, i, choice) {
-    const base = {
-      width: '100%', textAlign: 'left',
-      padding: '10px 14px', borderRadius: 9,
-      fontSize: 13, cursor: graded ? 'default' : 'pointer',
-      transition: 'background 0.15s',
-    };
-    if (!graded) {
-      const isSelected = selected[i] === choice;
-      return {
-        ...base,
-        background: isSelected ? 'var(--moss)' : 'var(--paper-2)',
-        color: isSelected ? '#fff' : 'var(--ink)',
-        border: isSelected ? '0.5px solid var(--moss)' : '0.5px solid var(--rule)',
-        fontWeight: isSelected ? 600 : 400,
-      };
-    }
-    // 채점 후
-    const isCorrect = choice === q.answer;
-    const isSelected = selected[i] === choice;
-    if (isCorrect) return { ...base, background: '#e8f5e9', color: '#2e7d32', border: '0.5px solid #81c784', fontWeight: 600 };
-    if (isSelected) return { ...base, background: '#ffebee', color: '#c62828', border: '0.5px solid #e57373' };
-    return { ...base, background: 'var(--paper-2)', color: 'var(--ink-3)', border: '0.5px solid var(--rule)' };
+  // 채점 전/후 보기 상태 클래스
+  function choiceClass(q, i, choice) {
+    if (!graded) return selected[i] === choice ? ' is-selected' : '';
+    if (choice === q.answer) return ' is-correct';
+    if (selected[i] === choice) return ' is-wrong';
+    return ' is-dim';
   }
 
+  // 채점 결과 별점(표시용) — 정답률을 5칸으로 환산
+  const starCount = list.length ? Math.round((correctCount / list.length) * 5) : 0;
+  const stars = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <div style={{
-        padding: 16, background: 'var(--paper-2)', borderRadius: 10,
-        fontSize: 12.5, color: 'var(--ink-2)', borderLeft: '2px solid var(--moss)',
-      }}>
-        💡 {pot?.emoji} {pot?.name} 화분의 TIL에서 핵심 개념 {quizCount}문항을 추출했어요. 보기를 선택하고 채점해보세요.
-      </div>
+    <div className="gb-ai-quiz">
+      <p className="gb-ai-quiz-intro">
+        {pot?.title ? `'${pot.title}' 화분의 ` : ''}기록에서 {quizCount}개의 문제를 만들었어요. 정답을 고른 뒤 채점해 보세요.
+      </p>
 
       {list.map((q, i) => (
-        <div key={i}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--moss-2)' }}>
-              {String(i + 1).padStart(2, '0')}
-            </span>
-            <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)', lineHeight: 1.6, flex: 1 }}>{q.question}</span>
+        <div key={i} className="gb-ai-q">
+          <div className="gb-ai-q-head">
+            <span className="gb-ai-q-no">Q{i + 1}</span>
+            <span className="gb-ai-q-text">{q.question}</span>
           </div>
-          {q.hint && (
-            <div style={{ paddingLeft: 28, marginTop: 6, fontSize: 11.5, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-              힌트: {q.hint}
-            </div>
-          )}
-          <div style={{ paddingLeft: 28, marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {q.hint && <div className="gb-ai-q-hint"><RtIcon name="drop" />힌트 · {q.hint}</div>}
+          <div className="gb-ai-choices">
             {(q.choices ?? []).map((choice, ci) => (
               <button
                 key={ci}
+                type="button"
+                className={`gb-ai-choice${choiceClass(q, i, choice)}`}
                 onClick={() => handleSelect(i, choice)}
-                style={getChoiceStyle(q, i, choice)}
+                disabled={graded}
               >
-                <span style={{ marginRight: 8, opacity: 0.5 }}>{['①', '②', '③', '④'][ci]}</span>
-                {choice}
+                <span className="gb-ai-choice-mk" aria-hidden="true">{['A', 'B', 'C', 'D'][ci] ?? '·'}</span>
+                <span className="gb-ai-choice-text">{choice}</span>
               </button>
             ))}
           </div>
@@ -953,31 +1360,20 @@ function QuizResult({ pot, quizCount, quizzes }) {
       ))}
 
       {list.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 8 }}>
+        <div className="gb-ai-quiz-foot">
           {graded && (
-            <div style={{
-              padding: '14px 24px', borderRadius: 12, textAlign: 'center',
-              background: correctCount === list.length ? '#e8f5e9' : '#fff8e1',
-              border: `1px solid ${correctCount === list.length ? '#81c784' : '#ffd54f'}`,
-              fontSize: 14, fontWeight: 600,
-              color: correctCount === list.length ? '#2e7d32' : '#f57f17',
-            }}>
-              {correctCount === list.length
-                ? `🎉 전체 정답! ${list.length}문제 모두 맞혔어요.`
-                : `${list.length}문제 중 ${correctCount}개 정답이에요.`}
+            <div className={`gb-ai-score${correctCount === list.length ? ' is-perfect' : ''}`}>
+              <span className="gb-ai-score-stars" aria-hidden="true">{stars}</span>
+              <span>{correctCount === list.length
+                ? `${list.length}문제 모두 정답이에요! 완벽해요.`
+                : `${list.length}문제 중 ${correctCount}개 정답!`}</span>
             </div>
           )}
           <button
+            type="button"
+            className="gb-ai-btn"
             onClick={handleGrade}
             disabled={!allAnswered || graded}
-            style={{
-              padding: '12px 32px', borderRadius: 10,
-              background: allAnswered && !graded ? 'var(--moss)' : 'var(--rule)',
-              color: allAnswered && !graded ? '#fff' : 'var(--ink-3)',
-              border: 'none', fontSize: 14, fontWeight: 600,
-              cursor: allAnswered && !graded ? 'pointer' : 'not-allowed',
-              transition: 'background 0.15s',
-            }}
           >
             {graded ? '채점 완료' : '채점하기'}
           </button>
@@ -989,31 +1385,19 @@ function QuizResult({ pot, quizCount, quizzes }) {
 
 function SummaryResult({ pot, summary, keyPoints }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{
-        padding: 16, background: 'var(--paper-2)', borderRadius: 10,
-        fontSize: 12.5, color: 'var(--ink-2)', borderLeft: '2px solid var(--moss)',
-      }}>
-        🌿 {pot ? `${pot.emoji} ${pot.name} 화분의 TIL 핵심을 한 문서로 묶었어요.` : 'TIL 핵심을 한 문서로 묶었어요.'}
-      </div>
+    <div className="gb-ai-summary">
+      <p className="gb-ai-summary-intro">
+        {pot?.title ? `'${pot.title}' 화분의 ` : ''}기록을 한 편으로 정리했어요.
+      </p>
 
-      {summary && (
-        <div>
-          <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>
-            {summary}
-          </div>
-        </div>
-      )}
+      {summary && <div className="gb-ai-summary-body">{summary}</div>}
 
       {keyPoints && keyPoints.length > 0 && (
-        <div style={{ padding: 16, borderRadius: 10, background: 'var(--paper-2)' }}>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>핵심 포인트</div>
-          <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="gb-ai-keypoints">
+          <div className="gb-ai-keypoints-cap"><RtIcon name="star" /> 핵심 포인트</div>
+          <ul className="gb-ai-keypoints-list">
             {keyPoints.map((point, i) => (
-              <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: 'var(--ink)' }}>
-                <span style={{ width: 4, height: 4, borderRadius: 2, background: 'var(--moss)', marginTop: 6, flexShrink: 0 }} />
-                {point}
-              </li>
+              <li key={i} className="gb-ai-keypoint"><span className="gb-ai-kp-mk" aria-hidden="true">{i + 1}</span>{point}</li>
             ))}
           </ul>
         </div>
@@ -1173,292 +1557,264 @@ function ProfileScreen() {
   const profileImageUrl = user?.profileImageUrl ?? null;
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1300, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
+    <div className="rt-app gb-profile-page">
 
-      <Card padding={28}>
-        {/* 뷰 모드: 가로 배치 / 편집 모드: 아바타+폼 세로 구조 */}
-        {editing ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {/* 아바타 행 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <img
-                  src={profileImageUrl || ''}
-                  alt="프로필"
-                  style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', display: profileImageUrl ? 'block' : 'none' }}
-                  onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-edit').style.display = 'flex'; }}
-                />
-                <div id="avatar-initial-edit" style={{
-                  width: 72, height: 72, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
-                  color: '#fff', display: profileImageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 28, fontFamily: 'var(--font-display)', fontWeight: 600,
-                }}>{avatarInitial}</div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleImageChange}
-                  data-testid="profile-image-input"
-                />
-                <button
-                  style={{
-                    position: 'absolute', bottom: -2, right: -2,
-                    width: 26, height: 26, borderRadius: '50%',
-                    background: '#fff', border: '1px solid var(--rule-2)',
-                    fontSize: 12, cursor: imageUploading ? 'not-allowed' : 'pointer',
-                    opacity: imageUploading ? 0.5 : 1,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                  disabled={imageUploading}
-                  onClick={() => fileInputRef.current?.click()}
-                  aria-label="프로필 이미지 변경"
-                >
-                  {imageUploading ? '…' : '📷'}
-                </button>
-              </div>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>이미지를 클릭해 변경하세요</span>
-            </div>
-
-            {/* 닉네임 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>닉네임</label>
-              <input
-                value={nickname}
-                onChange={e => setNickname(e.target.value)}
-                style={{
-                  fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--ink)',
-                  border: '0.5px solid var(--rule-2)', borderRadius: 8, padding: '8px 12px',
-                  width: '100%', maxWidth: 400, boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            {/* 소개 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>소개</label>
-              <textarea
-                value={bio}
-                onChange={e => setBio(e.target.value)}
-                style={{
-                  width: '100%', maxWidth: 600, minHeight: 64, padding: '8px 12px',
-                  border: '0.5px solid var(--rule-2)', borderRadius: 8,
-                  fontSize: 13, color: 'var(--ink-2)', outline: 'none', resize: 'vertical',
-                  fontFamily: 'var(--font-body)', boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            {/* 버튼 행 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Btn variant="green" onClick={handleSave} disabled={saving}>
-                {saving ? '저장 중…' : '저장'}
-              </Btn>
-              <Btn variant="secondary" onClick={() => { setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
-                취소
-              </Btn>
-              {saveError && <span style={{ fontSize: 12, color: '#e05252', marginLeft: 4 }}>{saveError}</span>}
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <img
-                src={profileImageUrl || ''}
-                alt="프로필"
-                style={{ width: 92, height: 92, borderRadius: '50%', objectFit: 'cover', display: profileImageUrl ? 'block' : 'none' }}
-                onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-view').style.display = 'flex'; }}
-              />
-              <div id="avatar-initial-view" style={{
-                width: 92, height: 92, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
-                color: '#fff', display: profileImageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
-              }}>{avatarInitial}</div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
-                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 13 }}>@{user?.handle ?? ''}</span>
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>{bio}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 8 }}>
-                {user?.joinedAt ?? ''}부터 Rootin과 함께
-              </div>
-            </div>
-            <Btn variant="secondary" onClick={() => setEditing(true)}>
-              프로필 수정
-            </Btn>
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginTop: 24, paddingTop: 22, borderTop: '0.5px solid var(--rule)' }}>
-          {[
-            { label: '누적 TIL', value: (user?.totalTil ?? 0) + '개' },
-            { label: '연속 기록', value: (user?.streak ?? 0) + '일' },
-            { label: '수확한 식물', value: harvestedCount !== null ? harvestedCount + '종' : '—' },
-            { label: '보유 포인트', value: (user?.points ?? 0) + 'P' },
-          ].map((s, i) => (
-            <div key={i} style={{
-              borderRight: i < 3 ? '0.5px solid var(--rule)' : 'none',
-              paddingLeft: i > 0 ? 22 : 0,
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{s.label}</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 4 }}>{s.value}</div>
-            </div>
-          ))}
+      {/* 게임 HUD 플레이어 바 */}
+      <div className="rt-hud">
+        <div className="rt-hud-l">
+          <RtIcon name="person" /> PLAYER : {nickname || '학습자'} · <span className="rt-hud-lv">SAVE FILE 01</span>
         </div>
-      </Card>
+        <div className="rt-hud-r">
+          <span className="rt-hud-grp"><RtIcon name="clock" /> {user?.joinedAt ? `${user.joinedAt}~` : '모험 진행 중'}</span>
+          <span className="rt-hud-sep" />
+          <span className="rt-hud-grp"><RtIcon name="star" /> {user?.points ?? 0}P</span>
+        </div>
+      </div>
 
-      {/* Account settings */}
-      <Card padding={24}>
-        <SectionHeader eyebrow="계정 관리" title="설정" />
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-
-          {/* 이메일 행 */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 20,
-            padding: '14px 0',
-            borderBottom: isLocal ? '0.5px solid var(--rule)' : 'none',
-          }}>
-            <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>이메일</div>
-            <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>{user?.email ?? ''}</div>
+      {/* ===== 플레이어 데이터 콘솔 (세이브 파일) ===== */}
+      <div className="gb-console gb-profile-console">
+        <div className="gb-console-head">
+          <div>
+            <span className="rt-tag"><RtIcon name="person" /> SAVE FILE · PLAYER DATA</span>
+            <h2 className="rt-h3" style={{ margin: '10px 0 0' }}>플레이어 프로필</h2>
           </div>
-
-          {/* 비밀번호 행 — local 유저만 */}
-          {isLocal && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '14px 0' }}>
-              <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>비밀번호</div>
-              <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>••••••••</div>
-              <Btn variant="secondary" size="sm" onClick={() => setShowPasswordForm(true)}>변경</Btn>
-            </div>
+          {!editing && (
+            <button className="rt-btn rt-btn--sm" onClick={() => { playSfx('nav'); setEditing(true); }}>
+              <RtIcon name="gear" /> 프로필 수정
+            </button>
           )}
         </div>
-      </Card>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 4px' }}>
-        <button
-          onClick={handleWithdraw}
-          disabled={withdrawing}
-          style={{
-            fontSize: 12.5,
-            color: '#b8536a',
-            background: 'transparent',
-            border: '1px solid #b8536a',
-            borderRadius: 6,
-            padding: '4px 12px',
-            cursor: withdrawing ? 'not-allowed' : 'pointer',
-            opacity: withdrawing ? 0.6 : 1,
-          }}
-        >
-          {withdrawing ? '처리 중…' : '회원 탈퇴'}
+        <div className="gb-prof-main">
+
+          {/* ── 좌: 캐릭터 LCD (보기) / 프로필 폼 (편집) ── */}
+          <div className="gb-prof-screen">
+            <div className="gb-prof-bezel">
+              <div className="gb-prof-beztop">
+                <span className="gb-garden-led" aria-hidden="true" />
+                <span className="gb-prof-cap">{editing ? 'EDIT MODE · 프로필 편집' : 'DOT MATRIX · CHARACTER'}</span>
+              </div>
+              <div className="gb-prof-frame">
+                <div className="gb-prof-lcd">
+
+                  {editing ? (
+                    /* ----- 편집 폼 ----- */
+                    <div className="gb-prof-form">
+                      <div className="gb-prof-avatar-row">
+                        <div className="gb-prof-avatar">
+                          <img
+                            src={profileImageUrl || ''}
+                            alt="프로필"
+                            className="gb-prof-avatar-img"
+                            style={{ display: profileImageUrl ? 'block' : 'none' }}
+                            onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-edit').style.display = 'flex'; }}
+                          />
+                          <div id="avatar-initial-edit" className="gb-prof-avatar-fallback" style={{ display: profileImageUrl ? 'none' : 'flex' }}>{avatarInitial}</div>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={handleImageChange}
+                            data-testid="profile-image-input"
+                          />
+                          <button
+                            className="gb-prof-cam"
+                            disabled={imageUploading}
+                            onClick={() => fileInputRef.current?.click()}
+                            aria-label="프로필 이미지 변경"
+                          >
+                            {imageUploading ? '…' : <RtIcon name="plus" />}
+                          </button>
+                        </div>
+                        <span className="gb-prof-avatar-hint">이미지를 클릭해 변경하세요</span>
+                      </div>
+
+                      <label className="gb-prof-field">
+                        <span className="gb-prof-field-k">닉네임</span>
+                        <input
+                          className="gb-prof-input"
+                          value={nickname}
+                          onChange={e => setNickname(e.target.value)}
+                        />
+                      </label>
+
+                      <label className="gb-prof-field">
+                        <span className="gb-prof-field-k">소개</span>
+                        <textarea
+                          className="gb-prof-textarea"
+                          value={bio}
+                          onChange={e => setBio(e.target.value)}
+                        />
+                      </label>
+
+                      <div className="gb-prof-form-actions">
+                        <button className="rt-btn rt-btn--primary" onClick={() => { playSfx('confirm'); handleSave(); }} disabled={saving}>
+                          {saving ? '저장 중…' : '저장'}
+                        </button>
+                        <button className="rt-btn rt-btn--ghost" onClick={() => { playSfx('cancel'); setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
+                          취소
+                        </button>
+                        {saveError && <span className="gb-prof-err">{saveError}</span>}
+                      </div>
+                    </div>
+                  ) : (
+                    /* ----- 캐릭터 카드 ----- */
+                    <div className="gb-prof-card">
+                      <div className="gb-prof-portrait">
+                        <img
+                          src={profileImageUrl || ''}
+                          alt="프로필"
+                          className="gb-prof-portrait-img"
+                          style={{ display: profileImageUrl ? 'block' : 'none' }}
+                          onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-view').style.display = 'flex'; }}
+                        />
+                        <div id="avatar-initial-view" className="gb-prof-portrait-fallback" style={{ display: profileImageUrl ? 'none' : 'flex' }}>{avatarInitial}</div>
+                      </div>
+                      <div className="gb-prof-id">
+                        <h3 className="gb-prof-name">{nickname}</h3>
+                        <span className="gb-prof-handle">@{user?.handle ?? ''}</span>
+                        <p className="gb-prof-bio">{bio || '아직 소개가 없어요.'}</p>
+                        <span className="gb-prof-since">
+                          <RtIcon name="clock" /> {user?.joinedAt ? `${user.joinedAt}부터 ` : ''}Rootin과 함께
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="gb-fx gb-fx-scan" aria-hidden="true" />
+                  <div className="gb-fx gb-fx-vignette" aria-hidden="true" />
+                  <div className="gb-fx gb-fx-glass" aria-hidden="true" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 우: STATUS 스탯 패널 ── */}
+          <div className="gb-prof-status">
+            <div className="gb-prof-status-head">
+              <span className="rt-tag"><RtIcon name="trophy" /> STATUS</span>
+            </div>
+            <ul className="gb-prof-stats">
+              {[
+                { icon: 'book',  k: '누적 TIL',    v: (user?.totalTil ?? 0) + '개', tone: 'leaf' },
+                { icon: 'flame', k: '연속 기록',   v: (user?.streak ?? 0) + '일', tone: 'peach' },
+                { icon: 'leaf',  k: '수확한 식물', v: harvestedCount !== null ? harvestedCount + '종' : '—', tone: 'sky' },
+                { icon: 'star',  k: '보유 포인트', v: (user?.points ?? 0) + 'P', tone: 'amber' },
+              ].map((s) => (
+                <li key={s.k} className={`gb-prof-stat gb-prof-stat--${s.tone}`}>
+                  <span className="gb-prof-stat-ic"><RtIcon name={s.icon} /></span>
+                  <span className="gb-prof-stat-k">{s.k}</span>
+                  <span className="gb-prof-stat-v">{s.v}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* 콘솔 하단 — 브랜드 각인 + 스피커 그릴 */}
+        <div className="gb-console-foot">
+          <div className="gb-brand">
+            <span className="gb-brand-word">Rootin</span>
+            <span className="gb-brand-sub">DOT-MATRIX&nbsp;SAVE&nbsp;SYSTEM<span className="tm">TM</span></span>
+          </div>
+          <div className="gb-speaker" aria-hidden="true" />
+        </div>
+      </div>
+
+      {/* ===== 계정 관리 ===== */}
+      <div className="rt-card gb-prof-acct">
+        <div className="gb-prof-acct-head">
+          <span className="rt-tag"><RtIcon name="gear" /> 계정 관리</span>
+          <h3 className="rt-h3" style={{ margin: '8px 0 0' }}>설정</h3>
+        </div>
+
+        {/* 이메일 행 */}
+        <div className="gb-acct-row">
+          <span className="gb-acct-k">이메일</span>
+          <span className="gb-acct-v">{user?.email ?? ''}</span>
+        </div>
+
+        {/* 비밀번호 행 — local 유저만 */}
+        {isLocal && (
+          <div className="gb-acct-row">
+            <span className="gb-acct-k">비밀번호</span>
+            <span className="gb-acct-v">••••••••</span>
+            <button className="rt-btn rt-btn--sm" onClick={() => { playSfx('nav'); setShowPasswordForm(true); }}>변경</button>
+          </div>
+        )}
+      </div>
+
+      {/* 회원 탈퇴 */}
+      <div className="gb-prof-danger-row">
+        <button className="gb-prof-danger" onClick={handleWithdraw} disabled={withdrawing}>
+          <RtIcon name="xmark" /> {withdrawing ? '처리 중…' : '회원 탈퇴'}
         </button>
       </div>
 
       {/* 비밀번호 변경 모달 */}
       {showPasswordForm && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(15, 42, 71, 0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={handlePasswordFormCancel}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: 420, background: '#fff', borderRadius: 18,
-              padding: '32px 28px', boxShadow: 'var(--shadow-lg)',
-            }}
-          >
-            <div className="eyebrow" style={{ color: 'var(--moss-2)', marginBottom: 4 }}>계정 관리</div>
-            <h3 style={{
-              fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700,
-              color: 'var(--ink)', marginBottom: 22,
-            }}>
-              비밀번호 변경
-            </h3>
+        <div className="gb-pw-overlay" onClick={handlePasswordFormCancel}>
+          <div className="gb-pw-modal" onClick={e => e.stopPropagation()}>
+            <div className="gb-pw-bar">
+              <span className="gb-garden-led" aria-hidden="true" />
+              <span className="gb-pw-cap">ACCOUNT&nbsp;·&nbsp;SECURITY</span>
+            </div>
+            <div className="gb-pw-body">
+              <span className="rt-tag"><RtIcon name="lock" /> 계정 관리</span>
+              <h3 className="gb-pw-title">비밀번호 변경</h3>
 
-            {pwStep === 'form' ? (
-              <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {[
-                    { label: '현재 비밀번호', value: pwCurrent, setter: setPwCurrent },
-                    { label: '새 비밀번호', value: pwNew, setter: setPwNew },
-                    { label: '새 비밀번호 확인', value: pwConfirm, setter: setPwConfirm },
-                  ].map(({ label, value, setter }) => (
-                    <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <label style={{
-                        fontSize: 11.5, color: 'var(--ink-3)',
-                        fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase',
-                      }}>
-                        {label}
+              {pwStep === 'form' ? (
+                <>
+                  <div className="gb-pw-fields">
+                    {[
+                      { label: '현재 비밀번호', value: pwCurrent, setter: setPwCurrent },
+                      { label: '새 비밀번호', value: pwNew, setter: setPwNew },
+                      { label: '새 비밀번호 확인', value: pwConfirm, setter: setPwConfirm },
+                    ].map(({ label, value, setter }) => (
+                      <label key={label} className="gb-pw-field">
+                        <span className="gb-pw-label">{label}</span>
+                        <input
+                          type="password"
+                          className="gb-pw-input"
+                          value={value}
+                          onChange={e => setter(e.target.value)}
+                        />
                       </label>
-                      <input
-                        type="password"
-                        value={value}
-                        onChange={e => setter(e.target.value)}
-                        style={{
-                          padding: '9px 12px', border: '0.5px solid var(--rule-2)', borderRadius: 8,
-                          fontSize: 13.5, color: 'var(--ink)', fontFamily: 'var(--font-body)',
-                          outline: 'none', width: '100%', boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                {pwError && (
-                  <div style={{
-                    marginTop: 12, padding: '9px 13px', borderRadius: 8,
-                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
-                    fontSize: 12.5, color: '#b8536a',
-                  }}>
-                    {pwError}
+                    ))}
                   </div>
-                )}
 
-                <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-                  <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={handlePasswordFormCancel}>
-                    취소
-                  </Btn>
-                  <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={handlePasswordNext}>
-                    비밀번호 변경
-                  </Btn>
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{
-                  padding: '18px 16px', borderRadius: 10, background: 'var(--paper-2)',
-                  fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 22,
-                }}>
-                  정말 비밀번호를 변경하시겠습니까?<br />
-                  <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>변경 후에는 새 비밀번호로 다시 로그인해야 합니다.</span>
-                </div>
+                  {pwError && <div className="gb-pw-error">{pwError}</div>}
 
-                {pwError && (
-                  <div style={{
-                    marginBottom: 14, padding: '9px 13px', borderRadius: 8,
-                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
-                    fontSize: 12.5, color: '#b8536a',
-                  }}>
-                    {pwError}
+                  <div className="gb-pw-actions">
+                    <button className="rt-btn rt-btn--ghost" onClick={() => { playSfx('cancel'); handlePasswordFormCancel(); }}>
+                      취소
+                    </button>
+                    <button className="rt-btn rt-btn--primary" onClick={() => { playSfx('nav'); handlePasswordNext(); }}>
+                      비밀번호 변경
+                    </button>
                   </div>
-                )}
+                </>
+              ) : (
+                <>
+                  <div className="gb-pw-confirm">
+                    정말 비밀번호를 변경하시겠습니까?<br />
+                    <span className="gb-pw-confirm-sub">변경 후에는 새 비밀번호로 다시 로그인해야 합니다.</span>
+                  </div>
 
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={() => { setPwStep('form'); setPwError(null); }} disabled={pwSaving}>
-                    아니요
-                  </Btn>
-                  <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={handlePasswordConfirm} disabled={pwSaving}>
-                    {pwSaving ? '변경 중…' : '변경합니다'}
-                  </Btn>
-                </div>
-              </>
-            )}
+                  {pwError && <div className="gb-pw-error">{pwError}</div>}
+
+                  <div className="gb-pw-actions">
+                    <button className="rt-btn rt-btn--ghost" onClick={() => { setPwStep('form'); setPwError(null); }} disabled={pwSaving}>
+                      아니요
+                    </button>
+                    <button className="rt-btn rt-btn--primary" onClick={() => { playSfx('confirm'); handlePasswordConfirm(); }} disabled={pwSaving}>
+                      {pwSaving ? '변경 중…' : '변경합니다'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

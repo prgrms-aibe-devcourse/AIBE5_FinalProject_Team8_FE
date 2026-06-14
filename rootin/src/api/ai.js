@@ -4,12 +4,15 @@ import { request } from './client.js';
  * TIL 요약 생성
  * POST /api/v1/ai/summary
  * @param {string} potId
+ * @param {number[]} [tilIds]  학습에 포함할 TIL ID 목록 (생략 시 화분 전체 TIL 사용)
  * @returns {{ summary: string, keyPoints: string[], usedPoint: number, remainPoint: number }}
  */
-export async function generateSummary(potId) {
+export async function generateSummary(potId, tilIds) {
+  const body = { potId };
+  if (tilIds && tilIds.length > 0) body.tilIds = tilIds;
   return request('/api/v1/ai/summary', {
     method: 'POST',
-    body: JSON.stringify({ potId }),
+    body: JSON.stringify(body),
   });
 }
 
@@ -18,12 +21,15 @@ export async function generateSummary(potId) {
  * POST /api/v1/ai/quiz
  * @param {string} potId
  * @param {number} count  문제 수 (1~10)
+ * @param {number[]} [tilIds]  학습에 포함할 TIL ID 목록 (생략 시 화분 전체 TIL 사용)
  * @returns {{ quizzes: Array<{ question: string, answer: string, hint?: string }>, usedPoint: number, remainPoint: number }}
  */
-export async function generateQuiz(potId, count) {
+export async function generateQuiz(potId, count, tilIds) {
+  const body = { potId, count };
+  if (tilIds && tilIds.length > 0) body.tilIds = tilIds;
   return request('/api/v1/ai/quiz', {
     method: 'POST',
-    body: JSON.stringify({ potId, count }),
+    body: JSON.stringify(body),
   });
 }
 

@@ -17,6 +17,9 @@ dist-ssr
 .env.*
 !.env.example
 
+# 보관용 디자인 변형(로컬 전용, 깃허브 미반영)
+design-variants/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

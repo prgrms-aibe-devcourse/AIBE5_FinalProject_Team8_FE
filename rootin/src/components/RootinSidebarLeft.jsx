@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext.jsx';
 import { Icon } from '../ui.jsx';
 import { Plant, RootinLogo } from '../plants.jsx';
@@ -15,6 +16,7 @@ import { NavMain } from '@/components/nav-main';
 
 export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
   const { user } = useUser();
+  const navigate = useNavigate();
 
   const navMainItems = [
     { title: '대시보드', icon: Icon.home, isActive: current === 'dashboard', onClick: () => onNav('dashboard') },
@@ -29,7 +31,7 @@ export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground">
+            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer" onClick={() => navigate(user ? '/dashboard' : '/')}>
               <div className="rootin-badge-moss flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <RootinLogo size={20} />
               </div>

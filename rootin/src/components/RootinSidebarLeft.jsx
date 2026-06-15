@@ -31,7 +31,7 @@ export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer" onClick={() => navigate(user ? '/dashboard' : '/')}>
+            <SidebarMenuButton size="lg" className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground cursor-pointer" onClick={() => user ? onNav('dashboard') : navigate('/')}>
               <div className="rootin-badge-moss flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
                 <RootinLogo size={20} />
               </div>

@@ -153,7 +153,6 @@ function Spinner({ size = 32, color = 'var(--moss)', style = {} }) {
     >
       <circle cx="12" cy="12" r="10" fill="none" opacity="0.15" />
       <path d="M12 2a10 10 0 0 1 10 10" />
-      <style>{`@keyframes rootin-spin { to { transform: rotate(360deg); } }`}</style>
     </svg>
   );
 }

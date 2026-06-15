@@ -182,7 +182,6 @@ function AppShell() {
       <RootinSidebarLeft
         current={screen.startsWith('pot') ? 'garden' : screen}
         onNav={handleNav}
-        onForceShow={() => { setFocusMode(false); setLeftOpen(true); }}
         onLogout={() => setLogoutModalOpen(true)}
       />
       <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>

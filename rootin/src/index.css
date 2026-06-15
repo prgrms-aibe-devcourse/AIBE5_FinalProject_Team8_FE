@@ -738,7 +738,6 @@
 .rootin-sidebar-left [data-sidebar="content"] [data-sidebar="menu-item"]:nth-child(3) { animation-delay: 140ms; }
 .rootin-sidebar-left [data-sidebar="content"] [data-sidebar="menu-item"]:nth-child(4) { animation-delay: 190ms; }
 .rootin-sidebar-left [data-sidebar="content"] [data-sidebar="menu-item"]:nth-child(5) { animation-delay: 240ms; }
-.rootin-sidebar-left [data-sidebar="content"] [data-sidebar="menu-item"]:nth-child(6) { animation-delay: 290ms; }
 
 /* 로그아웃 — danger 톤으로 또렷하게 구분되는 호버 */
 .rootin-sidebar-left .rootin-logout-btn {

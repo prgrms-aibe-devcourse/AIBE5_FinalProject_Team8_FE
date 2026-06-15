@@ -988,7 +988,10 @@ function AIScreen() {
             style={{ width: '100%', marginTop: 14, opacity: potId ? 1 : 0.45, cursor: potId ? 'pointer' : 'not-allowed' }}
             onClick={() => potId && !generating && setModalOpen(true)}
           >
-            {generating ? '생성 중...' : (mode === 'quiz' ? `🌱 복습 문제 ${quizCount}개 만들기` : '✨ 요약 생성하기')} · {mode === 'quiz' ? quizCount * 10 : 50} 포인트 사용
+            {generating
+              ? '생성 중...'
+              : `${mode === 'quiz' ? `🌱 복습 문제 ${quizCount}개 만들기` : '✨ 요약 생성하기'} · ${mode === 'quiz' ? quizCount * 10 : 50} 포인트 사용`
+            }
           </Btn>
           <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-3)', textAlign: 'center' }}>
             현재 보유: <b style={{ color: 'var(--ink)' }}>{remainPoint}P</b> · 포인트는 활동으로 적립돼요
@@ -1945,7 +1948,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
                 boxSizing: 'border-box',
               }}
             />
-            {mode === 'signup' && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>해당 이메일로 인증메일을 전송합니다.</div>}
+            {mode === 'signup' && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}></div>}
           </div>
           <div>
             <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>비밀번호</label>

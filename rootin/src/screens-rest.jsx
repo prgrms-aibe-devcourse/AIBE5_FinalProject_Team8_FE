@@ -272,7 +272,7 @@ const formatDate = (iso) => {
  *   onConfirm  — (tilIds: number[]) => void
  *   onClose    — () => void
  */
-function AiTilSelectModal({ potId, onConfirm, onClose }) {
+function AiTilSelectModal({ potId, onConfirm, onClose, onOpenGuide }) {
   const [tils, setTils]               = useState([]);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading]         = useState(true);
@@ -468,16 +468,29 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
               AI가 분석할 TIL을 골라주세요
             </div>
           </div>
-          <button
-            aria-label="닫기"
-            onClick={onClose}
-            style={{
-              width: 28, height: 28, borderRadius: 7,
-              border: '0.5px solid var(--rule-2)', background: '#fff',
-              fontSize: 14, color: 'var(--ink-2)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >✕</button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* 도움말(?) 버튼 추가 - 모달용 가이드 투어를 트리거합니다 */}
+            <button
+              onClick={() => onOpenGuide?.()}
+              title="이 모달의 이용 가이드 보기"
+              style={{
+                width: 28, height: 28, borderRadius: 7,
+                border: '0.5px solid var(--rule-2)', background: '#fff',
+                fontSize: 13, fontWeight: 'bold', color: 'var(--ink-2)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >?</button>
+            <button
+              aria-label="닫기"
+              onClick={onClose}
+              style={{
+                width: 28, height: 28, borderRadius: 7,
+                border: '0.5px solid var(--rule-2)', background: '#fff',
+                fontSize: 14, color: 'var(--ink-2)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >✕</button>
+          </div>
         </div>
 
         {/* 검색 */}
@@ -543,8 +556,8 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
           </div>
         )}
 
-        {/* TIL 목록 */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }} className="scrollbar">
+        {/* TIL 목록 - 가이드 타겟팅을 위해 guide-ai-modal-list 클래스를 설정합니다 */}
+        <div className="guide-ai-modal-list scrollbar" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {loading ? (
             <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
               TIL 목록을 불러오는 중...
@@ -625,6 +638,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn variant="secondary" size="md" style={{ flex: 1 }} onClick={onClose}>취소</Btn>
           <Btn
+            className="guide-ai-modal-submit"
             variant="green" size="md"
             style={{ flex: 2, opacity: selectedIds.size === 0 ? 0.45 : 1, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer' }}
             disabled={selectedIds.size === 0}
@@ -692,7 +706,7 @@ function PotCard({ pot, selected, onClick }) {
   );
 }
 
-function AIScreen() {
+function AIScreen({ onOpenGuide }) {
   const { user } = useUser();
   const [mode, setMode] = useState('quiz'); // quiz | summary — 입력 UI 탭 선택
   const [resultMode, setResultMode] = useState('quiz'); // quiz | summary — 현재 표시 중인 결과 타입
@@ -721,6 +735,41 @@ function AIScreen() {
 
   // TIL 선택 모달
   const [modalOpen, setModalOpen] = useState(false);
+
+  // 📝 가이드 투어 도중 설명용 AI 예시 결과지 데이터를 렌더링하기 위한 가짜 상태(Mock State)입니다.
+  const [guideMockActive, setGuideMockActive] = useState(false);
+
+  // 📝 가이드 투어 순차 진행 시 특정 단계에 맞춰 자동으로 TIL 선택 모달(modalOpen)을 열고 닫는 로직을 구현합니다.
+  useEffect(() => {
+    const handleGuideStep = (e) => {
+      const { stepIndex, isEnd, selector } = e.detail;
+      if (isEnd) {
+        setModalOpen(false);
+        setGuideMockActive(false);
+        return;
+      }
+      
+      // AI 학습 가이드가 실행 중일 때 각 단계별로 화면의 모드나 팝업을 자동 제어합니다.
+      if (selector && selector.startsWith('.guide-ai-')) {
+        // 3단계(모달 목록)와 4단계(모달 확인 생성 버튼)에서는 TIL 선택 모달을 자동으로 오픈합니다.
+        if ((stepIndex === 3 || stepIndex === 4) && potId) {
+          setModalOpen(true);
+        } else {
+          setModalOpen(false);
+        }
+
+        // 5단계(결과 화면 뷰)에서는 실제 생성된 AI 결과가 없다면 예시 데이터 가이드를 노출합니다.
+        if (stepIndex === 5) {
+          setGuideMockActive(true);
+        } else {
+          setGuideMockActive(false);
+        }
+      }
+    };
+
+    window.addEventListener('rootin-guide-step', handleGuideStep);
+    return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
+  }, []);
   // 마지막으로 선택한 tilIds (다시 생성 시 재사용)
   const [lastTilIds, setLastTilIds] = useState([]);
 
@@ -896,7 +945,8 @@ function AIScreen() {
         <SectionHeader eyebrow="입력" title="학습 소스 선택" />
         <Card padding={18} style={{ marginBottom: 16 }}>
           <div className="eyebrow" style={{ marginBottom: 8 }}>목적</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          {/* 가이드 하이라이트 매칭을 위해 guide-ai-mode 클래스를 추가합니다 */}
+          <div className="guide-ai-mode" style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setMode('quiz')} style={{
               flex: 1, padding: '12px 10px', borderRadius: 10,
               background: mode === 'quiz' ? 'var(--ink)' : '#fff',
@@ -962,7 +1012,7 @@ function AIScreen() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflow: 'auto', paddingRight: 4 }} className="scrollbar">
+          <div className="guide-ai-pots scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflow: 'auto', paddingRight: 4 }}>
             {potsLoading ? (
               <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
                 화분 목록을 불러오는 중...
@@ -984,6 +1034,7 @@ function AIScreen() {
           </div>
 
           <Btn
+            className="guide-ai-select-til"
             variant="green" size="lg"
             style={{ width: '100%', marginTop: 14, opacity: potId ? 1 : 0.45, cursor: potId ? 'pointer' : 'not-allowed' }}
             onClick={() => potId && !generating && setModalOpen(true)}
@@ -1072,23 +1123,38 @@ function AIScreen() {
           ) : null}
         />
 
-        <Card padding={28}>
+        <Card className="guide-ai-result" padding={28}>
           {generating ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '60px 0', color: 'var(--ink-3)' }}>
               <div style={{ fontSize: 32 }}>🌱</div>
               <div style={{ fontSize: 13.5, color: 'var(--ink-2)', fontFamily: 'var(--font-display)' }}>AI가 TIL을 분석하고 있어요...</div>
             </div>
-          ) : !generated ? (
+          ) : (!generated && !guideMockActive) ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '60px 0' }}>
               <div style={{ fontSize: 40, opacity: 0.35 }}>{mode === 'quiz' ? '📝' : '✨'}</div>
               <div style={{ fontSize: 13.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)' }}>
                 화분을 선택하고 생성 버튼을 눌러주세요
               </div>
             </div>
-          ) : resultMode === 'quiz' ? (
-            <QuizResult pot={selectedPot} quizCount={quizCount} quizzes={aiResult?.quizzes ?? null} />
+          ) : (resultMode === 'quiz' || (guideMockActive && mode === 'quiz')) ? (
+            <QuizResult
+              pot={selectedPot ?? { name: '예시 화분(JavaScript 입문)' }}
+              quizCount={2}
+              quizzes={aiResult?.quizzes ?? [
+                { id: 1, question: 'React에서 useEffect의 의존성 배열을 빈 배열([])로 설정하면 어떤 시점에 실행되나요?', options: ['컴포넌트가 처음 화면에 나타날 때(마운트)', '상태가 바뀔 때마다', '화면에서 사라질 때만', '렌더링되기 직전'], answer: 1, explanation: '의존성 배열이 빈 배열인 경우 컴포넌트가 마운트될 때 최초 1회만 동작합니다.' },
+                { id: 2, question: '마크다운 문법에서 가장 큰 제목을 표현할 때 쓰는 기호는 무엇인가요?', options: ['#', '##', '###', '####'], answer: 1, explanation: '# 기호를 사용하면 HTML의 h1 태그와 같은 가장 큰 제목이 생성됩니다.' }
+              ]}
+            />
           ) : (
-            <SummaryResult pot={selectedPot} summary={aiResult?.summary ?? null} keyPoints={aiResult?.keyPoints ?? null} />
+            <SummaryResult
+              pot={selectedPot ?? { name: '예시 화분(JavaScript 입문)' }}
+              summary={aiResult?.summary ?? '오늘 학습한 React 핵심 개념과 마크다운 작성 팁에 관한 요약입니다. 컴포넌트 생명주기와 훅의 올바른 사용법이 분석되었습니다.'}
+              keyPoints={aiResult?.keyPoints ?? [
+                'useEffect의 의존성 관리 및 메모리 누수 방지 기법 학습',
+                'Shadcn UI와 Tailwind CSS를 활용한 반응형 웹 인터페이스 배치',
+                'AI 학습지 생성 시의 포인트 소모 규칙 확인'
+              ]}
+            />
           )}
         </Card>
       </div>
@@ -1099,6 +1165,7 @@ function AIScreen() {
         potId={potId}
         onConfirm={handleModalConfirm}
         onClose={handleModalClose}
+        onOpenGuide={onOpenGuide}
       />
     )}
     </>

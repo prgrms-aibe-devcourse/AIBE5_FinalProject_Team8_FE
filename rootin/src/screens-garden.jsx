@@ -871,6 +871,29 @@ const FE_THEME_TO_BE_THEME = {
 function GardenScreen({ refreshKey = 0, onOpenPot }) {
   const { user } = useUser();
   const [editMode, setEditMode] = useState(false);
+
+  // 🎨 가이드 투어 순차 진행 시 특정 단계에 맞춰 자동으로 정원 꾸미기 모드(editMode)를 온/오프 처리합니다.
+  useEffect(() => {
+    const handleGuideStep = (e) => {
+      const { stepIndex, isEnd, selector } = e.detail;
+      if (isEnd) {
+        setEditMode(false);
+        return;
+      }
+      
+      // 정원 화면 관련 가이드가 실행 중이고, 드래그 앤 드롭(3단계), 배경 변경(4단계), 꾸미기 완료(5단계)일 때 꾸미기 모드를 자동 활성화합니다.
+      if (selector && selector.startsWith('.guide-garden-')) {
+        if (stepIndex === 3 || stepIndex === 4 || stepIndex === 5) {
+          setEditMode(true);
+        } else {
+          setEditMode(false);
+        }
+      }
+    };
+
+    window.addEventListener('rootin-guide-step', handleGuideStep);
+    return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
+  }, []);
   const [themeId, setThemeId] = useState('meadow');
   const [layout, setLayout] = useState(DEFAULT_GARDEN_LAYOUT);
   const [decorations, setDecorations] = useState([]);
@@ -1218,7 +1241,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
                 : `${pots.length}개의 화분이 자라고 있어요. 오늘 ${wateredCount}개의 화분에 물을 줬어요.`}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+          <div className="guide-garden-edit" style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
             <Btn variant="secondary" size="md" icon={Icon.plus} onClick={() => setShowCreatePot(true)}>새 화분</Btn>
             {editMode ? (
               <Btn variant="green" size="md" icon={Icon.check} onClick={handleSaveLayout} disabled={layoutSaving}>
@@ -1240,7 +1263,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         </div>
 
         {/* Scene */}
-        <div style={{ padding: '0 20px 20px' }}>
+        <div className="guide-garden-scene" style={{ padding: '0 20px 20px' }}>
           <GardenScene
             pots={pots}
             theme={theme}
@@ -1268,7 +1291,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
               alignItems: 'flex-start',
             }}>
               {/* Backgrounds */}
-              <div>
+              <div className="guide-garden-theme">
                 <div className="eyebrow" style={{ marginBottom: 10 }}>배경</div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {GARDEN_THEMES.map(t => {
@@ -1442,7 +1465,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
           <Pill>전체 {pots.length}</Pill>
         </div>
       } />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+      <div className="guide-garden-pots" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
         {potsLoading && (
           <Card padding={24} style={{ minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
             화분 목록을 불러오는 중이에요.

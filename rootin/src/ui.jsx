@@ -55,9 +55,9 @@ function Btn({ children, variant = 'primary', size = 'md', icon, onClick, style,
   );
 }
 
-function Card({ children, style, padding = 20, hoverable = false, onClick }) {
+function Card({ children, style, padding = 20, hoverable = false, onClick, className }) {
   return (
-    <div onClick={onClick} style={{
+    <div className={className} onClick={onClick} style={{
       background: 'var(--card)',
       border: '0.5px solid var(--rule)',
       borderRadius: 'var(--r-lg)',

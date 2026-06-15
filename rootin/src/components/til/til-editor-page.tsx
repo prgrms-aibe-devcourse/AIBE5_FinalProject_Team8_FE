@@ -85,6 +85,7 @@ export function TilEditorPage({
     publishing,
     setCurrentTilId,
     setDirty,
+    refreshPots,
   } = useTilEditor()
 
   const restoredPotIdRef = useRef<string | null>(null)
@@ -140,6 +141,12 @@ export function TilEditorPage({
     },
     onUpdate: () => setSaved(false),
   })
+
+  // 에디터 화면에 진입(마운트)할 때마다 화분 목록을 백엔드로부터 새로고침합니다.
+  // 이로 인해 새로 생성된 화분이 화면을 새로고침(F5)하지 않아도 목록에 즉시 노출됩니다.
+  useEffect(() => {
+    refreshPots?.()
+  }, [refreshPots])
 
   // 사이드바(템플릿)·아일랜드가 editor에 접근할 수 있도록 context에 등록
   useEffect(() => {
@@ -355,12 +362,16 @@ export function TilEditorPage({
         className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <main className="mx-auto w-full max-w-3xl px-5 pb-40 pt-24 md:px-6">
-          <TilMeta />
+          <div className="guide-editor-meta">
+            <TilMeta />
+          </div>
           <div className="til-prose mt-8">
             {editor ? (
               <>
                 <EditorBubbleMenu editor={editor} />
-                <EditorContent editor={editor} />
+                <div className="guide-editor-content">
+                  <EditorContent editor={editor} />
+                </div>
               </>
             ) : (
               <div className="space-y-3">

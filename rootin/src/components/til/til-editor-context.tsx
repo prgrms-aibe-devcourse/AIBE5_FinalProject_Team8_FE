@@ -72,6 +72,7 @@ type TilEditorContextValue = {
   setSelectedPotId: (v: string | null) => void
   pots: Pot[]
   potsLoading: boolean
+  refreshPots: () => void
   selectedPotDashboard: PotDashboard | null
   selectedPotDashboardLoading: boolean
   templates: Template[]
@@ -119,10 +120,8 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
   const [dirty, setDirty] = useState(false)
   const { user } = useUser()
 
-  // 진입 시 화분 목록 로딩
-  // pots API는 임시로 X-USER-ID 헤더의 사용자 화분을 반환하므로,
-  // TIL 발행(JWT 사용자)과 동일한 사용자가 되도록 실제 userId를 전달한다.
-  useEffect(() => {
+  // 화분 목록 수동 새로고침 함수 정의
+  const refreshPots = useCallback(() => {
     const userId = user?.userId ?? localStorage.getItem('userId')
     if (!userId) {
       setPotsLoading(false)
@@ -134,6 +133,11 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
       .catch(() => setPots([]))
       .finally(() => setPotsLoading(false))
   }, [user?.userId])
+
+  // 진입 시 화분 목록 로딩
+  useEffect(() => {
+    refreshPots()
+  }, [refreshPots])
 
   // 화분을 선택했을 때만 상세 대시보드를 1회 조회합니다.
   // 글 작성 중 예상 경험치는 프론트에서 계산하므로, 타이핑할 때마다 서버를 호출하지 않습니다.
@@ -291,6 +295,7 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     setSelectedPotId,
     pots,
     potsLoading,
+    refreshPots,
     selectedPotDashboard,
     selectedPotDashboardLoading,
     templates,

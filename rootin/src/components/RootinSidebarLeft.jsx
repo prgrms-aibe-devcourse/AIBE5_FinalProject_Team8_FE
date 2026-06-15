@@ -7,7 +7,6 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarFooter,
-  SidebarRail,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
@@ -74,7 +73,6 @@ export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-      <SidebarRail />
     </Sidebar>
   );
 }

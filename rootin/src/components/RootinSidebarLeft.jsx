@@ -1,4 +1,3 @@
-import React from 'react';
 import { useUser } from '../context/UserContext.jsx';
 import { Icon } from '../ui.jsx';
 import { Plant, RootinLogo } from '../plants.jsx';
@@ -18,7 +17,6 @@ export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
   const { user } = useUser();
 
   const navMainItems = [
-    { title: '새 TIL 작성', icon: Icon.plus, isActive: current === 'editor', onClick: () => onNav('editor') },
     { title: '대시보드', icon: Icon.home, isActive: current === 'dashboard', onClick: () => onNav('dashboard') },
     { title: '정원', icon: Icon.garden, isActive: current === 'garden', onClick: () => onNav('garden') },
     { title: '식물도감', icon: Icon.book, isActive: current === 'collection', onClick: () => onNav('collection') },
@@ -65,7 +63,7 @@ export function RootinSidebarLeft({ current, onNav, onLogout, ...props }) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={onLogout}>
+            <SidebarMenuButton className="rootin-logout-btn" onClick={onLogout}>
               <div style={{ width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               </div>

@@ -1,5 +1,7 @@
 "use client"
 
+import { motion } from "framer-motion"
+
 import {
   SidebarGroup,
   SidebarGroupLabel,
@@ -30,6 +32,13 @@ export function NavMain({
             onClick={item.onClick}
             render={item.onClick ? <button /> : <a href={item.url} />}
           >
+            {item.isActive && (
+              <motion.span
+                layoutId="nav-active-pill"
+                className="nav-active-pill"
+                transition={{ type: "spring", stiffness: 420, damping: 36, mass: 0.8 }}
+              />
+            )}
             {item.icon}
             <span>{item.title}</span>
           </SidebarMenuButton>

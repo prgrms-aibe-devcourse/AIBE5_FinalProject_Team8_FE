@@ -9,6 +9,7 @@ import { Plant, RootinLogo, STAGE_META } from './plants.jsx';
 import { RtIcon } from './pixel-icons.jsx';
 import { playSfx } from './lib/sfx.js';
 import { useUser } from './context/UserContext.jsx';
+import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
 import './dex.css';
 import './ai.css';
@@ -1408,8 +1409,14 @@ function SummaryResult({ pot, summary, keyPoints }) {
 
 // === Profile Screen ===
 
+const THEME_OPTIONS = [
+  { id: 'classic', emoji: '🌿', name: '원본', desc: '깔끔한 식물 테마' },
+  { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔' },
+];
+
 function ProfileScreen() {
   const { user, updateUser, clearUser } = useUser();
+  const { theme, setTheme } = useTheme();
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState(user?.name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
@@ -1743,6 +1750,33 @@ function ProfileScreen() {
             <button className="rt-btn rt-btn--sm" onClick={() => { playSfx('nav'); setShowPasswordForm(true); }}>변경</button>
           </div>
         )}
+      </div>
+
+      {/* 테마 보관함 — 카트리지 컬렉션 */}
+      <div className="rt-card gb-prof-theme">
+        <div className="gb-prof-acct-head">
+          <span className="rt-tag"><RtIcon name="star" /> 화면 테마</span>
+          <h3 className="rt-h3" style={{ margin: '8px 0 0' }}>테마 보관함</h3>
+        </div>
+        <div className="gb-theme-grid">
+          {THEME_OPTIONS.map((opt) => {
+            const active = theme === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className={`gb-theme-cart${active ? ' is-active' : ''}`}
+                onClick={() => { playSfx('nav'); setTheme(opt.id); }}
+                aria-pressed={active}
+              >
+                <span className="gb-theme-cart-emoji">{opt.emoji}</span>
+                <span className="gb-theme-cart-name">{opt.name}</span>
+                <span className="gb-theme-cart-desc">{opt.desc}</span>
+                <span className="gb-theme-cart-badge">{active ? '● 장착됨' : '○ 선택'}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* 회원 탈퇴 */}

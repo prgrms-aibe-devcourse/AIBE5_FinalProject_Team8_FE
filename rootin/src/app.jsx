@@ -11,7 +11,16 @@ import { NotFoundScreen } from './screens-error.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { GameBoySidebar } from '@/components/GameBoySidebar.jsx';
+import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
+import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
+import { DashboardScreen as DashboardClassic } from './screens-dashboard.classic.jsx';
+import { GardenScreen as GardenClassic, PotDetailScreen as PotDetailClassic } from './screens-garden.classic.jsx';
+import { CollectionScreen as CollectionClassic, AIScreen as AIClassic, ProfileScreen as ProfileClassic } from './screens-rest.classic.jsx';
+import { LogoutConfirmModal as LogoutConfirmModalClassic } from '@/components/LogoutConfirmModal.classic.jsx';
+import { EditorScreen as EditorClassic } from './screens-editor.classic.jsx';
+import { RootinSidebarRight as RootinSidebarRightClassic } from '@/components/RootinSidebarRight.classic.jsx';
+import { TilEditorProvider as TilEditorProviderClassic } from '@/components/til-classic/til-editor-context';
 import { TilEditorProvider } from '@/components/til/til-editor-context';
 import { LogoutConfirmModal } from '@/components/LogoutConfirmModal.jsx';
 import { logout, clearTokens } from './api/auth.js';
@@ -22,6 +31,7 @@ import { logout, clearTokens } from './api/auth.js';
 
 function AppShell() {
   const { setUserFromApi, clearUser } = useUser();
+  const { theme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [authed, setAuthed] = useState(!!localStorage.getItem('accessToken'));
@@ -32,6 +42,11 @@ function AppShell() {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
   const [gardenRefreshKey, setGardenRefreshKey] = useState(0);
+  // 발행 후 화분 복귀 시 식물 성장 연출(물주기)을 1회 발동시키는 신호.
+  // "이 화분을 축하하라"는 일회성 potId. 화면이 소비하면 onCelebrated로 다시 null이 된다.
+  // (카운터 대신 potId를 쓰는 이유: 화분 상세는 발행 직후 새로 마운트되므로
+  //  마운트 시점 값과의 비교로는 변화를 감지할 수 없다.)
+  const [growthCelebratePotId, setGrowthCelebratePotId] = useState(null);
   // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(() => {
@@ -47,6 +62,19 @@ function AppShell() {
     return next;
   });
   const toggleFocusMode = () => setFocusMode((f) => !f);
+
+  const confirmLogout = async () => {
+    try {
+      await logout().catch(() => {}); // 서버 세션 무효화 (best-effort)
+    } finally {
+      clearTokens();
+      clearUser();
+      setAuthed(false);
+      setLogoutModalOpen(false);
+      navigate('/landing', { replace: true });
+    }
+  };
+  const closeLogoutModal = () => setLogoutModalOpen(false);
 
   useEffect(() => {
     if (!authed) {
@@ -74,7 +102,17 @@ function AppShell() {
   const screen = getScreenFromPath(location.pathname);
   // 풀스크린 비전-디스플레이 프레임(어두운 룸 + 모니터 베젤)을 적용할 화면.
   // 게임보이/CRT로 개편된 화면을 여기에 추가하면 양쪽 여백 없이 풀폭 + 테두리가 입혀진다.
-  const framed = screen === 'dashboard' || screen === 'garden' || screen === 'pot-detail' || screen === 'collection' || screen === 'ai' || screen === 'profile';
+  const baseFramed = screen === 'dashboard' || screen === 'garden' || screen === 'pot-detail' || screen === 'collection' || screen === 'ai' || screen === 'profile';
+  // 테마 토글: classic 테마에서는 게임보이 베젤/사이드바를 끄고 원본 셸(RootinSidebarLeft)로 렌더한다.
+  // 대상 화면(대시보드/정원/화분상세/도감/AI/프로필)은 classic 구현이 있다. 에디터·TIL상세는 게임보이 유지.
+  const CLASSIC_SHELL_SCREENS = ['dashboard', 'garden', 'pot-detail', 'collection', 'ai', 'profile', 'editor'];
+  const useClassicShell = theme === 'classic' && CLASSIC_SHELL_SCREENS.includes(screen);
+  const framed = baseFramed && !useClassicShell;
+  // 에디터 스택을 테마별로 선택 (Provider·화면·우측 패널은 같은 til 트리/컨텍스트끼리 묶여야 한다)
+  const isClassic = theme === 'classic';
+  const TilProvider = isClassic ? TilEditorProviderClassic : TilEditorProvider;
+  const EditorComp = isClassic ? EditorClassic : EditorScreen;
+  const RightPanel = isClassic ? RootinSidebarRightClassic : RootinSidebarRight;
   const reduceMotion = useReducedMotion();
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
@@ -132,8 +170,12 @@ function AppShell() {
 
   const handleTilPublished = (publishedPotId) => {
     if (editorReturnScreen?.startsWith?.('/garden/pots/')) {
-      setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
+      // publishedPotId는 에디터의 selectedPotId(문자열)에서 오므로 숫자로 정규화한다.
+      // (라우트 potId는 숫자라 문자열과 비교하면 연출이 발동하지 않는다.)
+      const celebratePotId = parseRoutePotId(publishedPotId) ?? editorInitialPotId ?? potFocus;
+      setPotFocus(celebratePotId);
       setPotDetailRefreshKey(key => key + 1);
+      setGrowthCelebratePotId(celebratePotId);
     } else if (editorReturnScreen === '/garden') {
       setGardenRefreshKey(key => key + 1);
     }
@@ -170,33 +212,41 @@ function AppShell() {
   }
 
   return (
-    <TilEditorProvider>
+    <TilProvider>
     <SidebarProvider
       open={focusMode ? false : leftOpen}
       onOpenChange={setLeftOpen}
       style={{
         display: 'flex', minHeight: '100vh', minWidth: 1180,
-        // 에디터·TIL 상세는 베젤 없는 크림 화면 — 좌측 사이드바 슬롯까지 따뜻한 크림으로 채워 흰 여백 제거
-        background: framed ? 'transparent' : ((screen === 'editor' || screen === 'til-detail') ? '#efe7d3' : 'var(--paper)'),
+        // 게임보이 에디터·TIL 상세는 베젤 없는 크림 화면. classic 에디터는 원본 종이 배경(var(--paper)).
+        background: framed ? 'transparent' : ((!useClassicShell && (screen === 'editor' || screen === 'til-detail')) ? '#efe7d3' : 'var(--paper)'),
         position: framed ? 'relative' : undefined,
         zIndex: framed ? 0 : undefined,
       }}
       data-screen-label={screen}
     >
       {framed && <><div className="rt-vision-room" /><div className="rt-vision-screen-bg" /></>}
-      <GameBoySidebar
-        current={screen.startsWith('pot') || screen === 'til-detail' ? 'garden' : screen}
-        onNav={handleNav}
-        onLogout={() => setLogoutModalOpen(true)}
-        forceHidden={focusMode}
-      />
+      {useClassicShell ? (
+        <RootinSidebarLeft
+          current={screen.startsWith('pot') || screen === 'til-detail' ? 'garden' : screen}
+          onNav={handleNav}
+          onLogout={() => setLogoutModalOpen(true)}
+        />
+      ) : (
+        <GameBoySidebar
+          current={screen.startsWith('pot') || screen === 'til-detail' ? 'garden' : screen}
+          onNav={handleNav}
+          onLogout={() => setLogoutModalOpen(true)}
+          forceHidden={focusMode}
+        />
+      )}
       <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
         <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
           <Routes>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<DashboardScreen onNav={handleNav} />} />
+            <Route path="/dashboard" element={theme === 'classic' ? <DashboardClassic onNav={handleNav} /> : <DashboardScreen onNav={handleNav} />} />
             <Route path="/editor" element={(
-              <EditorScreen
+              <EditorComp
                 onNav={handleNav}
                 initialSelectedPotId={activeEditorPotId}
                 initialTil={editorInitialTil}
@@ -207,12 +257,18 @@ function AppShell() {
                 onToggleFocus={toggleFocusMode}
               />
             )} />
-            <Route path="/garden" element={<GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
+            <Route path="/garden" element={theme === 'classic'
+              ? <GardenClassic refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />
+              : <GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
             <Route path="/garden/pots/:potId" element={(
               <PotDetailRoute
+                theme={theme}
                 refreshKey={potDetailRefreshKey}
+                celebratePotId={growthCelebratePotId}
+                onCelebrated={() => setGrowthCelebratePotId(null)}
                 onBack={() => navigate('/garden')}
                 onStartTil={openEditorForPot}
+                onEditTil={openEditorForTil}
                 onOpenTil={(potId, tilId) => navigate(`/garden/pots/${potId}/tils/${tilId}`)}
               />
             )} />
@@ -226,15 +282,15 @@ function AppShell() {
                 }}
               />
             )} />
-            <Route path="/collection" element={<CollectionScreen />} />
-            <Route path="/ai" element={<AIScreen />} />
-            <Route path="/profile" element={<ProfileScreen />} />
+            <Route path="/collection" element={theme === 'classic' ? <CollectionClassic /> : <CollectionScreen />} />
+            <Route path="/ai" element={theme === 'classic' ? <AIClassic /> : <AIScreen />} />
+            <Route path="/profile" element={theme === 'classic' ? <ProfileClassic /> : <ProfileScreen />} />
             <Route path="*" element={<NotFoundScreen />} />
           </Routes>
         </div>
       </SidebarInset>
       {screen === 'editor' && !focusMode && (
-        <RootinSidebarRight
+        <RightPanel
           onEditTil={openEditorForTil}
           onResumeDraft={resumeEditorDraft}
           onNewTil={startNewEditorTil}
@@ -267,27 +323,15 @@ function AppShell() {
         )}
       </AnimatePresence>
     </SidebarProvider>
-    {logoutModalOpen && (
-      <LogoutConfirmModal
-        onConfirm={async () => {
-          try {
-            await logout().catch(() => {}); // 서버 세션 무효화 (best-effort)
-          } finally {
-            clearTokens();
-            clearUser();
-            setAuthed(false);
-            setLogoutModalOpen(false);
-            navigate('/landing', { replace: true });
-          }
-        }}
-        onClose={() => setLogoutModalOpen(false)}
-      />
+    {logoutModalOpen && (theme === 'classic'
+      ? <LogoutConfirmModalClassic onConfirm={confirmLogout} onClose={closeLogoutModal} />
+      : <LogoutConfirmModal onConfirm={confirmLogout} onClose={closeLogoutModal} />
     )}
-    </TilEditorProvider>
+    </TilProvider>
   );
 }
 
-function PotDetailRoute({ refreshKey, onBack, onStartTil, onOpenTil }) {
+function PotDetailRoute({ theme, refreshKey, celebratePotId, onCelebrated, onBack, onStartTil, onEditTil, onOpenTil }) {
   const { potId } = useParams();
   const numericPotId = parseRoutePotId(potId);
 
@@ -295,10 +339,25 @@ function PotDetailRoute({ refreshKey, onBack, onStartTil, onOpenTil }) {
     return <Navigate to="/garden" replace />;
   }
 
+  // classic 화분 상세는 TIL을 전용 라우트가 아니라 에디터(onEditTil)로 연다.
+  if (theme === 'classic') {
+    return (
+      <PotDetailClassic
+        potId={numericPotId}
+        refreshKey={refreshKey}
+        onBack={onBack}
+        onStartTil={onStartTil}
+        onEditTil={onEditTil}
+      />
+    );
+  }
+
   return (
     <PotDetailScreen
       potId={numericPotId}
       refreshKey={refreshKey}
+      celebratePotId={celebratePotId}
+      onCelebrated={onCelebrated}
       onBack={onBack}
       onStartTil={onStartTil}
       onOpenTil={(tilId) => onOpenTil(numericPotId, tilId)}
@@ -379,7 +438,9 @@ function App() {
   return (
     <BrowserRouter>
       <UserProvider onAuthExpired={handleAuthExpired}>
-        <AppShell />
+        <ThemeProvider>
+          <AppShell />
+        </ThemeProvider>
       </UserProvider>
     </BrowserRouter>
   );

@@ -85,7 +85,6 @@ export function TilEditorPage({
     publishing,
     setCurrentTilId,
     setDirty,
-    refreshPots,
   } = useTilEditor()
 
   const restoredPotIdRef = useRef<string | null>(null)
@@ -141,12 +140,6 @@ export function TilEditorPage({
     },
     onUpdate: () => setSaved(false),
   })
-
-  // 에디터 화면에 진입(마운트)할 때마다 화분 목록을 백엔드로부터 새로고침합니다.
-  // 이로 인해 새로 생성된 화분이 화면을 새로고침(F5)하지 않아도 목록에 즉시 노출됩니다.
-  useEffect(() => {
-    refreshPots?.()
-  }, [refreshPots])
 
   // 사이드바(템플릿)·아일랜드가 editor에 접근할 수 있도록 context에 등록
   useEffect(() => {

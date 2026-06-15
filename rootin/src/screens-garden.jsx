@@ -875,19 +875,15 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
   // 🎨 가이드 투어 순차 진행 시 특정 단계에 맞춰 자동으로 정원 꾸미기 모드(editMode)를 온/오프 처리합니다.
   useEffect(() => {
     const handleGuideStep = (e) => {
-      const { stepIndex, isEnd, selector } = e.detail;
+      const { action, isEnd, selector } = e.detail;
       if (isEnd) {
         setEditMode(false);
         return;
       }
       
-      // 정원 화면 관련 가이드가 실행 중이고, 드래그 앤 드롭(3단계), 배경 변경(4단계), 꾸미기 완료(5단계)일 때 꾸미기 모드를 자동 활성화합니다.
+      // 정원 화면 관련 가이드가 실행 중이고, 꾸미기 기능 설명 단계에 도달하면 편집 모드를 자동 활성화합니다.
       if (selector && selector.startsWith('.guide-garden-')) {
-        if (stepIndex === 3 || stepIndex === 4 || stepIndex === 5) {
-          setEditMode(true);
-        } else {
-          setEditMode(false);
-        }
+        setEditMode(action === 'enableGardenEditMode');
       }
     };
 

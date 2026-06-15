@@ -35,9 +35,9 @@ const GUIDE_STEPS = {
     { selector: '.guide-garden-scene', text: '🌿 매일 학습 기록(TIL)을 통해 키워낸 나의 식물들을 한눈에 모아 감상하는 정원 캔버스입니다.', placement: 'top', textOffset: { x: -120, y: -35 } },
     { selector: '.guide-garden-pots', text: '🪴 키우는 화분의 레벨과 물주기 상태를 확인하고, 수확한 식물로 화분 위를 꾸밀 수 있습니다.', placement: 'top', textOffset: { x: 120, y: -20 } },
     { selector: '.guide-garden-edit', text: '🎨 [정원 꾸미기] 버튼을 누르면 화분의 위치나 테마를 자유롭게 바꿀 수 있는 꾸미기 모드가 켜집니다.', placement: 'bottom', textOffset: { x: -50, y: 15 } },
-    { selector: '.guide-garden-scene', text: '🖐️ 꾸미기 모드에서 화분을 클릭한 채 원하는 위치로 끌어다 놓으면 자유롭게 배치할 수 있습니다.', placement: 'top', textOffset: { x: -120, y: -35 } },
-    { selector: '.guide-garden-theme', text: '🖼️ 숲, 가을, 밤, 미니룸 등 원하는 테마 버튼을 선택하여 정원의 배경을 취향대로 변경합니다.', placement: 'left', textOffset: { x: -30, y: 0 } },
-    { selector: '.guide-garden-edit', text: '💾 [꾸미기 완료] 버튼을 누르면 화분 배치와 정원 꾸미기 변경사항이 저장됩니다.', placement: 'bottom', textOffset: { x: -50, y: 15 } }
+    { selector: '.guide-garden-scene', action: 'enableGardenEditMode', text: '🖐️ 꾸미기 모드에서 화분을 클릭한 채 원하는 위치로 끌어다 놓으면 자유롭게 배치할 수 있습니다.', placement: 'top', textOffset: { x: -120, y: -35 } },
+    { selector: '.guide-garden-theme', action: 'enableGardenEditMode', text: '🖼️ 숲, 가을, 밤, 미니룸 등 원하는 테마 버튼을 선택하여 정원의 배경을 취향대로 변경합니다.', placement: 'left', textOffset: { x: -30, y: 0 } },
+    { selector: '.guide-garden-edit', action: 'enableGardenEditMode', text: '💾 [꾸미기 완료] 버튼을 누르면 화분 배치와 정원 꾸미기 변경사항이 저장됩니다.', placement: 'bottom', textOffset: { x: -50, y: 15 } }
   ],
   editor: [
     { selector: '.guide-editor-meta', text: '글을 누적할 대상 화분을 고르고 제목과 태그를 입력하는 메타정보 영역입니다.', placement: 'left', textOffset: { x: -80, y: 30 } },
@@ -49,9 +49,9 @@ const GUIDE_STEPS = {
     { selector: '.guide-ai-mode', text: '🎯 AI 학습 목적을 선택합니다.\n\n- 복습 문제 생성: TIL을 분석해 퀴즈를 만듭니다.\n- TIL 요약: 공부한 내용의 핵심 요약본을 만듭니다.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
     { selector: '.guide-ai-pots', text: 'AI가 학습 지식을 분석할 기준 화분을 목록에서 선택합니다. 해당 화분의 글들로 학습지가 제작됩니다.', placement: 'right', textOffset: { x: 40, y: -20 } },
     { selector: '.guide-ai-select-til', text: '학습에 활용할 개별 TIL 글 목록을 확인하고 직접 선택하기 위해 이 버튼을 클릭합니다.', placement: 'bottom', textOffset: { x: 0, y: 10 } },
-    { selector: '.guide-ai-modal-list', text: '학습 데이터로 사용할 개별 TIL 글들을 선택합니다. 검색바나 태그 필터로 원하는 공부 기록만 빠르게 골라낼 수 있습니다.', placement: 'left', textOffset: { x: -60, y: 0 } },
-    { selector: '.guide-ai-modal-submit', text: '하단의 생성 버튼을 눌러 AI 학습지를 발행합니다. 공부 분량과 모드에 따라 물방울 포인트가 차감됩니다.', placement: 'top', textOffset: { x: 0, y: -20 } },
-    { selector: '.guide-ai-result', text: 'AI가 출제한 퀴즈를 풀고 채점받거나 요약된 개념 노트를 학습하는 메인 결과 화면입니다.', placement: 'left', textOffset: { x: -40, y: 0 } }
+    { selector: '.guide-ai-modal-list', action: 'openAiTilModal', text: '학습 데이터로 사용할 개별 TIL 글들을 선택합니다. 검색바나 태그 필터로 원하는 공부 기록만 빠르게 골라낼 수 있습니다.', placement: 'left', textOffset: { x: -60, y: 0 } },
+    { selector: '.guide-ai-modal-submit', action: 'openAiTilModal', text: '하단의 생성 버튼을 눌러 AI 학습지를 발행합니다. 공부 분량과 모드에 따라 물방울 포인트가 차감됩니다.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-ai-result', action: 'showAiGuideResult', text: 'AI가 출제한 퀴즈를 풀고 채점받거나 요약된 개념 노트를 학습하는 메인 결과 화면입니다.', placement: 'left', textOffset: { x: -40, y: 0 } }
   ]
 };
 
@@ -210,9 +210,9 @@ function AppShell() {
   };
 
   const titles = {
-    dashboard: { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
-    editor: { title: '오늘의 TIL 작성', subtitle: 'New entry' },
-    garden: { title: '나의 정원', subtitle: 'Garden · 4개의 화분' },
+    dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
+    editor:     { title: '오늘의 TIL 작성', subtitle: 'New entry' },
+    garden:     { title: '나의 정원', subtitle: 'Garden · 4개의 화분' },
     'pot-detail': {
       title: (routePotId ?? potFocus)
         ? `${POTS.find(p => p.id === (routePotId ?? potFocus))?.emoji ?? '🌱'} ${POTS.find(p => p.id === (routePotId ?? potFocus))?.name ?? '화분 상세'}`
@@ -225,8 +225,8 @@ function AppShell() {
         ? `Collection · ${collectionStats.collected} / ${collectionStats.total} 종 해금`
         : 'Collection · 식물 도감',
     },
-    ai: { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
-    profile: { title: '내 계정', subtitle: 'Account' },
+    ai:         { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
+    profile:    { title: '내 계정', subtitle: 'Account' },
   };
 
   if (!authed) {

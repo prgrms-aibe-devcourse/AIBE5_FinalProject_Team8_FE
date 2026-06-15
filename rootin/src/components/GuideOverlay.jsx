@@ -216,11 +216,11 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
     setCoords(calculated);
   }, [isOpen, steps]);
 
-  // 창 스크롤 및 윈도우 크기 변경 시에도 화살표와 상자가 엘리먼트를 실시간으로 따라다니도록 바인딩합니다.
+  // 창 스크롤 및 내부 스크롤 컨테이너 변경 시에도 화살표와 상자가 엘리먼트를 실시간으로 따라다니도록 바인딩합니다.
   useEffect(() => {
     calculateCoords();
-    window.addEventListener('scroll', calculateCoords);
-    return () => window.removeEventListener('scroll', calculateCoords);
+    window.addEventListener('scroll', calculateCoords, true);
+    return () => window.removeEventListener('scroll', calculateCoords, true);
   }, [calculateCoords, windowSize]);
 
   // 가이드 단계 변경 시, 비동기 리렌더링 및 마운트 지연으로 인해 
@@ -253,6 +253,7 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
           isEnd: false,
           selector: activeStep?.selector,
           placement: activeStep?.placement,
+          action: activeStep?.action,
         },
       })
     );
@@ -266,6 +267,19 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
     );
     onClose?.();
   }, [onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        closeGuide();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, closeGuide]);
 
   if (!isOpen) return null;
 

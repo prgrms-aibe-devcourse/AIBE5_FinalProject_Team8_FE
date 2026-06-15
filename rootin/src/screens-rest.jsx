@@ -742,7 +742,7 @@ function AIScreen({ onOpenGuide }) {
   // 📝 가이드 투어 순차 진행 시 특정 단계에 맞춰 자동으로 TIL 선택 모달(modalOpen)을 열고 닫는 로직을 구현합니다.
   useEffect(() => {
     const handleGuideStep = (e) => {
-      const { stepIndex, isEnd, selector } = e.detail;
+      const { action, isEnd, selector } = e.detail;
       if (isEnd) {
         setModalOpen(false);
         setGuideMockActive(false);
@@ -751,25 +751,21 @@ function AIScreen({ onOpenGuide }) {
       
       // AI 학습 가이드가 실행 중일 때 각 단계별로 화면의 모드나 팝업을 자동 제어합니다.
       if (selector && selector.startsWith('.guide-ai-')) {
-        // 3단계(모달 목록)와 4단계(모달 확인 생성 버튼)에서는 TIL 선택 모달을 자동으로 오픈합니다.
-        if ((stepIndex === 3 || stepIndex === 4) && potId) {
+        // TIL 선택 모달을 설명하는 단계에서는 모달을 자동으로 오픈합니다.
+        if (action === 'openAiTilModal' && potId) {
           setModalOpen(true);
         } else {
           setModalOpen(false);
         }
 
-        // 5단계(결과 화면 뷰)에서는 실제 생성된 AI 결과가 없다면 예시 데이터 가이드를 노출합니다.
-        if (stepIndex === 5) {
-          setGuideMockActive(true);
-        } else {
-          setGuideMockActive(false);
-        }
+        // 결과 화면을 설명하는 단계에서는 실제 생성 결과가 없어도 가이드용 예시 데이터를 노출합니다.
+        setGuideMockActive(action === 'showAiGuideResult');
       }
     };
 
     window.addEventListener('rootin-guide-step', handleGuideStep);
     return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
-  }, []);
+  }, [potId]);
   // 마지막으로 선택한 tilIds (다시 생성 시 재사용)
   const [lastTilIds, setLastTilIds] = useState([]);
 
@@ -934,6 +930,19 @@ function AIScreen({ onOpenGuide }) {
       setError('삭제에 실패했어요. 잠시 후 다시 시도해 주세요.');
     }
   };
+
+  const guideMockQuizzes = guideMockActive ? [
+    { id: 1, question: 'React에서 useEffect의 의존성 배열을 빈 배열([])로 설정하면 어떤 시점에 실행되나요?', options: ['컴포넌트가 처음 화면에 나타날 때(마운트)', '상태가 바뀔 때마다', '화면에서 사라질 때만', '렌더링되기 직전'], answer: 1, explanation: '의존성 배열이 빈 배열인 경우 컴포넌트가 마운트될 때 최초 1회만 동작합니다.' },
+    { id: 2, question: '마크다운 문법에서 가장 큰 제목을 표현할 때 쓰는 기호는 무엇인가요?', options: ['#', '##', '###', '####'], answer: 1, explanation: '# 기호를 사용하면 HTML의 h1 태그와 같은 가장 큰 제목이 생성됩니다.' },
+  ] : [];
+  const guideMockSummary = guideMockActive
+    ? '오늘 학습한 React 핵심 개념과 마크다운 작성 팁에 관한 요약입니다. 컴포넌트 생명주기와 훅의 올바른 사용법이 분석되었습니다.'
+    : '';
+  const guideMockKeyPoints = guideMockActive ? [
+    'useEffect의 의존성 관리 및 메모리 누수 방지 기법 학습',
+    'Shadcn UI와 Tailwind CSS를 활용한 반응형 웹 인터페이스 배치',
+    'AI 학습지 생성 시의 포인트 소모 규칙 확인',
+  ] : [];
 
   return (
     <>
@@ -1140,20 +1149,13 @@ function AIScreen({ onOpenGuide }) {
             <QuizResult
               pot={selectedPot ?? { name: '예시 화분(JavaScript 입문)' }}
               quizCount={2}
-              quizzes={aiResult?.quizzes ?? [
-                { id: 1, question: 'React에서 useEffect의 의존성 배열을 빈 배열([])로 설정하면 어떤 시점에 실행되나요?', options: ['컴포넌트가 처음 화면에 나타날 때(마운트)', '상태가 바뀔 때마다', '화면에서 사라질 때만', '렌더링되기 직전'], answer: 1, explanation: '의존성 배열이 빈 배열인 경우 컴포넌트가 마운트될 때 최초 1회만 동작합니다.' },
-                { id: 2, question: '마크다운 문법에서 가장 큰 제목을 표현할 때 쓰는 기호는 무엇인가요?', options: ['#', '##', '###', '####'], answer: 1, explanation: '# 기호를 사용하면 HTML의 h1 태그와 같은 가장 큰 제목이 생성됩니다.' }
-              ]}
+              quizzes={guideMockActive ? guideMockQuizzes : (aiResult?.quizzes ?? [])}
             />
           ) : (
             <SummaryResult
               pot={selectedPot ?? { name: '예시 화분(JavaScript 입문)' }}
-              summary={aiResult?.summary ?? '오늘 학습한 React 핵심 개념과 마크다운 작성 팁에 관한 요약입니다. 컴포넌트 생명주기와 훅의 올바른 사용법이 분석되었습니다.'}
-              keyPoints={aiResult?.keyPoints ?? [
-                'useEffect의 의존성 관리 및 메모리 누수 방지 기법 학습',
-                'Shadcn UI와 Tailwind CSS를 활용한 반응형 웹 인터페이스 배치',
-                'AI 학습지 생성 시의 포인트 소모 규칙 확인'
-              ]}
+              summary={guideMockActive ? guideMockSummary : (aiResult?.summary ?? '')}
+              keyPoints={guideMockActive ? guideMockKeyPoints : (aiResult?.keyPoints ?? [])}
             />
           )}
         </Card>

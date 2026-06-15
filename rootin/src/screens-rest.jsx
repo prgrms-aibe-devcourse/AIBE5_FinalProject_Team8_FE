@@ -1078,7 +1078,7 @@ function AIScreen() {
         <Card padding={28}>
           {generating ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '60px 0', color: 'var(--ink-3)' }}>
-              <Spinner size={48} color="var(--moss)" />
+              <Spinner size={48} color="var(--moss)" ariaHidden={true} />
               <div style={{ fontSize: 13.5, color: 'var(--ink-2)', fontFamily: 'var(--font-display)' }}>AI가 TIL을 분석하고 있어요...</div>
             </div>
           ) : !generated ? (
@@ -1948,7 +1948,6 @@ function AuthScreen({ onAuth, onBackToLanding }) {
                 boxSizing: 'border-box',
               }}
             />
-            {mode === 'signup' && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}></div>}
           </div>
           <div>
             <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>비밀번호</label>

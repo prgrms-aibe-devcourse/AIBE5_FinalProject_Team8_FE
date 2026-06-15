@@ -131,7 +131,7 @@ const Icon = {
 /**
  * Spinner — 빙글빙글 로딩 인디케이터
  * size: px 숫자 (기본 32)
- * color: CSS 색상 문자열 (기본 var(--brand))
+ * color: CSS 색상 문자열 (기본 var(--moss))
  */
 function Spinner({ size = 32, color = 'var(--moss)', style = {}, ariaHidden = false }) {
   return (

@@ -128,4 +128,34 @@ const Icon = {
   close: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>,
 };
 
-export { Pill, Btn, Card, SectionHeader, ProgressBar, StatTile, Icon };
+/**
+ * Spinner — 빙글빙글 로딩 인디케이터
+ * size: px 숫자 (기본 32)
+ * color: CSS 색상 문자열 (기본 var(--moss))
+ */
+function Spinner({ size = 32, color = 'var(--moss)', style = {}, ariaHidden = false }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      role={ariaHidden ? undefined : 'status'}
+      aria-hidden={ariaHidden ? true : undefined}
+      aria-label={ariaHidden ? undefined : 'Loading'}
+      style={{
+        animation: 'rootin-spin 0.8s linear infinite',
+        display: 'block',
+        stroke: color,
+        strokeWidth: 2.2,
+        strokeLinecap: 'round',
+        ...style,
+      }}
+    >
+      <circle cx="12" cy="12" r="10" fill="none" opacity="0.15" />
+      <path d="M12 2a10 10 0 0 1 10 10" />
+    </svg>
+  );
+}
+
+export { Pill, Btn, Card, SectionHeader, ProgressBar, StatTile, Icon, Spinner };

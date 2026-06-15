@@ -1,7 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { POTS } from './data.jsx';
-import { getPlants } from './api/collection.js';
 import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
@@ -9,9 +7,7 @@ import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens
 import { LandingScreen } from './screens-landing.jsx';
 import { NotFoundScreen } from './screens-error.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
-import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator, BreadcrumbLink } from '@/components/ui/breadcrumb';
-import { Separator } from '@/components/ui/separator';
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
 import { TilEditorProvider } from '@/components/til/til-editor-context';
@@ -84,7 +80,6 @@ function AppShell() {
     return v === null ? true : v === 'true';
   });
   const [focusMode, setFocusMode] = useState(false);
-  const [collectionStats, setCollectionStats] = useState(null);
 
   // 도움말 가이드의 오픈 여부를 담당하는 상태
   const [guideOpen, setGuideOpen] = useState(false);
@@ -121,29 +116,6 @@ function AppShell() {
     }
   }, [authed, guideStorageKey]);
 
-
-  useEffect(() => {
-    if (!authed) {
-      setCollectionStats(null);
-      return;
-    }
-
-    let active = true;
-
-    getPlants()
-      .then(data => {
-        if (active) {
-          setCollectionStats(data?.stats ?? null);
-        }
-      })
-      .catch(error => {
-        if (active) {
-          console.error('식물도감 요약 조회 중 오류 발생:', error);
-        }
-      });
-
-    return () => { active = false; };
-  }, [authed]);
 
   const handleNav = (nextScreen) => {
     setFocusMode(false);
@@ -209,26 +181,6 @@ function AppShell() {
     }
   };
 
-  const titles = {
-    dashboard:  { title: '안녕하세요 🌱', subtitle: 'Dashboard · 오늘' },
-    editor:     { title: '오늘의 TIL 작성', subtitle: 'New entry' },
-    garden:     { title: '나의 정원', subtitle: 'Garden · 4개의 화분' },
-    'pot-detail': {
-      title: (routePotId ?? potFocus)
-        ? `${POTS.find(p => p.id === (routePotId ?? potFocus))?.emoji ?? '🌱'} ${POTS.find(p => p.id === (routePotId ?? potFocus))?.name ?? '화분 상세'}`
-        : '화분',
-      subtitle: 'Garden / Detail',
-    },
-    collection: {
-      title: '식물 도감',
-      subtitle: collectionStats
-        ? `Collection · ${collectionStats.collected} / ${collectionStats.total} 종 해금`
-        : 'Collection · 식물 도감',
-    },
-    ai:         { title: 'AI 학습 도구', subtitle: 'AI · 내 TIL로 만든 학습지' },
-    profile:    { title: '내 계정', subtitle: 'Account' },
-  };
-
   if (!authed) {
     return (
       <Routes>
@@ -248,8 +200,6 @@ function AppShell() {
     );
   }
 
-  const meta = titles[screen] || { title: '', subtitle: '' };
-
   return (
     <TilEditorProvider>
       <SidebarProvider
@@ -264,49 +214,6 @@ function AppShell() {
           onLogout={() => setLogoutModalOpen(true)}
         />
         <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
-          {screen !== 'editor' && (
-            <header className="flex h-16 shrink-0 items-center justify-between border-b px-4">
-              <div className="flex items-center gap-2">
-                <SidebarTrigger className="-ml-1" />
-                <Separator orientation="vertical" className="mr-2 h-4" />
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    <BreadcrumbItem className="hidden md:block">
-                      <BreadcrumbLink href="/dashboard" onClick={(e) => { e.preventDefault(); handleNav('dashboard'); }}>
-                        Rootin
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator className="hidden md:block" />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage>{meta.title}</BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </BreadcrumbList>
-                </Breadcrumb>
-              </div>
-              {/* 도움말(?) 버튼 추가 */}
-              {['dashboard', 'garden', 'ai'].includes(screen) && (
-                <button
-                  onClick={() => setGuideOpen(true)}
-                  className="flex items-center justify-center border hover:bg-muted text-muted-foreground transition-all duration-200"
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    borderColor: 'var(--rule-2)',
-                    backgroundColor: 'var(--paper)',
-                    color: 'var(--ink-2)',
-                    fontWeight: 'bold',
-                    fontSize: '15px',
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 5px rgba(0,0,0,0.06)'
-                  }}
-                  title="이 화면의 이용 가이드 맵 켜기"
-                >
-                  ?
-                </button>
-              )}
-            </header>
-          )}
           <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -356,8 +263,8 @@ function AppShell() {
             steps={GUIDE_STEPS[screen]}
           />
         )}
-        {/* 에디터 전용 플로팅 도움말 버튼 */}
-        {screen === 'editor' && !focusMode && (
+        {/* 도움말 플로팅 버튼 */}
+        {GUIDE_STEPS[screen] && !focusMode && (
           <button
             onClick={() => setGuideOpen(true)}
             className="flex items-center justify-center border hover:bg-muted text-muted-foreground transition-all duration-200"
@@ -377,7 +284,7 @@ function AppShell() {
               cursor: 'pointer',
               boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
             }}
-            title="에디터 가이드 맵 켜기"
+            title="이 화면의 이용 가이드 맵 켜기"
           >
             ?
           </button>

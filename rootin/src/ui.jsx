@@ -133,15 +133,16 @@ const Icon = {
  * size: px 숫자 (기본 32)
  * color: CSS 색상 문자열 (기본 var(--brand))
  */
-function Spinner({ size = 32, color = 'var(--moss)', style = {} }) {
+function Spinner({ size = 32, color = 'var(--moss)', style = {}, ariaHidden = false }) {
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 24 24"
       fill="none"
-      role="status"
-      aria-label="Loading"
+      role={ariaHidden ? undefined : 'status'}
+      aria-hidden={ariaHidden ? true : undefined}
+      aria-label={ariaHidden ? undefined : 'Loading'}
       style={{
         animation: 'rootin-spin 0.8s linear infinite',
         display: 'block',

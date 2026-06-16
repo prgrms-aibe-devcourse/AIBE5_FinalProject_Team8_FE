@@ -126,6 +126,7 @@ export function EditorToolbarIsland({
             exit={{ opacity: 0, y: -14, scale: 0.96 }}
             transition={{ type: 'spring', damping: 22, stiffness: 320 }}
             className={cn(
+              'guide-editor-toolbar', // 가이드 오버레이용 타겟 클래스를 이너 툴바에 직접 할당
               'pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-0.5',
               'rounded-2xl border border-primary/10',
               'bg-secondary/90 px-2 py-1.5 shadow-[var(--shadow-lg)] backdrop-blur-xl',

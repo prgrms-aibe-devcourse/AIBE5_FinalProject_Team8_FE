@@ -355,12 +355,16 @@ export function TilEditorPage({
         className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <main className="mx-auto w-full max-w-3xl px-5 pb-40 pt-24 md:px-6">
-          <TilMeta />
+          <div className="guide-editor-meta">
+            <TilMeta />
+          </div>
           <div className="til-prose mt-8">
             {editor ? (
               <>
                 <EditorBubbleMenu editor={editor} />
-                <EditorContent editor={editor} />
+                <div className="guide-editor-content">
+                  <EditorContent editor={editor} />
+                </div>
               </>
             ) : (
               <div className="space-y-3">

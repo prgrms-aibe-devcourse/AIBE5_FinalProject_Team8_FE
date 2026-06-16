@@ -319,7 +319,7 @@ export function TilEditorPage({
       setDraftPrompt(null)
     } catch (error) {
       console.error('임시저장 삭제 실패:', error)
-      window.alert('임시저장 글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.')
+      setEditorError('임시저장 글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.')
     } finally {
       setDraftChoiceBusy(false)
     }

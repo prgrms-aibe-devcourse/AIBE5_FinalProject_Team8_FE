@@ -100,6 +100,22 @@ describe('UserContext', () => {
     expect(capturedUser.joinedAt).toBe('');
   });
 
+  it('createdAt이 유효하지 않은 문자열이면 joinedAt이 빈 문자열이다', () => {
+    const apiUser = { userId: 1, nickname: '소나무', bio: '', point: 0, tilCount: 0, createdAt: 'invalid-date' };
+    let capturedUser;
+    function Capture() {
+      const { user } = useUser();
+      capturedUser = user;
+      return null;
+    }
+    render(
+      <UserProvider initialUser={apiUser}>
+        <Capture />
+      </UserProvider>
+    );
+    expect(capturedUser.joinedAt).toBe('');
+  });
+
   it('initialUser를 정규화해서 name/bio를 올바르게 노출한다', () => {
     const apiUser = { userId: 1, nickname: '소나무', bio: '안녕', point: 0, tilCount: 0 };
     render(

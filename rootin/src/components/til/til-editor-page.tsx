@@ -85,6 +85,7 @@ export function TilEditorPage({
   const [updating, setUpdating] = useState(false)
   const [draftPrompt, setDraftPrompt] = useState<DraftData | null>(null)
   const [draftChoiceBusy, setDraftChoiceBusy] = useState(false)
+  const [editorError, setEditorError] = useState('')
   const {
     setEditor,
     title,
@@ -193,6 +194,7 @@ export function TilEditorPage({
     settledPotIdRef.current = null
     startNewTil()
     setSaved(false)
+    setEditorError('')
   }, [editor, entryMode, isEditMode, normalizedInitialPotId, startNewTil])
 
   useEffect(() => {
@@ -208,6 +210,7 @@ export function TilEditorPage({
     loadDraft(Number(normalizedInitialPotId))
       .then((draft) => {
         if (cancelled) return
+        setEditorError('')
         if (!draft) {
           startNewTil()
           settledPotIdRef.current = null
@@ -220,7 +223,15 @@ export function TilEditorPage({
         setSaved(true)
         setDraftPrompt(null)
       })
-      .catch(() => {})
+      .catch((error) => {
+        if (cancelled) return
+        console.error('임시저장 글 불러오기 실패:', error)
+        setEditorError('임시저장 글을 불러오지 못했어요. 새 글로 시작하거나 잠시 후 다시 시도해주세요.')
+        startNewTil()
+        settledPotIdRef.current = null
+        setSaved(false)
+        setDraftPrompt(null)
+      })
 
     return () => {
       cancelled = true
@@ -268,10 +279,16 @@ export function TilEditorPage({
     setDraftPrompt(null)
     loadDraft(Number(selectedPotId))
       .then((draft) => {
-        if (cancelled || !draft) return
+        if (cancelled) return
+        setEditorError('')
+        if (!draft) return
         setDraftPrompt(draft)
       })
-      .catch(() => {})
+      .catch((error) => {
+        if (cancelled) return
+        console.error('임시저장 글 확인 실패:', error)
+        setEditorError('임시저장 글을 확인하지 못했어요. 잠시 후 다시 시도해주세요.')
+      })
     return () => {
       cancelled = true
     }
@@ -282,6 +299,7 @@ export function TilEditorPage({
     resumeDraft(draftPrompt)
     settledPotIdRef.current = null
     setSaved(true)
+    setEditorError('')
     setDraftPrompt(null)
   }
 
@@ -297,6 +315,7 @@ export function TilEditorPage({
       startNewTil()
       settledPotIdRef.current = null
       setSaved(false)
+      setEditorError('')
       setDraftPrompt(null)
     } catch (error) {
       console.error('임시저장 삭제 실패:', error)
@@ -338,9 +357,10 @@ export function TilEditorPage({
     }
     const tooLongTags = getTooLongTilTags(tags)
     if (tooLongTags.length > 0) {
-      window.alert(`태그는 ${TIL_TAG_MAX_LENGTH}자 이하로 입력해주세요.\n확인할 태그: #${tooLongTags[0]}`)
+      setEditorError(`태그는 ${TIL_TAG_MAX_LENGTH}자 이하로 입력해주세요. 확인할 태그: #${tooLongTags[0]}`)
       return false
     }
+    setEditorError('')
     return true
   }
 
@@ -459,6 +479,14 @@ export function TilEditorPage({
           <div className="guide-editor-meta">
             <TilMeta />
           </div>
+          {editorError && (
+            <div
+              role="alert"
+              className="mt-4 rounded-2xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm font-medium text-destructive"
+            >
+              {editorError}
+            </div>
+          )}
           <div className="til-prose mt-8">
             {editor ? (
               <>

@@ -73,10 +73,14 @@ function Btn({ children, variant = 'primary', size = 'md', icon, onClick, style,
   );
 }
 
+<<<<<<< HEAD
 function Card({ children, style, padding = 20, hoverable = false, onClick }) {
   const baseShadow = 'var(--shadow-sm)';
+=======
+function Card({ children, style, padding = 20, hoverable = false, onClick, className }) {
+>>>>>>> 4e83bce0bcd0ab046ac5bad6f1d5be97947317b7
   return (
-    <div onClick={onClick} style={{
+    <div className={className} onClick={onClick} style={{
       background: 'var(--card)',
       border: '1px solid var(--rule)',
       borderRadius: 'var(--r-xl)',

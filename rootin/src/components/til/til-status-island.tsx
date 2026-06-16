@@ -211,7 +211,7 @@ export function TilStatusIsland({
         hidden ? 'translate-y-6 opacity-0' : 'translate-y-0 opacity-100',
       )}
     >
-      <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-2.5 shadow-[var(--shadow-lg)] backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="guide-editor-status pointer-events-auto flex items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-2.5 shadow-[var(--shadow-lg)] backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <TemplateMenu />
 
         <span className="h-4 w-px bg-border/70" />

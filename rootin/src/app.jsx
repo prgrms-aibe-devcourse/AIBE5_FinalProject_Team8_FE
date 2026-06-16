@@ -93,6 +93,7 @@ function AppShell() {
   const screen = getScreenFromPath(location.pathname);
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
+  const editorEntryMode = getEditorModeFromSearch(location.search);
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
   const guideStorageKey = GUIDE_STEPS[screen] ? `rootin.visitedGuide.${screen}` : null;
 
@@ -127,6 +128,8 @@ function AppShell() {
       setEditorInitialPotId(null);
       setEditorInitialTil(null);
       setEditorReturnScreen(null);
+      navigate('/editor?mode=new');
+      return;
     }
     navigate(screenToPath(nextScreen, potFocus));
   };
@@ -136,7 +139,7 @@ function AppShell() {
     setEditorInitialPotId(potId);
     setEditorInitialTil(null);
     setEditorReturnScreen(`/garden/pots/${potId}`);
-    navigate(`/editor?potId=${potId}`);
+    navigate(`/editor?potId=${potId}&mode=new`);
   };
 
   const openEditorForTil = (til) => {
@@ -152,7 +155,7 @@ function AppShell() {
   const resumeEditorDraft = (potId) => {
     setEditorInitialPotId(potId ?? null);
     setEditorInitialTil(null);
-    navigate(potId ? `/editor?potId=${potId}` : '/editor', { replace: true });
+    navigate(potId ? `/editor?potId=${potId}&mode=resume` : '/editor?mode=resume', { replace: true });
   };
 
   // 사이드바 "새 TIL 작성" — 수정 모드 해제(신규 작성 상태). 선택한 화분은 유지.
@@ -222,6 +225,7 @@ function AppShell() {
                 <EditorScreen
                   onNav={handleNav}
                   initialSelectedPotId={activeEditorPotId}
+                  entryMode={editorEntryMode}
                   initialTil={editorInitialTil}
                   afterPublishScreen={editorReturnScreen ?? (activeEditorPotId ? `/garden/pots/${activeEditorPotId}` : '/dashboard')}
                   onPublished={handleTilPublished}
@@ -348,6 +352,11 @@ function getPotIdFromPath(pathname) {
 function getEditorPotIdFromSearch(search) {
   const params = new URLSearchParams(search);
   return parseRoutePotId(params.get('potId'));
+}
+
+function getEditorModeFromSearch(search) {
+  const mode = new URLSearchParams(search).get('mode');
+  return mode === 'new' || mode === 'resume' ? mode : null;
 }
 
 function screenToPath(screen, potId) {

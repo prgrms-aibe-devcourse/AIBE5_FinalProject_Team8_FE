@@ -21,7 +21,11 @@ import { request } from './client.js';
  */
 export function getPots() {
   // headers 옵션을 제거하여 client.js의 Bearer 토큰 인증 헤더를 그대로 활용합니다.
-  return request('/api/v1/pots');
+  return request('/api/v1/pots').then((res) => {
+    if (Array.isArray(res)) return res;
+    if (Array.isArray(res?.data)) return res.data;
+    return [];
+  });
 }
 
 /**

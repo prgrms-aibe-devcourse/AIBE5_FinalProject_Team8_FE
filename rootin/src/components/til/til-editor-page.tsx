@@ -25,7 +25,7 @@ import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 import { createLowlight, common } from 'lowlight'
 
-import { Minimize2 } from 'lucide-react'
+import { FileClock, Minimize2 } from 'lucide-react'
 
 import { createCodeBlock } from './extensions/code-block'
 import { FontSize } from './extensions/font-size'
@@ -38,14 +38,25 @@ import { SidebarTrigger } from '@/components/ui/sidebar'
 
 import { TilStatusIsland } from './til-status-island'
 import { TilMeta } from './til-meta'
-import { useTilEditor } from './til-editor-context'
+import { useTilEditor, type DraftData } from './til-editor-context'
+import { getTooLongTilTags, TIL_TAG_MAX_LENGTH } from './til-policy'
 import { updateTil } from '@/api/til.js'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 const lowlight = createLowlight(common)
 
 export function TilEditorPage({
   onNav,
   initialSelectedPotId,
+  entryMode,
   initialTil,
   afterPublishScreen = 'dashboard',
   onPublished,
@@ -55,6 +66,7 @@ export function TilEditorPage({
 }: {
   onNav?: (screen: string) => void
   initialSelectedPotId?: number | string | null
+  entryMode?: 'new' | 'resume' | null
   afterPublishScreen?: string
   onPublished?: (potId: number | string | null) => void
   onSelectedPotChange?: (potId: string | null) => void
@@ -71,6 +83,8 @@ export function TilEditorPage({
 }) {
   const [saved, setSaved] = useState(false)
   const [updating, setUpdating] = useState(false)
+  const [draftPrompt, setDraftPrompt] = useState<DraftData | null>(null)
+  const [draftChoiceBusy, setDraftChoiceBusy] = useState(false)
   const {
     setEditor,
     title,
@@ -79,8 +93,12 @@ export function TilEditorPage({
     setTitle,
     setTags,
     setSelectedPotId,
+    refreshPots,
     saveDraft,
     loadDraft,
+    resumeDraft,
+    startNewTil,
+    clearDraft,
     publish,
     publishing,
     setCurrentTilId,
@@ -91,6 +109,7 @@ export function TilEditorPage({
   const settledPotIdRef = useRef<string | null>(null)
   const hydratedTilIdRef = useRef<string | null>(null)
   const initialPotReadyRef = useRef(false)
+  const handledEntryRef = useRef<string | null>(null)
   const normalizedInitialPotId = initialSelectedPotId == null
     ? null
     : String(initialSelectedPotId)
@@ -164,6 +183,55 @@ export function TilEditorPage({
   }, [saved, setDirty])
 
   useEffect(() => {
+    if (isEditMode || !editor || entryMode !== 'new') return
+
+    const entryKey = `${normalizedInitialPotId ?? 'none'}:new`
+    if (handledEntryRef.current === entryKey) return
+
+    handledEntryRef.current = entryKey
+    restoredPotIdRef.current = null
+    settledPotIdRef.current = null
+    startNewTil()
+    setSaved(false)
+  }, [editor, entryMode, isEditMode, normalizedInitialPotId, startNewTil])
+
+  useEffect(() => {
+    if (isEditMode || !editor || entryMode !== 'resume' || !normalizedInitialPotId) return
+
+    const entryKey = `${normalizedInitialPotId}:resume`
+    if (handledEntryRef.current === entryKey) return
+
+    handledEntryRef.current = entryKey
+    restoredPotIdRef.current = normalizedInitialPotId
+    let cancelled = false
+
+    loadDraft(Number(normalizedInitialPotId))
+      .then((draft) => {
+        if (cancelled) return
+        if (!draft) {
+          startNewTil()
+          settledPotIdRef.current = null
+          setSaved(false)
+          setDraftPrompt(null)
+          return
+        }
+        resumeDraft(draft)
+        settledPotIdRef.current = null
+        setSaved(true)
+        setDraftPrompt(null)
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [editor, entryMode, isEditMode, loadDraft, normalizedInitialPotId, resumeDraft, startNewTil])
+
+  useEffect(() => {
+    refreshPots()
+  }, [refreshPots, normalizedInitialPotId])
+
+  useEffect(() => {
     if (!normalizedInitialPotId) {
       initialPotReadyRef.current = true
       return
@@ -192,28 +260,56 @@ export function TilEditorPage({
     setSaved(true)
   }, [editor, initialTil, editTilId, normalizedInitialPotId, setSelectedPotId, setTitle, setTags])
 
-  // 화분 선택 시, 해당 화분의 서버 임시저장을 1회 복원
+  // 화분 선택 시, 해당 화분의 서버 임시저장이 있으면 사용자가 이어쓸지 새로 작성할지 선택하게 합니다.
   useEffect(() => {
     if (isEditMode || !editor || !selectedPotId || restoredPotIdRef.current === selectedPotId) return
     restoredPotIdRef.current = selectedPotId
     let cancelled = false
+    setDraftPrompt(null)
     loadDraft(Number(selectedPotId))
       .then((draft) => {
         if (cancelled || !draft) return
-        editor.commands.setContent(draft.content || '')
-        setTitle(draft.title || '')
-        setTags(draft.tags || [])
-        setSaved(true)
+        setDraftPrompt(draft)
       })
       .catch(() => {})
     return () => {
       cancelled = true
     }
-  }, [isEditMode, editor, selectedPotId, loadDraft, setTitle, setTags])
+  }, [isEditMode, editor, selectedPotId, loadDraft])
+
+  const handleResumeDraft = () => {
+    if (!draftPrompt || !selectedPotId) return
+    resumeDraft(draftPrompt)
+    settledPotIdRef.current = null
+    setSaved(true)
+    setDraftPrompt(null)
+  }
+
+  const handleStartFresh = async () => {
+    if (!selectedPotId) {
+      setDraftPrompt(null)
+      return
+    }
+
+    setDraftChoiceBusy(true)
+    try {
+      await clearDraft()
+      startNewTil()
+      settledPotIdRef.current = null
+      setSaved(false)
+      setDraftPrompt(null)
+    } catch (error) {
+      console.error('임시저장 삭제 실패:', error)
+      window.alert('임시저장 글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setDraftChoiceBusy(false)
+    }
+  }
 
   // 본문/제목/태그 변경 시 디바운스 자동 임시저장 (화분 선택 시에만, 최초 1회는 건너뜀)
   useEffect(() => {
     if (isEditMode || !editor || !selectedPotId) return
+    if (draftPrompt) return
     if (settledPotIdRef.current !== selectedPotId) {
       settledPotIdRef.current = selectedPotId
       return
@@ -225,7 +321,7 @@ export function TilEditorPage({
     }, 1500)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, editor?.state, title, tags, selectedPotId])
+  }, [isEditMode, editor?.state, title, tags, selectedPotId, draftPrompt])
 
   const validateBeforeSubmit = () => {
     if (!selectedPotId) {
@@ -238,6 +334,11 @@ export function TilEditorPage({
     }
     if (!editor?.getText().trim()) {
       window.alert('본문을 입력해주세요.')
+      return false
+    }
+    const tooLongTags = getTooLongTilTags(tags)
+    if (tooLongTags.length > 0) {
+      window.alert(`태그는 ${TIL_TAG_MAX_LENGTH}자 이하로 입력해주세요.\n확인할 태그: #${tooLongTags[0]}`)
       return false
     }
     return true
@@ -405,6 +506,137 @@ export function TilEditorPage({
           isEditMode={isEditMode}
         />
       )}
+
+      <DraftChoiceDialog
+        draft={draftPrompt}
+        busy={draftChoiceBusy}
+        onResume={handleResumeDraft}
+        onStartFresh={handleStartFresh}
+      />
     </div>
+  )
+}
+
+function formatDraftTime(draft: DraftData | null) {
+  const value = draft?.updatedAt ?? draft?.savedAt ?? draft?.createdAt
+  if (!value) return '임시저장된 내용이 있어요.'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '임시저장된 내용이 있어요.'
+
+  return `${date.toLocaleDateString('ko-KR', {
+    month: 'long',
+    day: 'numeric',
+  })} ${date.toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })}에 임시저장된 내용이 있어요.`
+}
+
+function DraftChoiceDialog({
+  draft,
+  busy,
+  onResume,
+  onStartFresh,
+}: {
+  draft: DraftData | null
+  busy: boolean
+  onResume: () => void
+  onStartFresh: () => void
+}) {
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  useEffect(() => {
+    if (!draft) setConfirmingDelete(false)
+  }, [draft])
+
+  return (
+    <Dialog open={Boolean(draft)}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-sm gap-5 border-border/70 bg-card p-7 text-center shadow-[var(--shadow-md)]"
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        <DialogHeader className="items-center text-center">
+          <span
+            className="mb-1 flex size-11 items-center justify-center rounded-full"
+            style={{ background: 'color-mix(in oklch, var(--sprout) 18%, transparent)' }}
+          >
+            <FileClock className="size-5 text-primary" />
+          </span>
+          <DialogTitle className="text-xl font-bold">
+            {confirmingDelete ? '임시저장 글을 삭제할까요?' : '작성 중인 글이 있습니다.'}
+          </DialogTitle>
+          <DialogDescription className="text-center leading-6">
+            {confirmingDelete ? (
+              <>
+                삭제하면 이전 임시저장 글은 복구할 수 없어요.
+                <br />
+                새 글을 처음부터 작성합니다.
+              </>
+            ) : (
+              <>
+                {formatDraftTime(draft)}
+                <br />
+                이어서 작성할까요?
+                <br />
+                <span className="text-xs text-destructive">
+                  새로 작성하면 기존 임시저장 글은 삭제됩니다.
+                </span>
+              </>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <DialogFooter className="grid grid-cols-2 gap-2 sm:grid-cols-2 sm:justify-normal">
+          {confirmingDelete ? (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={() => setConfirmingDelete(false)}
+                disabled={busy}
+                className="h-10"
+              >
+                이전
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                onClick={onStartFresh}
+                disabled={busy}
+                className="h-10 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                삭제
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="lg"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={busy}
+                className="h-10"
+              >
+                삭제하고 새로 작성
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                onClick={onResume}
+                disabled={busy}
+                className="h-10 bg-primary text-primary-foreground"
+              >
+                이어쓰기
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

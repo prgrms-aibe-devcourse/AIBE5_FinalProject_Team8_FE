@@ -3,11 +3,22 @@ import { createContext, useContext, useState, useEffect, useRef } from 'react';
 const UserContext = createContext(null);
 
 /**
+ * ISO 날짜 문자열을 한국어 형식(년 월 일)으로 변환
+ * Invalid Date인 경우 빈 문자열 반환
+ */
+function formatKoreanDate(dateString) {
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+/**
  * API 응답 필드를 앱 내부 필드명으로 정규화
  * - nickname  → name
  * - point     → points
  * - tilCount  → totalTil
- * - streak, bestStreak, joinedAt 은 API 미지원 → 기본값 0 / 0 / ''
+ * - streak, bestStreak 은 API 미지원 → 기본값 0 / 0
+ * - joinedAt: createdAt 필드로 매핑
  */
 function normalizeUser(apiUser) {
   if (!apiUser) return null;
@@ -16,7 +27,7 @@ function normalizeUser(apiUser) {
     handle:      apiUser.handle   ?? apiUser.nickname ?? '',
     email:       apiUser.email    ?? '',
     bio:         apiUser.bio      ?? '',
-    joinedAt:    apiUser.joinedAt ?? '',
+    joinedAt:    apiUser.createdAt ? formatKoreanDate(apiUser.createdAt) : '',
     totalTil:    apiUser.tilCount ?? 0,
     points:      apiUser.point    ?? 0,
     streak:      apiUser.streak      ?? 0,
@@ -55,8 +66,9 @@ export function UserProvider({ children, initialUser = null, onAuthExpired }) {
         const { getMe } = await import('../api/user.js');
         const data = await getMe();
         if (!active) return;
-        if (data?.userId != null) {
-          localStorage.setItem('userId', data.userId);
+        const resolvedUserId = data?.id ?? data?.userId;
+        if (resolvedUserId != null) {
+          localStorage.setItem('userId', resolvedUserId);
         }
         try {
           const { getSummary } = await import('../api/dashboard.js');
@@ -91,8 +103,9 @@ export function UserProvider({ children, initialUser = null, onAuthExpired }) {
 
   /** 로그인 성공 후 외부에서 유저 정보 주입 */
   function setUserFromApi(apiUser) {
-    if (apiUser?.userId != null) {
-      localStorage.setItem('userId', apiUser.userId);
+    const resolvedUserId = apiUser?.id ?? apiUser?.userId;
+    if (resolvedUserId != null) {
+      localStorage.setItem('userId', resolvedUserId);
     }
     setUser(normalizeUser(apiUser));
   }

@@ -24,6 +24,7 @@ const mockApiUser = {
   tilCount: 0,
   email: 'test@test.com',
   provider: 'google',
+  createdAt: '2024-03-15T10:00:00Z',
 };
 
 const mockApiUserLocal = {
@@ -131,6 +132,23 @@ describe('ProfileScreen — provider 조건부 렌더', () => {
   it('provider=local: 연결된 SNS 행이 노출되지 않는다', () => {
     renderProfile(mockApiUserLocal);
     expect(screen.queryByText('연결된 SNS')).not.toBeInTheDocument();
+  });
+});
+
+// ─── 가입일 표시 ─────────────────────────────────────────────────────────────
+
+describe('ProfileScreen — 가입일 표시', () => {
+  it('createdAt이 있으면 한국어 날짜(년 월 일)로 표시된다', () => {
+    renderProfile(mockApiUser); // createdAt: '2024-03-15T10:00:00Z'
+    expect(screen.getByText(/2024년 3월 15일/)).toBeInTheDocument();
+  });
+
+  it('createdAt이 없으면 가입일 텍스트가 비어있다', () => {
+    const userWithoutDate = { ...mockApiUser, createdAt: undefined };
+    renderProfile(userWithoutDate);
+    expect(screen.getByText(/부터 Rootin과 함께/)).toBeInTheDocument();
+    // 날짜 없이 '부터 Rootin과 함께'만 표시
+    expect(screen.queryByText(/\d{4}년/)).not.toBeInTheDocument();
   });
 });
 

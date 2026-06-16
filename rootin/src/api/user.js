@@ -13,6 +13,7 @@ import { request } from './client.js';
  *   provider: string,
  *   point: number,
  *   tilCount: number,
+ *   createdAt: string,
  * }>}
  */
 export async function getMe() {
@@ -34,6 +35,7 @@ export async function getMe() {
  *   provider: string,
  *   point: number,
  *   tilCount: number,
+ *   createdAt: string,
  * }>}
  */
 export async function patchUserMe(data) {

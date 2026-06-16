@@ -7,32 +7,50 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes rootin-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Rootin Design System Light Theme — 정제된 moss + paper 팔레트 (채도↓, 위계↑) */
-  --paper: oklch(0.977 0.006 95);
-  --paper-2: oklch(0.963 0.008 95);
-  --paper-3: oklch(0.948 0.009 95);   /* inset/track 등 한 단계 더 깊은 표면 */
-  --ink: oklch(0.21 0.016 152);
-  --ink-2: oklch(0.40 0.016 150);
-  --ink-3: oklch(0.52 0.012 145);
-  --moss: oklch(0.44 0.075 148);
-  --moss-2: oklch(0.34 0.062 148);
-  --sprout: oklch(0.74 0.115 140);
-  --leaf: oklch(0.905 0.04 140);
-  --amber: oklch(0.76 0.115 74);
-  --amber-soft: oklch(0.945 0.038 82);
-  --rule: oklch(0.92 0.007 100);
-  --rule-2: oklch(0.865 0.009 100);
-  --danger: oklch(0.58 0.16 25);
-  
+  /* Rootin Design System Light Theme — main-design-system 기준 따뜻한 sage 팔레트 */
+  --paper: #F7F2E7;     /* warm cream paper */
+  --paper-2: #F1EAD9;   /* deeper paper / footer band */
+  --paper-3: #F3EDDE;   /* inset/track 등 한 단계 더 깊은 표면 */
+  --ink: #2E2A21;
+  --ink-2: #6C6353;
+  --ink-3: #9A9082;
+  --moss: #4F7C52;      /* brand green — warm sage */
+  --moss-2: #38593B;    /* 진한 강조 / 그라데이션 끝 */
+  --sprout: #6CA15C;
+  --leaf: #E4EEDD;      /* 연한 녹색 강조 배경 */
+  --amber: #E6B14E;
+  --amber-soft: #F8ECCC;
+  --rule: #E8DFCC;
+  --rule-2: #DBCFB6;
+  --danger: #D2674F;
+
+  /* 액센트 — 꽃·햇살 (절제해서 사용) */
+  --coral: #E08A6B;
+  --coral-weak: #F8E3D8;
+  --honey: var(--amber);
+  --honey-weak: var(--amber-soft);
+  --primary-weak: var(--leaf);
+  --primary-weak2: #EFF4E9;
+  --on-primary: #FBF8EF;
+
   /* shadcn semantic tokens mapped to Rootin design tokens */
   --background: var(--paper);
   --foreground: var(--ink);
-  --card: oklch(0.998 0.0015 95); /* 종이 위 카드 — 순백 대신 미세한 온기 */
+  --card: #FFFDF7; /* 종이 위 카드 — 순백 대신 미세한 온기 */
   --card-foreground: var(--ink);
-  --popover: oklch(0.998 0.0015 95);
+  --popover: #FFFDF7;
   --popover-foreground: var(--ink);
   --primary: var(--moss);
   --primary-foreground: oklch(1 0 0);
@@ -52,7 +70,7 @@
   --chart-3: var(--amber);
   --chart-4: var(--leaf);
   --chart-5: var(--moss-2);
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   --sidebar: var(--paper-2);
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--moss);
@@ -64,16 +82,18 @@
 
   /* Restored missing legacy variables for other pages */
   --font-display: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
-  --font-body: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
+  --font-serif: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
+  --font-body: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
   --r-xl: 20px;
+  --r-2xl: 26px;
   /* 그림자 색조를 차가운 네이비 → moss 계열 따뜻한 중성으로 정제, 위계를 부드럽게 */
-  --shadow-sm: 0 1px 2px rgb(38 46 34 / 0.04), 0 1px 1px rgb(38 46 34 / 0.03);
-  --shadow-md: 0 4px 16px rgb(38 46 34 / 0.06), 0 1px 2px rgb(38 46 34 / 0.04);
-  --shadow-lg: 0 14px 44px rgb(38 46 34 / 0.10), 0 2px 6px rgb(38 46 34 / 0.05);
+  --shadow-sm: 0 1px 2px rgba(74,58,30,.05), 0 1px 3px rgba(74,58,30,.06);
+  --shadow-md: 0 2px 6px rgba(74,58,30,.05), 0 10px 24px rgba(74,58,30,.06);
+  --shadow-lg: 0 6px 14px rgba(74,58,30,.07), 0 18px 40px rgba(74,58,30,.10);
 
   /* 역동적 강조용 — moss 글로우/포커스 링 + 은은한 그라데이션 표면 (var() 참조라 모드 자동 적응) */
   --glow-moss: 0 0 0 3px color-mix(in oklch, var(--moss) 14%, transparent);
@@ -134,9 +154,9 @@
 }
 
 @theme inline {
-  --font-sans: 'Pretendard Variable', 'Pretendard', 'Noto Sans KR', system-ui, sans-serif;
+  --font-sans: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --font-serif: 'Newsreader', Georgia, serif;
+  --font-serif: 'Gowun Batang', 'Nanum Myeongjo', 'Noto Serif KR', serif;
   
   /* Rootin specific variables */
   --color-paper: var(--paper);
@@ -247,6 +267,29 @@
   }
   .scrollbar-subtle::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  /* 스크롤은 되지만 스크롤바를 숨김 — 화분 상세 좌측 컬럼용(화면엔 우측 스크롤바 1개만 보이게) */
+  .scrollbar-hide {
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* old Edge/IE */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;                /* Chrome/Safari */
+  }
+
+  /* 스크롤바 없이도 "아래에 더 있다"를 알려주는 스크롤 그림자.
+     커버(local)+그림자(scroll) 조합이라 끝에 닿으면 그림자가 사라짐 → 스크롤 가능할 때만 노출 */
+  .scroll-shadow {
+    background:
+      linear-gradient(var(--paper) 30%, transparent) center top,
+      linear-gradient(transparent, var(--paper) 70%) center bottom,
+      radial-gradient(farthest-side at 50% 0, rgba(74, 58, 30, 0.14), transparent) center top,
+      radial-gradient(farthest-side at 50% 100%, rgba(74, 58, 30, 0.14), transparent) center bottom;
+    background-repeat: no-repeat;
+    background-size: 100% 36px, 100% 36px, 100% 12px, 100% 12px;
+    background-attachment: local, local, scroll, scroll;
+    background-color: var(--paper);
   }
 }
 

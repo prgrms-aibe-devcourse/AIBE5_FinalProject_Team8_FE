@@ -243,8 +243,8 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
 
   return (
     <aside
-      className="relative shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
-      style={{ width: open ? PANEL_WIDTH : 0 }}
+      className="relative shrink-0 overflow-hidden"
+      style={{ width: PANEL_WIDTH }}
     >
       {/* 가장자리 토글 — 접힘/펼침 (항상 접근 가능하도록 aria-hidden 밖에 둠) */}
       <button
@@ -262,7 +262,7 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
       <div
         className={cn(
           'h-svh overflow-y-auto scrollbar-subtle border-l border-border/60 bg-[var(--paper-2)] transition-opacity duration-300',
-          open ? 'opacity-100' : 'opacity-0',
+          open ? 'opacity-100' : 'pointer-events-none opacity-0',
         )}
         style={{ width: PANEL_WIDTH }}
         aria-hidden={!open}

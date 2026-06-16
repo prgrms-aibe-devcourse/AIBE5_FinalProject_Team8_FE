@@ -166,7 +166,7 @@ function CollectionScreen() {
   const stats = dex?.stats;
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto' }}>
 
       {/* 헤더 */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, gap: 14, flexWrap: 'wrap' }}>
@@ -200,9 +200,7 @@ function CollectionScreen() {
               <Pill tone="default">총 {stats.total}칸</Pill>
               <Pill tone="green">일반 {stats.common}칸</Pill>
               <Pill tone="navy">희귀 {stats.rare}칸</Pill>
-              <Btn variant="green" size="sm">
-                {stats.collected} / {stats.total} 수집
-              </Btn>
+              <Pill tone="warn">{stats.collected} / {stats.total} 수집</Pill>
             </div>
           )}
         </div>
@@ -899,9 +897,9 @@ function AIScreen() {
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setMode('quiz')} style={{
               flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'quiz' ? 'var(--ink)' : '#fff',
+              background: mode === 'quiz' ? 'var(--coral)' : '#fff',
               color: mode === 'quiz' ? '#fff' : 'var(--ink-2)',
-              border: '0.5px solid ' + (mode === 'quiz' ? 'var(--ink)' : 'var(--rule-2)'),
+              border: '0.5px solid ' + (mode === 'quiz' ? 'var(--coral)' : 'var(--rule-2)'),
               fontSize: 12.5, fontWeight: 500, textAlign: 'left',
             }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 4 }}>📝 복습 문제 생성</div>
@@ -909,9 +907,9 @@ function AIScreen() {
             </button>
             <button onClick={() => setMode('summary')} style={{
               flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'summary' ? 'var(--ink)' : '#fff',
+              background: mode === 'summary' ? 'var(--coral)' : '#fff',
               color: mode === 'summary' ? '#fff' : 'var(--ink-2)',
-              border: '0.5px solid ' + (mode === 'summary' ? 'var(--ink)' : 'var(--rule-2)'),
+              border: '0.5px solid ' + (mode === 'summary' ? 'var(--coral)' : 'var(--rule-2)'),
               fontSize: 12.5, fontWeight: 500, textAlign: 'left',
             }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 4 }}>✨ TIL 요약</div>
@@ -1411,7 +1409,7 @@ function ProfileScreen() {
   const profileImageUrl = user?.profileImageUrl ?? null;
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1300, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
 
       <Card padding={28}>
         {/* 뷰 모드: 가로 배치 / 편집 모드: 아바타+폼 세로 구조 */}
@@ -1517,7 +1515,7 @@ function ProfileScreen() {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
+                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 13 }}>@{user?.handle ?? ''}</span>
               </div>
               <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>{bio}</div>
@@ -1613,7 +1611,7 @@ function ProfileScreen() {
           >
             <div className="eyebrow" style={{ color: 'var(--moss-2)', marginBottom: 4 }}>계정 관리</div>
             <h3 style={{
-              fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700,
+              fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 700,
               color: 'var(--ink)', marginBottom: 22,
             }}>
               비밀번호 변경

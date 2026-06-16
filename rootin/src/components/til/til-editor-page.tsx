@@ -344,15 +344,15 @@ export function TilEditorPage({
 
   const validateBeforeSubmit = () => {
     if (!selectedPotId) {
-      window.alert('화분을 먼저 선택해주세요.')
+      setEditorError('화분을 먼저 선택해주세요.')
       return false
     }
     if (!title.trim()) {
-      window.alert('제목을 입력해주세요.')
+      setEditorError('제목을 입력해주세요.')
       return false
     }
     if (!editor?.getText().trim()) {
-      window.alert('본문을 입력해주세요.')
+      setEditorError('본문을 입력해주세요.')
       return false
     }
     const tooLongTags = getTooLongTilTags(tags)
@@ -395,7 +395,7 @@ export function TilEditorPage({
       return
     }
     if (!selectedPotId) {
-      window.alert('화분을 먼저 선택해주세요.')
+      setEditorError('화분을 먼저 선택해주세요.')
       return
     }
     saveDraft().then((ok) => {

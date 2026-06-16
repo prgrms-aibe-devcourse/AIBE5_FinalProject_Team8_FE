@@ -141,7 +141,6 @@ export function TilMeta() {
               setTagError('')
             }}
             onBlur={addTag}
-            maxLength={tagInput.trimStart().startsWith('#') ? TIL_TAG_MAX_LENGTH + 1 : TIL_TAG_MAX_LENGTH}
             aria-invalid={Boolean(tagError)}
             aria-describedby={tagError ? 'til-tag-error' : undefined}
             onKeyDown={(e) => {

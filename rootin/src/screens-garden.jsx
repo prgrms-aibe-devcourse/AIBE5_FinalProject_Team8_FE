@@ -1237,13 +1237,8 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
                 : `${pots.length}개의 화분이 자라고 있어요. 오늘 ${wateredCount}개의 화분에 물을 줬어요.`}
             </div>
           </div>
-<<<<<<< HEAD
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
-            <Btn variant="primary" size="md" icon={Icon.plus} onClick={() => setShowCreatePot(true)}>새 화분</Btn>
-=======
           <div className="guide-garden-edit" style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
-            <Btn variant="secondary" size="md" icon={Icon.plus} onClick={() => setShowCreatePot(true)}>새 화분</Btn>
->>>>>>> 4e83bce0bcd0ab046ac5bad6f1d5be97947317b7
+            <Btn variant="primary" size="md" icon={Icon.plus} onClick={() => setShowCreatePot(true)}>새 화분</Btn>
             {editMode ? (
               <Btn variant="green" size="md" icon={Icon.check} onClick={handleSaveLayout} disabled={layoutSaving}>
                 {layoutSaving ? '저장 중...' : '꾸미기 완료'}

@@ -114,21 +114,27 @@ function PotIcon({ size = 24, stage = 'leaf' }) {
 }
 
 // Logo mark
-function RootinLogo({ size = 36 }) {
+// 브랜드 마크 — 게임보이 부팅 픽셀 새싹과 한 가족인 "뿌리새싹".
+// 위로 떡잎 2장(게임보이 DNA) + 아래로 뿌리 → 브랜드명 Root-in·슬로건 "뿌리처럼"을 형상화.
+// 모노(currentColor 기본)라 배경/테마에 따라 색이 자동으로 맞춰지고 박스가 필요 없다.
+function RootinLogo({ size = 36, color = 'currentColor' }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 80 80" fill="none">
-      <path d="M22 50 L18 68 L62 68 L58 50 Z" fill="#c8a882" />
-      <rect x="20" y="44" width="40" height="8" rx="4" fill="#b8946a" />
-      <ellipse cx="40" cy="49" rx="18" ry="4" fill="#8b6340" opacity="0.3" />
-      <path d="M40 52 Q32 56 28 62" stroke="#8b6340" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.5" />
-      <path d="M40 52 Q48 56 52 62" stroke="#8b6340" strokeWidth="1.2" strokeLinecap="round" fill="none" opacity="0.5" />
-      <rect x="38" y="22" width="4" height="28" rx="2" fill="#1a3a5c" />
-      <ellipse cx="28" cy="32" rx="12" ry="8" fill="#1a3a5c" transform="rotate(-20 28 32)" />
-      <ellipse cx="52" cy="26" rx="11" ry="7.5" fill="#3d8b5e" transform="rotate(15 52 26)" />
-      <circle cx="40" cy="14" r="8" fill="#3d8b5e" opacity="0.9" />
-      <circle cx="33" cy="9" r="6" fill="#3d8b5e" opacity="0.65" />
-      <circle cx="47" cy="9" r="6" fill="#4a9066" opacity="0.65" />
-      <circle cx="40" cy="14" r="2.5" fill="#e8f5ec" />
+    <svg width={size * 0.8} height={size} viewBox="0 0 80 100" fill="none" aria-hidden="true">
+      {/* 새순 + 떡잎 2장 + 줄기 */}
+      <g fill={color}>
+        <path d="M40 20 C42.5 23 42.5 27 40 30 C37.5 27 37.5 23 40 20 Z" />
+        <path d="M40 41 C34 25 23 19 15 18 C17 29 25 37 38 40 Z" />
+        <path d="M40 41 C46 25 57 19 65 18 C63 29 55 37 42 40 Z" />
+        <rect x="37.8" y="28" width="4.4" height="36" rx="2.2" />
+      </g>
+      {/* 뿌리 */}
+      <g fill="none" stroke={color} strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M40 62 C40 73 40 80 40 88" />
+        <path d="M40 64 C33 70 27 74 22 85" />
+        <path d="M40 64 C47 70 53 74 58 85" />
+        <path d="M31 71 C29 75 28 78 27 83" />
+        <path d="M49 71 C51 75 52 78 53 83" />
+      </g>
     </svg>
   );
 }

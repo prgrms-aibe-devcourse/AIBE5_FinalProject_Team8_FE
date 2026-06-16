@@ -15,7 +15,6 @@ import { LogoutConfirmModal } from '@/components/LogoutConfirmModal.jsx';
 import { logout, clearTokens } from './api/auth.js';
 import { GuideOverlay } from './components/GuideOverlay.jsx';
 
-// 각 화면에 표시될 가이드 오버레이 설명 및 좌표 매핑 정보
 const GUIDE_STEPS = {
   dashboard: [
     { selector: '.guide-dashboard-greeting', text: '📝 오늘의 한 줄과 현재 연속 기록을 확인하고, [오늘 기록하기]로 새 TIL 작성을 시작합니다.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
@@ -51,11 +50,6 @@ const GUIDE_STEPS = {
   ]
 };
 
-// App shell — sidebar + topbar + route-based screen routing
-
-
-// Old custom Sidebar and TopBar removed and replaced by Shadcn UI
-
 function AppShell() {
   const { setUserFromApi, clearUser } = useUser();
   const location = useLocation();
@@ -68,8 +62,6 @@ function AppShell() {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
   const [gardenRefreshKey, setGardenRefreshKey] = useState(0);
-  // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
-  // 좌측 사이드바 열림 상태는 SidebarProvider가 controlled라 새로고침 시 쿠키(sidebar_state)에서 복원
   const [leftOpen, setLeftOpen] = useState(() => {
     if (typeof document === 'undefined') return true;
     const m = document.cookie.match(/(?:^|;\s*)sidebar_state=(true|false)/);
@@ -80,13 +72,13 @@ function AppShell() {
     return v === null ? true : v === 'true';
   });
   const [focusMode, setFocusMode] = useState(false);
-
-  // 도움말 가이드의 오픈 여부를 담당하는 상태
+  const [leftFreedWidth, setLeftFreedWidth] = useState(0);
+  const rightFreedWidth = rightOpen ? 0 : 266;
   const [guideOpen, setGuideOpen] = useState(false);
 
   const toggleRightPanel = () => setRightOpen((o) => {
     const next = !o;
-    try { localStorage.setItem('rootin.tilRightOpen', String(next)); } catch { /* noop */ }
+    try { localStorage.setItem('rootin.tilRightOpen', String(next)); } catch { }
     return next;
   });
   const toggleFocusMode = () => setFocusMode((f) => !f);
@@ -99,24 +91,22 @@ function AppShell() {
 
   const closeGuide = useCallback(() => {
     if (guideStorageKey) {
-      try { localStorage.setItem(guideStorageKey, 'true'); } catch { /* noop */ }
+      try { localStorage.setItem(guideStorageKey, 'true'); } catch { }
     }
     setGuideOpen(false);
   }, [guideStorageKey]);
 
-  // 각 화면(대시보드, 정원, 에디터, AI 학습 등)별 최초 방문 시 도움말 가이드 투어가 자동으로 1회 실행되는 로직입니다.
   useEffect(() => {
     if (authed && guideStorageKey) {
       const hasVisited = localStorage.getItem(guideStorageKey);
       if (!hasVisited) {
         const timer = setTimeout(() => {
           setGuideOpen(true);
-        }, 1000); // 1초 뒤 각 화면의 UI 컴포넌트 렌더링이 안착되면 부드럽게 가이드를 실행합니다.
+        }, 1000);
         return () => clearTimeout(timer);
       }
     }
   }, [authed, guideStorageKey]);
-
 
   const handleNav = (nextScreen) => {
     setFocusMode(false);
@@ -150,16 +140,12 @@ function AppShell() {
     navigate(returnPotId ? `/editor?potId=${returnPotId}` : '/editor');
   };
 
-  // 사이드바에서 임시저장본 "이어쓰기" — 수정 모드를 해제해 신규 작성 상태로 되돌림
-  // (에디터 본문 적용은 context.resumeDraft가 담당)
   const resumeEditorDraft = (potId) => {
     setEditorInitialPotId(potId ?? null);
     setEditorInitialTil(null);
     navigate(potId ? `/editor?potId=${potId}&mode=resume` : '/editor?mode=resume', { replace: true });
   };
 
-  // 사이드바 "새 TIL 작성" — 수정 모드 해제(신규 작성 상태). 선택한 화분은 유지.
-  // (에디터 비우기는 context.startNewTil이 담당)
   const startNewEditorTil = () => {
     setEditorInitialTil(null);
   };
@@ -215,6 +201,7 @@ function AppShell() {
           current={screen.startsWith('pot') ? 'garden' : screen}
           onNav={handleNav}
           onLogout={() => setLogoutModalOpen(true)}
+          onCollapseChange={setLeftFreedWidth}
         />
         <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
           <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -232,6 +219,8 @@ function AppShell() {
                   onSelectedPotChange={syncEditorPotQuery}
                   focusMode={focusMode}
                   onToggleFocus={toggleFocusMode}
+                  contentShift={leftFreedWidth}
+                  rightContentShift={rightFreedWidth}
                 />
               )} />
               <Route path="/garden" element={<GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
@@ -259,7 +248,6 @@ function AppShell() {
             onToggle={toggleRightPanel}
           />
         )}
-        {/* 가이드 오버레이 컴포넌트 마운트 */}
         {guideOpen && GUIDE_STEPS[screen] && (
           <GuideOverlay
             isOpen={guideOpen}
@@ -267,14 +255,13 @@ function AppShell() {
             steps={GUIDE_STEPS[screen]}
           />
         )}
-        {/* 도움말 플로팅 버튼 */}
         {GUIDE_STEPS[screen] && !focusMode && (
           <button
             onClick={() => setGuideOpen(true)}
             className="flex items-center justify-center border hover:bg-muted text-muted-foreground transition-all duration-200"
             style={{
               position: 'fixed',
-              right: '16px', // 다른 페이지들의 우측 상단 헤더 도움말 버튼과 동일하게 맞춥니다.
+              right: '16px',
               top: '16px',
               zIndex: 100,
               width: 32,
@@ -298,7 +285,7 @@ function AppShell() {
         <LogoutConfirmModal
           onConfirm={async () => {
             try {
-              await logout().catch(() => { }); // 서버 세션 무효화 (best-effort)
+              await logout().catch(() => { });
             } finally {
               clearTokens();
               clearUser();
@@ -384,7 +371,6 @@ function isRoutePath(pathname, route) {
 
 function App() {
   const handleAuthExpired = useCallback(() => {
-    // 토큰 만료 시 페이지 리로드로 로그아웃 처리
     window.location.reload();
   }, []);
 
@@ -396,6 +382,5 @@ function App() {
     </BrowserRouter>
   );
 }
-
 
 export default App;

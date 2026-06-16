@@ -3,6 +3,16 @@ import { createContext, useContext, useState, useEffect, useRef } from 'react';
 const UserContext = createContext(null);
 
 /**
+ * ISO 날짜 문자열을 한국어 형식(년 월 일)으로 변환
+ * Invalid Date인 경우 빈 문자열 반환
+ */
+function formatKoreanDate(dateString) {
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+/**
  * API 응답 필드를 앱 내부 필드명으로 정규화
  * - nickname  → name
  * - point     → points
@@ -17,7 +27,7 @@ function normalizeUser(apiUser) {
     handle:      apiUser.handle   ?? apiUser.nickname ?? '',
     email:       apiUser.email    ?? '',
     bio:         apiUser.bio      ?? '',
-    joinedAt:    apiUser.createdAt ? (() => { const d = new Date(apiUser.createdAt); return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`; })() : '',
+    joinedAt:    apiUser.createdAt ? formatKoreanDate(apiUser.createdAt) : '',
     totalTil:    apiUser.tilCount ?? 0,
     points:      apiUser.point    ?? 0,
     streak:      apiUser.streak      ?? 0,

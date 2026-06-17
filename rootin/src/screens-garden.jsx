@@ -1573,8 +1573,10 @@ function CreatePotModal({ userId, onClose, onCreated }) {
       const created = await createPot({
         title: title.trim(),
         description: description.trim(),
-      }, userId);
-      onCreated(created);
+      });
+      const freshPots = await getPots().catch(() => []);
+      const createdWithPlant = freshPots.find(p => p.id === created.id) ?? created;
+      onCreated(createdWithPlant);
       onClose();
     } catch (err) {
       setError(err?.body?.message ?? '화분을 만들지 못했어요. 잠시 후 다시 시도해 주세요.');

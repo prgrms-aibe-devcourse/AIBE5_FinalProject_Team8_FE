@@ -13,6 +13,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { GameBoySidebar } from '@/components/GameBoySidebar.jsx';
 import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
+import { GuideOverlay } from './components/GuideOverlay.jsx';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
 import { DashboardScreen as DashboardClassic } from './screens-dashboard.classic.jsx';
 import { GardenScreen as GardenClassic, PotDetailScreen as PotDetailClassic } from './screens-garden.classic.jsx';
@@ -28,6 +29,57 @@ import { logout, clearTokens } from './api/auth.js';
 // App shell — sidebar + topbar + route-based screen routing
 
 // Old custom Sidebar and TopBar removed and replaced by Shadcn UI
+
+// 사용자 이용 가이드 단계 정의 — 메인(classic) 테마 화면 요소를 .guide-* 클래스로 가리키며 안내한다.
+// (게임보이 테마에는 가이드를 적용하지 않으므로 렌더는 classic 테마에서만 동작)
+const GUIDE_STEPS = {
+  dashboard: [
+    { selector: '.guide-dashboard-greeting', text: '📝 오늘의 한 줄과 현재 연속 기록을 확인하고, [화분 선택하기]로 정원에서 오늘 기록할 화분을 골라요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
+    { selector: '.guide-dashboard-stats', text: '📊 누적 TIL 개수, 연속 기록일수, 전체 글자 수, 보유 포인트를 보여줘요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
+    { selector: '.guide-dashboard-grass', text: '🌱 TIL을 작성하면 잔디가 채워져요. 많이 기록한 날일수록 더 진한 색으로 표시돼요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-goals', text: '🎯 매일 주어지는 목표를 확인하고, 완료한 목표만큼 포인트를 받을 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-streak', text: '🔥 최근 30일 작성량과 현재/최고 연속 기록을 함께 확인할 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-distribution', text: '📊 가꾸고 있는 여러 화분(주제) 중 어떤 분야를 가장 많이 공부했는지 비율로 보여줘요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-weekly', text: '📅 이번 주 요일별로 글을 작성한 횟수를 그래프로 보여줘요. 주간 학습 패턴을 확인할 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-interests', text: '📈 시간의 흐름에 따라 나의 학습 관심사가 어떻게 변화했는지 보여줘요.', placement: 'top', textOffset: { x: -80, y: -30 } }
+  ],
+  garden: [
+    { selector: '.guide-garden-scene', text: '🌿 매일 작성한 TIL로 키워낸 식물들을 정원에서 한눈에 볼 수 있어요.', placement: 'top', textOffset: { x: -120, y: -35 } },
+    { selector: '.guide-garden-pots', text: '🪴 키우는 화분의 레벨과 물주기 상태를 확인하고, 수확한 식물로 화분 위를 꾸밀 수 있어요.', placement: 'top', textOffset: { x: 120, y: -20 } },
+    { selector: '.guide-garden-edit', text: '🎨 [정원 꾸미기] 버튼을 누르면 화분 위치와 테마를 바꿀 수 있는 꾸미기 모드가 켜져요.', placement: 'bottom', textOffset: { x: -50, y: 15 } },
+    { selector: '.guide-garden-scene', action: 'enableGardenEditMode', text: '🖐️ 꾸미기 모드에서 화분을 클릭한 채 원하는 위치로 끌어다 놓을 수 있어요.', placement: 'top', textOffset: { x: -120, y: -35 } },
+    { selector: '.guide-garden-theme', action: 'enableGardenEditMode', text: '🖼️ 풀밭, 노을, 달밤, 미니멀 중 원하는 테마를 골라 정원 배경을 바꿀 수 있어요.', placement: 'left', textOffset: { x: -30, y: 0 } },
+    { selector: '.guide-garden-edit', action: 'enableGardenEditMode', text: '💾 [꾸미기 완료] 버튼을 누르면 화분 배치와 정원 꾸미기 변경사항이 저장돼요.', placement: 'bottom', textOffset: { x: -50, y: 15 } }
+  ],
+  'pot-detail': [
+    { selector: '.guide-pot-detail-plant', text: '🌱 현재 화분에서 자라는 식물의 모습을 볼 수 있어요. TIL을 작성하면 경험치가 쌓이고 성장 단계가 올라가요.', placement: 'right', textOffset: { x: 40, y: -20 } },
+    { selector: '.guide-pot-detail-info', text: '🪴 화분 이름, 레벨, 소개글을 한눈에 볼 수 있어요. [화분 수정]으로 제목과 소개글을 바꿀 수 있어요.', placement: 'right', textOffset: { x: 40, y: 0 } },
+    { selector: '.guide-pot-detail-growth', text: '📈 화분 경험치와 식물 상태, 수확 가능 여부를 확인할 수 있어요. 발행한 TIL이 물주기로 반영되면 성장 수치가 올라가요.', placement: 'right', textOffset: { x: 40, y: 0 } },
+    { selector: '.guide-pot-detail-actions', text: '✍️ [TIL 작성하고 물주기]로 이 화분에 새 기록을 남길 수 있어요. [수확] 버튼으로 현재 식물을 수확할 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-pot-detail-evolution', text: '🌿 진화 계통에서 현재 식물 단계와 앞으로 성장할 단계를 미리 볼 수 있어요.', placement: 'right', textOffset: { x: 40, y: 0 } },
+    { selector: '.guide-pot-detail-records', text: '📚 이 화분에 작성한 TIL 목록이에요. 제목, 본문, 태그 검색으로 필요한 기록을 빠르게 찾을 수 있어요.', placement: 'left', textOffset: { x: -50, y: 0 } }
+  ],
+  editor: [
+    { selector: '.guide-editor-pot-select', text: '🪴 오늘 기록을 쌓을 화분을 선택해요. 발행한 TIL은 선택한 화분의 경험치와 식물 성장에 반영돼요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
+    { selector: '.guide-editor-title', text: '✏️ 오늘 공부한 내용을 한눈에 알아볼 수 있도록 TIL 제목을 입력해요.', placement: 'right', textOffset: { x: 80, y: -10 } },
+    { selector: '.guide-editor-tags', text: '🏷️ 태그를 달아두면 화분 상세, 대시보드, AI 학습에서 기록을 더 쉽게 찾을 수 있어요.', placement: 'right', textOffset: { x: 80, y: 0 } },
+    { selector: '.guide-editor-toolbar', text: '🧰 글자 굵기, 이미지 업로드, 수학 공식 같은 서식을 적용할 수 있어요.', placement: 'bottom', textOffset: { x: -160, y: 15 } },
+    { selector: '.guide-editor-content', text: '📄 오늘 학습한 내용을 자유롭게 작성하는 본문 영역이에요. 마크다운 단축키도 활용할 수 있어요.', placement: 'right', textOffset: { x: 80, y: -30 } },
+    { selector: '.guide-editor-plant-status', text: '🌱 오른쪽 패널에서 현재 키우는 식물과 이번 글로 얻을 예상 경험치를 확인할 수 있어요.', placement: 'left', textOffset: { x: -50, y: 0 } },
+    { selector: '.guide-editor-history', text: '📚 선택한 화분의 최근 TIL과 임시저장 글을 볼 수 있어요. 임시저장 글은 이어서 작성할 수 있어요.', placement: 'left', textOffset: { x: -50, y: 0 } },
+    { selector: '.guide-editor-status', text: '✅ 하단 바에서 템플릿을 불러오거나 임시저장 상태를 확인해요. 최종 발행하면 선택한 화분에 물주기와 경험치가 반영돼요.', placement: 'top', textOffset: { x: 0, y: -25 } }
+  ],
+  ai: [
+    { selector: '.guide-ai-mode', text: '🎯 AI 학습 목적을 선택해요. 복습 문제를 만들거나 TIL 내용을 요약해 핵심 개념을 정리할 수 있어요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
+    { selector: '.guide-ai-quiz-count', action: 'ensureQuizMode', text: '🔢 복습 문제를 만들 때는 원하는 문제 수량을 고를 수 있어요. 문제 수에 따라 필요한 포인트가 달라져요.', placement: 'bottom', textOffset: { x: 0, y: 12 } },
+    { selector: '.guide-ai-pots', text: '🪴 AI가 학습할 기준 화분을 선택해요. 해당 화분의 글을 바탕으로 학습지가 만들어져요.', placement: 'right', textOffset: { x: 40, y: -20 } },
+    { selector: '.guide-ai-select-til', text: '📚 버튼을 누르면 학습에 활용할 TIL 글을 직접 고를 수 있어요.', placement: 'bottom', textOffset: { x: 0, y: 10 } },
+    { selector: '.guide-ai-modal-list', action: 'openAiTilModal', text: '🔎 학습 데이터로 사용할 TIL 글을 골라요. 검색이나 태그 필터로 원하는 기록만 빠르게 찾을 수 있어요.', placement: 'left', textOffset: { x: -60, y: 0 } },
+    { selector: '.guide-ai-modal-submit', action: 'openAiTilModal', text: '✨ 하단의 생성 버튼으로 선택한 TIL 기반 AI 학습지를 만들어요. 모드에 따라 포인트가 차감돼요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-ai-result', action: 'showAiGuideResult', text: '🧠 AI가 만든 퀴즈를 풀고 채점하거나, 요약된 개념 노트를 학습할 수 있어요.', placement: 'left', textOffset: { x: -40, y: 0 } },
+    { selector: '.guide-ai-saved-results', text: '🗂️ 저장한 AI 결과는 보관함에 모여요. 나중에 다시 열어 복습할 수 있어요.', placement: 'right', textOffset: { x: 40, y: 0 } }
+  ]
+};
 
 function AppShell() {
   const { setUserFromApi, clearUser } = useUser();
@@ -55,6 +107,7 @@ function AppShell() {
   });
   const [focusMode, setFocusMode] = useState(false);
   const [collectionStats, setCollectionStats] = useState(null);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   const toggleRightPanel = () => setRightOpen((o) => {
     const next = !o;
@@ -117,6 +170,29 @@ function AppShell() {
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
+  // 이용 가이드는 메인(classic) 테마에서만 동작 — 게임보이 테마는 가이드 대상 요소(.guide-*)를 두지 않는다.
+  const guideEnabled = isClassic && !!GUIDE_STEPS[screen];
+  const guideStorageKey = guideEnabled ? `rootin.visitedGuide.${screen}` : null;
+
+  const closeGuide = useCallback(() => {
+    if (guideStorageKey) {
+      try { localStorage.setItem(guideStorageKey, 'true'); } catch { /* noop */ }
+    }
+    setGuideOpen(false);
+  }, [guideStorageKey]);
+
+  // 화면 첫 방문 시(메인 테마) 이용 가이드를 1초 뒤 한 번 자동으로 열어준다. (방문 기록은 localStorage)
+  useEffect(() => {
+    if (authed && guideStorageKey) {
+      const hasVisited = localStorage.getItem(guideStorageKey);
+      if (!hasVisited) {
+        const timer = setTimeout(() => {
+          setGuideOpen(true);
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [authed, guideStorageKey]);
 
   // TIL 작성 페이지에 진입할 때마다 오른쪽 패널(템플릿/임시저장)을 항상 펼친다.
   // (진입 시점에만 강제로 열고, 이후 세션 내 토글은 그대로 동작)
@@ -283,7 +359,7 @@ function AppShell() {
               />
             )} />
             <Route path="/collection" element={theme === 'classic' ? <CollectionClassic /> : <CollectionScreen />} />
-            <Route path="/ai" element={theme === 'classic' ? <AIClassic /> : <AIScreen />} />
+            <Route path="/ai" element={theme === 'classic' ? <AIClassic onOpenGuide={() => setGuideOpen(true)} /> : <AIScreen />} />
             <Route path="/profile" element={theme === 'classic' ? <ProfileClassic /> : <ProfileScreen />} />
             <Route path="*" element={<NotFoundScreen />} />
           </Routes>
@@ -322,6 +398,38 @@ function AppShell() {
           </motion.div>
         )}
       </AnimatePresence>
+      {guideEnabled && guideOpen && (
+        <GuideOverlay
+          isOpen={guideOpen}
+          onClose={closeGuide}
+          steps={GUIDE_STEPS[screen]}
+        />
+      )}
+      {guideEnabled && !focusMode && (
+        <button
+          onClick={() => setGuideOpen(true)}
+          className="flex items-center justify-center border hover:bg-muted text-muted-foreground transition-all duration-200"
+          style={{
+            position: 'fixed',
+            right: '24px',
+            bottom: '24px',
+            zIndex: 100,
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            borderColor: 'var(--rule-2)',
+            backgroundColor: 'var(--paper)',
+            color: 'var(--ink-2)',
+            fontWeight: 'bold',
+            fontSize: '15px',
+            cursor: 'pointer',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+          }}
+          title="이 화면의 이용 가이드 맵 켜기"
+        >
+          ?
+        </button>
+      )}
     </SidebarProvider>
     {logoutModalOpen && (theme === 'classic'
       ? <LogoutConfirmModalClassic onConfirm={confirmLogout} onClose={closeLogoutModal} />

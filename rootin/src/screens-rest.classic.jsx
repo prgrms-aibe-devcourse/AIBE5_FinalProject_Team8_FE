@@ -266,6 +266,16 @@ function CollectionScreen() {
 const TIL_MODAL_PAGE_SIZE = 10;
 const TIL_IDS_MAX_SIZE = 200; // BE AiPolicy.TIL_IDS_MAX_SIZE 와 동기화 — AI에 전달 가능한 선택 최대 개수
 
+const createGuideAiTils = () => {
+  const guideDate = new Date().toISOString();
+
+  return [
+    { id: -1, title: 'React 상태 관리 복습', date: guideDate, tags: ['React', '상태관리'] },
+    { id: -2, title: 'Spring API 설계 정리', date: guideDate, tags: ['Spring', 'API'] },
+    { id: -3, title: '오늘 배운 알고리즘 메모', date: guideDate, tags: ['Algorithm'] },
+  ];
+};
+
 const formatDate = (iso) => {
   if (!iso) return '';
   const d = new Date(iso);
@@ -280,7 +290,7 @@ const formatDate = (iso) => {
  *   onConfirm  — (tilIds: number[]) => void
  *   onClose    — () => void
  */
-function AiTilSelectModal({ potId, onConfirm, onClose, onOpenGuide }) {
+function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpenGuide }) {
   const [tils, setTils]               = useState([]);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading]         = useState(true);
@@ -304,7 +314,29 @@ function AiTilSelectModal({ potId, onConfirm, onClose, onOpenGuide }) {
 
   // 진입 시 화분 TIL 전체 로딩 — 전체 페이지 순회
   useEffect(() => {
-    if (!potId) return;
+    if (guideMode) {
+      const guideTils = createGuideAiTils();
+      setLoading(false);
+      setError(null);
+      setPartialError(false);
+      setKeyword('');
+      setSelectedTag(null);
+      setPage(0);
+      setTotalElements(guideTils.length);
+      setTils(guideTils);
+      setSelectedIds(new Set(guideTils.slice(0, 1).map(til => til.id)));
+      return;
+    }
+
+    if (!potId) {
+      setLoading(false);
+      setError(null);
+      setPartialError(false);
+      setTotalElements(0);
+      setTils([]);
+      setSelectedIds(new Set());
+      return;
+    }
     let active = true;
     const controller = new AbortController();
     setLoading(true);
@@ -365,7 +397,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose, onOpenGuide }) {
       });
 
     return () => { active = false; controller.abort(); };
-  }, [potId]);
+  }, [potId, guideMode]);
 
   // 태그 목록 (빈도순)
   const tagCounts = useMemo(() => {
@@ -440,6 +472,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose, onOpenGuide }) {
   }, []);
 
   const handleConfirm = () => {
+    if (guideMode || selectedIds.size === 0) return;
     onConfirm(Array.from(selectedIds));
   };
 
@@ -648,8 +681,12 @@ function AiTilSelectModal({ potId, onConfirm, onClose, onOpenGuide }) {
           <Btn
             className="guide-ai-modal-submit"
             variant="green" size="md"
-            style={{ flex: 2, opacity: selectedIds.size === 0 ? 0.45 : 1, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer' }}
-            disabled={selectedIds.size === 0}
+            style={{
+              flex: 2,
+              opacity: selectedIds.size === 0 || guideMode ? 0.55 : 1,
+              cursor: selectedIds.size === 0 || guideMode ? 'not-allowed' : 'pointer'
+            }}
+            disabled={selectedIds.size === 0 || guideMode}
             onClick={handleConfirm}
           >
             {selectedIds.size === 0 ? 'TIL을 선택해 주세요' : `${selectedIds.size}개 TIL로 생성`}
@@ -743,6 +780,7 @@ function AIScreen({ onOpenGuide }) {
 
   // TIL 선택 모달
   const [modalOpen, setModalOpen] = useState(false);
+  const [guideTilModalActive, setGuideTilModalActive] = useState(false);
 
   // 📝 가이드 투어 도중 설명용 AI 예시 결과지 데이터를 렌더링하기 위한 가짜 상태(Mock State)입니다.
   const [guideMockActive, setGuideMockActive] = useState(false);
@@ -753,16 +791,23 @@ function AIScreen({ onOpenGuide }) {
       const { action, isEnd, selector } = e.detail;
       if (isEnd) {
         setModalOpen(false);
+        setGuideTilModalActive(false);
         setGuideMockActive(false);
         return;
       }
       
       // AI 학습 가이드가 실행 중일 때 각 단계별로 화면의 모드나 팝업을 자동 제어합니다.
       if (selector && selector.startsWith('.guide-ai-')) {
+        if (action === 'ensureQuizMode') {
+          setMode('quiz');
+        }
+
         // TIL 선택 모달을 설명하는 단계에서는 모달을 자동으로 오픈합니다.
-        if (action === 'openAiTilModal' && potId) {
+        if (action === 'openAiTilModal') {
+          setGuideTilModalActive(true);
           setModalOpen(true);
         } else {
+          setGuideTilModalActive(false);
           setModalOpen(false);
         }
 
@@ -773,7 +818,7 @@ function AIScreen({ onOpenGuide }) {
 
     window.addEventListener('rootin-guide-step', handleGuideStep);
     return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
-  }, [potId]);
+  }, []);
   // 마지막으로 선택한 tilIds (다시 생성 시 재사용)
   const [lastTilIds, setLastTilIds] = useState([]);
 
@@ -881,7 +926,10 @@ function AIScreen({ onOpenGuide }) {
     handleGenerate(tilIds);
   };
 
-  const handleModalClose = useCallback(() => setModalOpen(false), []);
+  const handleModalClose = useCallback(() => {
+    setModalOpen(false);
+    setGuideTilModalActive(false);
+  }, []);
 
   const handlePotChange = (id) => {
     setPotId(id);
@@ -989,33 +1037,37 @@ function AIScreen({ onOpenGuide }) {
             <div style={{
               marginTop: 12, paddingTop: 12,
               borderTop: '0.5px solid var(--rule)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>문제 수량</span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button
-                  onClick={() => setQuizCount(c => Math.max(1, c - 1))}
-                  style={{
-                    width: 28, height: 28, borderRadius: 7,
-                    border: '0.5px solid var(--rule-2)', background: '#fff',
-                    fontSize: 15, color: 'var(--ink-2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >−</button>
-                <span style={{
-                  width: 28, textAlign: 'center',
-                  fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)',
-                }}>{quizCount}</span>
-                <button
-                  onClick={() => setQuizCount(c => Math.min(10, c + 1))}
-                  style={{
-                    width: 28, height: 28, borderRadius: 7,
-                    border: '0.5px solid var(--rule-2)', background: '#fff',
-                    fontSize: 15, color: 'var(--ink-2)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                >+</button>
-                <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>최대 10문제</span>
+              <div className="guide-ai-quiz-count" style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                borderRadius: 10,
+              }}>
+                <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>문제 수량</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <button
+                    onClick={() => setQuizCount(c => Math.max(1, c - 1))}
+                    style={{
+                      width: 28, height: 28, borderRadius: 7,
+                      border: '0.5px solid var(--rule-2)', background: '#fff',
+                      fontSize: 15, color: 'var(--ink-2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >−</button>
+                  <span style={{
+                    width: 28, textAlign: 'center',
+                    fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)',
+                  }}>{quizCount}</span>
+                  <button
+                    onClick={() => setQuizCount(c => Math.min(10, c + 1))}
+                    style={{
+                      width: 28, height: 28, borderRadius: 7,
+                      border: '0.5px solid var(--rule-2)', background: '#fff',
+                      fontSize: 15, color: 'var(--ink-2)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >+</button>
+                  <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>최대 10문제</span>
+                </div>
               </div>
             </div>
           )}
@@ -1077,7 +1129,7 @@ function AIScreen({ onOpenGuide }) {
       </div>
 
         {/* ➕ 추가: 저장된 AI 결과 목록(보관함) UI 신규 배치 */}
-        <div>
+        <div className="guide-ai-saved-results">
           <SectionHeader eyebrow="보관함" title="저장된 AI 결과" />
           <Card padding={14} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {savedResults.length === 0 ? (
@@ -1176,6 +1228,7 @@ function AIScreen({ onOpenGuide }) {
     {modalOpen && (
       <AiTilSelectModal
         potId={potId}
+        guideMode={guideTilModalActive}
         onConfirm={handleModalConfirm}
         onClose={handleModalClose}
         onOpenGuide={onOpenGuide}

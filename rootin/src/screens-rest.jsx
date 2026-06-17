@@ -2210,13 +2210,6 @@ function AuthScreen({ onAuth, onBackToLanding }) {
                   <ReqItem ok={pc.checks.length} label="비밀번호 8자 이상 (필수)" />
                   <div style={{ height: 1, background: 'var(--rule-2)', margin: '2px 0' }} />
                   <StrengthMeter pc={pc} />
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
-                    {[{ ok: pc.checks.upper, l: '대문자' }, { ok: pc.checks.number, l: '숫자' }, { ok: pc.checks.special, l: '특수문자' }].map(p => (
-                      <span key={p.l} style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: p.ok ? '#EAF3EC' : 'var(--paper-2)', color: p.ok ? '#2F8F54' : 'var(--ink-3)', border: `1px solid ${p.ok ? '#BFE0C9' : 'var(--rule-2)'}`, transition: 'background 0.2s, color 0.2s, border-color 0.2s' }}>
-                        {p.ok ? '✓ ' : ''}{p.l}
-                      </span>
-                    ))}
-                  </div>
                 </div>
               </motion.div>
             )}

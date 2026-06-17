@@ -906,7 +906,7 @@ function DashboardScreen({ onNav }) {
             </div>
           </div>
           <Btn variant="green" size="lg" icon={Icon.edit} onClick={() => onNav('garden')}>
-            화분 선택하고 기록하기
+            화분 선택하기
           </Btn>
         </div>
       </Card>

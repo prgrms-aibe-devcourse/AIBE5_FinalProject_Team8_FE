@@ -57,7 +57,7 @@ export function TilMeta() {
 
   return (
     <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="guide-editor-pot-select flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-[color:var(--leaf-2)]">
           <CalendarDays className="size-3.5" />
           <span>{TODAY}</span>
@@ -101,7 +101,7 @@ export function TilMeta() {
           rows={1}
           placeholder="제목을 입력하세요"
           className={cn(
-            'til-title block w-full resize-none overflow-hidden bg-transparent font-serif text-4xl leading-tight tracking-tight text-[color:var(--leaf)] outline-none',
+            'guide-editor-title til-title block w-full resize-none overflow-hidden bg-transparent font-serif text-4xl leading-tight tracking-tight text-[color:var(--leaf)] outline-none',
             'placeholder:text-muted-foreground/50 md:text-5xl',
           )}
           onInput={(e) => {
@@ -115,7 +115,7 @@ export function TilMeta() {
       </div>
 
       {/* Tags */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="guide-editor-tags flex flex-wrap items-center gap-2">
         {tags.map((tag) => (
           <span
             key={tag}

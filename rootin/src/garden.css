@@ -92,11 +92,30 @@
 
 /* ---------------- 꾸미기 패널 ---------------- */
 .gb-garden-page .gb-panel {
-  border: 1px solid var(--line-strong); border-radius: var(--r-card);
+  border: 2px solid var(--line-strong); border-radius: var(--r-card);
   background: var(--paper-2); padding: var(--sp-4) var(--sp-5);
   display: flex; flex-direction: column; gap: var(--sp-4);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
 }
 .gb-garden-page .gb-panel-sep { height: 0; border-top: 2px dotted var(--line-strong); opacity: .7; }
+
+/* 패널 섹션 제목 — 흐릿한 올리브 캡션 대신 또렷한 잉크 + 좌측 액센트 바로 구획을 명확히 */
+.gb-garden-page .gb-panel .rt-eyebrow {
+  position: relative; padding-left: 11px;
+  color: var(--leaf); font-size: 12px; letter-spacing: .5px;
+}
+.gb-garden-page .gb-panel .rt-eyebrow::before {
+  content: ""; position: absolute; left: 0; top: 1px; bottom: 1px;
+  width: 4px; border-radius: 1px; background: var(--peach);
+}
+
+/* 칩 안의 액션 라벨(+ 적용 / + 배치) — 작은 알약 배지로 클릭 가능함을 분명히 */
+.gb-garden-page .gb-chip-act {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: var(--font-pixel); font-size: 10px; font-weight: 700; line-height: 1;
+  padding: 3px 8px; border-radius: var(--r-pill);
+  background: var(--peach-soft); color: var(--peach-deep);
+}
 .gb-garden-page .gb-chip {
   display: inline-flex; flex-direction: column; align-items: center; gap: 5px;
   padding: 7px; border-radius: var(--r-chip); cursor: pointer;

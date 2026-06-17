@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Plant } from './plants.jsx';
 import { RtIcon } from './pixel-icons.jsx';
 import { getSummary, getGrass, getWeekly, getDistribution, getInterests, getQuests } from './api/dashboard.js';
@@ -27,8 +27,10 @@ const SPROUT = {
 
 // ─── 변환 유틸 ────────────────────────────────────────────────
 
-// months → 주 수 (3개월≈13주, 6개월≈26주, 1년≈52주)
-const MONTHS_TO_WEEKS = { 3: 13, 6: 26, 12: 52 };
+// 잔디는 항상 1년치(52주) 고정 — 클래식 테마와 동일하게 기간 선택 없이 한 해를 보여준다.
+const GRASS_WEEKS = 52;
+const STREAK_CHAR_COUNT_CAP = 1200;
+const STREAK_MAX_BAR_HEIGHT = 48;
 
 // 로컬 기준 날짜 키(YYYY-MM-DD). toISOString()은 UTC라 KST 등에서 하루 밀리므로 사용 금지.
 function formatDateKey(date) {
@@ -38,23 +40,100 @@ function formatDateKey(date) {
   return `${year}-${month}-${day}`;
 }
 
-// BE cells([{date, tilCount, charCount, level}]) → N주×7일 2D 배열 (0~4)
-function buildGrassGrid(cells = [], months = 3) {
+function formatShortDate(dateKey) {
+  const [, month, day] = dateKey.split('-');
+  return `${month}.${day}`;
+}
+
+function getGrassStartDate(referenceDate = new Date(), weeks = GRASS_WEEKS) {
+  const start = new Date(referenceDate);
+  start.setDate(referenceDate.getDate() - referenceDate.getDay() - (weeks - 1) * 7);
+  return start;
+}
+
+function buildGrassState(cells = []) {
+  const startDate = getGrassStartDate();
+  return {
+    grid: buildGrassGrid(cells, startDate),
+    startDate,
+  };
+}
+
+// BE cells([{date, tilCount, charCount, level}]) → 52주×7일 2D 배열 (0~4) — 항상 1년 고정
+function buildGrassGrid(cells = [], startDate = getGrassStartDate()) {
   const levelMap = {};
-  cells.forEach(c => { levelMap[c.date] = c.level; });
+  cells.forEach(c => {
+    levelMap[String(c.date ?? '').slice(0, 10)] = c.level;
+  });
 
-  const weeks = MONTHS_TO_WEEKS[months] ?? 13;
-  const today = new Date();
-  const start = new Date(today);
-  start.setDate(today.getDate() - today.getDay() - (weeks - 1) * 7);
-
-  return Array.from({ length: weeks }, (_, w) =>
+  return Array.from({ length: GRASS_WEEKS }, (_, w) =>
     Array.from({ length: 7 }, (_, d) => {
-      const dt = new Date(start);
-      dt.setDate(start.getDate() + w * 7 + d);
+      const dt = new Date(startDate);
+      dt.setDate(startDate.getDate() + w * 7 + d);
       return levelMap[formatDateKey(dt)] ?? 0;
     })
   );
+}
+
+// 최근 maxDays일의 작성 활동(스트릭 막대용) — 잔디 셀에서 실제 글자수/활성 여부를 뽑아낸다.
+function buildRecentStreakDays(cells = [], maxDays = 30) {
+  const cellMap = new Map(
+    cells.map(cell => [String(cell.date ?? '').slice(0, 10), {
+      tilCount: Number(cell.tilCount) || 0,
+      charCount: Number(cell.charCount) || 0,
+      level: Number(cell.level) || 0,
+    }])
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: maxDays }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (maxDays - 1 - index));
+    const dateKey = formatDateKey(date);
+    const record = cellMap.get(dateKey) ?? { tilCount: 0, charCount: 0 };
+
+    return {
+      date: dateKey,
+      tilCount: record.tilCount,
+      charCount: record.charCount,
+      active: record.level > 0 || record.tilCount > 0 || record.charCount > 0,
+    };
+  });
+}
+
+// 잔디 셀 기준 현재 연속 기록 계산 — API 캐시가 늦을 때의 보정값.
+function calculateCurrentStreakFromCells(cells = []) {
+  const activeDates = new Set(
+    cells
+      .filter(cell =>
+        (Number(cell.level) || 0) > 0 ||
+        (Number(cell.tilCount) || 0) > 0 ||
+        (Number(cell.charCount) || 0) > 0
+      )
+      .map(cell => String(cell.date ?? '').slice(0, 10))
+      .filter(Boolean)
+  );
+
+  if (activeDates.size === 0) return 0;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const cursor = new Date(today);
+
+  if (!activeDates.has(formatDateKey(cursor))) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  let count = 0;
+
+  while (activeDates.has(formatDateKey(cursor))) {
+    count += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return count;
 }
 
 // BE weeklyData([{date, tilCount}]) → [{day:'월', count:2}, ...]
@@ -110,38 +189,54 @@ function SegTabs({ options, cur, onPick }) {
 const GRASS_SHADES = ['#e7dcc1', '#cfe49a', '#9ec85c', '#5f9a34', '#2f5b1d'];
 const GRASS_LABELS = ['기록 없음', '1단계', '2단계', '3단계', '4단계 (많음)'];
 
-function GrassCell({ v, size }) {
-  return (
-    <div title={GRASS_LABELS[v]} style={{
-      width: size, height: size, borderRadius: 2,
-      background: GRASS_SHADES[v],
-      // 모든 칸에 또렷한 픽셀 테두리 — 타일이 격자처럼 읽히게 한다.
-      boxShadow: v === 0 ? 'inset 0 0 0 1px var(--line-strong)' : 'inset 0 0 0 1px rgba(20,40,12,.22)',
-    }} />
-  );
-}
-
-function GrassGraph({ data }) {
+function GrassGraph({ data, startDate }) {
+  const colors = GRASS_SHADES;
   const weekDays = ['', '월', '', '수', '', '금', ''];
-  const cellSize = 14;
-  const gap = 3;
+  const weeks = data.length || GRASS_WEEKS;
+
+  // viewBox 좌표계 — SVG가 width:100%로 컨테이너에 맞춰 통째로 스케일되므로
+  // 1년치(52주)가 가로 스크롤 없이 한눈에 들어오고, 셀과 요일/월 레이블 정렬이 어떤 폭에서도 유지된다.
+  const cell = 13, gap = 3, dayLabelW = 18, monthRowH = 14;
+  const step = cell + gap;
+  const vbW = dayLabelW + weeks * step - gap;
+  const vbH = monthRowH + 7 * step - gap;
+
+  // 각 주(column)의 시작일로 월 레이블 계산
+  const start = new Date(startDate ?? getGrassStartDate(new Date(), weeks));
+  const monthLabels = data.map((_, w) => {
+    const cur = new Date(start);
+    cur.setDate(start.getDate() + w * 7);
+    if (w === 0) return (cur.getMonth() + 1) + '월';
+    const prev = new Date(start);
+    prev.setDate(start.getDate() + (w - 1) * 7);
+    return cur.getMonth() !== prev.getMonth() ? (cur.getMonth() + 1) + '월' : null;
+  });
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: 7 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap, fontSize: 10, color: SPROUT.muted, marginTop: 1 }}>
-          {weekDays.map((d, i) => (
-            <div key={i} style={{ width: 14, height: cellSize, lineHeight: `${cellSize}px` }}>{d}</div>
-          ))}
-        </div>
-        {/* 1년(52주)도 잘리지 않도록 가로 스크롤 허용 */}
-        <div className="scrollbar" style={{ display: 'flex', gap, flex: 1, overflowX: 'auto', paddingBottom: 4 }}>
-          {data.map((week, wi) => (
-            <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap }}>
-              {week.map((v, di) => <GrassCell key={di} v={v} size={cellSize} />)}
-            </div>
-          ))}
-        </div>
-      </div>
+      <svg viewBox={`0 0 ${vbW} ${vbH}`} width="100%" style={{ display: 'block', height: 'auto' }}>
+        {/* 월 레이블 */}
+        {monthLabels.map((label, w) => label ? (
+          <text key={`m${w}`} x={dayLabelW + w * step} y={monthRowH - 4}
+            fontSize="9" style={{ fontWeight: 500, fill: SPROUT.body }}>{label}</text>
+        ) : null)}
+        {/* 요일 레이블 */}
+        {weekDays.map((d, i) => d ? (
+          <text key={`d${i}`} x={dayLabelW - 5} y={monthRowH + i * step + cell - 3} textAnchor="end"
+            fontSize="9" style={{ fontWeight: 500, fill: SPROUT.muted }}>{d}</text>
+        ) : null)}
+        {/* 잔디 셀 — 픽셀 격자 느낌의 또렷한 테두리 유지 */}
+        {data.map((week, w) =>
+          week.map((v, d) => (
+            <rect key={`${w}-${d}`} x={dayLabelW + w * step} y={monthRowH + d * step}
+              width={cell} height={cell} rx="2"
+              style={{ fill: colors[v], stroke: v === 0 ? 'var(--line-strong)' : 'rgba(20,40,12,.22)', strokeWidth: 0.6 }}>
+              <title>{GRASS_LABELS[v]}</title>
+            </rect>
+          ))
+        )}
+      </svg>
+
       <div style={{ borderTop: '2px dotted var(--line-strong)', margin: '16px 0 0' }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 12, fontSize: 11, color: SPROUT.muted }}>
         <span>적음</span>
@@ -155,22 +250,47 @@ function GrassGraph({ data }) {
   );
 }
 
-function StreakChart() {
-  const days = [];
-  for (let i = 0; i < 21; i++) {
-    const active = i >= 9;
-    days.push({ active, h: active ? 18 + Math.sin(i * 0.8) * 6 + ((i * 7 + 3) % 8) : 0 });
-  }
+// 최근 30일 작성량 막대 — 잔디 셀에서 뽑은 실제 글자수로 높이를 그린다 (클래식 테마와 동일 로직).
+function StreakChart({ days }) {
+  const maxCharCount = Math.max(...days.map(day => Math.min(day.charCount, STREAK_CHAR_COUNT_CAP)), 1);
+  const todayKey = formatDateKey(new Date());
+  const minActiveBarHeight = 6;
+
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 60, borderBottom: '2px dotted var(--line-strong)', paddingBottom: 1 }}>
-      {days.map((d, i) => (
-        <div key={i} style={{
-          flex: 1, height: d.active ? `${d.h + 18}px` : '4px',
-          background: d.active ? 'var(--leaf-2)' : 'var(--paper-2)',
-          boxShadow: d.active ? 'inset 0 0 0 1px rgba(20,40,12,.18)' : 'none',
-          borderRadius: '2px 2px 0 0',
-        }} />
-      ))}
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <span style={{ fontSize: 11.5, color: SPROUT.body, fontWeight: 600 }}>최근 30일 작성량</span>
+        <span style={{ fontSize: 10.5, color: SPROUT.muted }}>글자수 기준</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 60, borderBottom: '2px dotted var(--line-strong)', paddingBottom: 1 }}>
+        {days.map(day => {
+          const cappedCharCount = Math.min(day.charCount, STREAK_CHAR_COUNT_CAP);
+          const ratio = cappedCharCount / maxCharCount;
+          const height = day.active
+            ? Math.max(minActiveBarHeight, Math.round(Math.sqrt(ratio) * STREAK_MAX_BAR_HEIGHT))
+            : 4;
+          const isToday = day.date === todayKey;
+          return (
+            <div
+              key={day.date}
+              title={`${formatShortDate(day.date)} · ${day.charCount.toLocaleString()}자`}
+              style={{
+                flex: 1,
+                height,
+                minWidth: 0,
+                background: day.active ? 'var(--leaf-2)' : 'var(--paper-2)',
+                boxShadow: day.active ? 'inset 0 0 0 1px rgba(20,40,12,.18)' : 'none',
+                borderRadius: '2px 2px 0 0',
+                outline: isToday && day.active ? '1px solid var(--peach-deep)' : 'none',
+                outlineOffset: 1,
+              }}
+            />
+          );
+        })}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10, color: SPROUT.muted }}>
+        <span>30일 전</span><span>오늘</span>
+      </div>
     </div>
   );
 }
@@ -222,50 +342,122 @@ function WeeklyBar({ weekly }) {
 }
 
 function PotDistribution({ distribution }) {
+  const emptyState = (
+    <div style={{
+      minHeight: 150,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      border: `1px dashed ${SPROUT.line}`,
+      borderRadius: 6,
+      background: 'linear-gradient(180deg, var(--paper-warm), var(--surface-card))',
+      color: SPROUT.muted,
+      padding: '22px 18px',
+    }}>
+      <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center' }}>
+        <Plant stage="sprout" size={40} />
+      </div>
+      <div style={{ fontSize: 14, color: SPROUT.ink }}>
+        아직 주제 비율이 없어요
+      </div>
+      <div style={{ marginTop: 6, fontSize: 12, color: SPROUT.body, lineHeight: 1.5 }}>
+        화분에 TIL을 작성하면<br />주제별 비율이 이곳에 표시됩니다.
+      </div>
+    </div>
+  );
+
   if (!distribution || distribution.length === 0) {
-    return <div style={{ textAlign: 'center', color: SPROUT.muted, padding: '20px 0', fontSize: 12 }}>TIL 데이터가 없습니다.</div>;
+    return emptyState;
   }
-  const total = distribution.reduce((s, p) => s + p.tilCount, 0);
+
+  const normalizePotName = name => {
+    const value = String(name ?? '').trim();
+    if (!value || value === 'undefined' || value === 'null') return '이름 없는 화분';
+    return value;
+  };
+
+  const positiveDistribution = distribution
+    .map(p => ({
+      ...p,
+      potName: normalizePotName(p.potName),
+      tilCount: Number(p.tilCount) || 0,
+      ratio: Number(p.ratio) || 0,
+    }))
+    .filter(p => p.tilCount > 0)
+    .sort((a, b) => b.tilCount - a.tilCount || b.ratio - a.ratio);
+
+  if (positiveDistribution.length === 0) {
+    return emptyState;
+  }
+
+  const visiblePots = positiveDistribution.slice(0, 5);
+  const hiddenPots = positiveDistribution.slice(5);
+  const total = positiveDistribution.reduce((s, p) => s + p.tilCount, 0);
+  const hiddenTilCount = hiddenPots.reduce((s, p) => s + p.tilCount, 0);
+  const formatRatio = count => {
+    const ratio = total > 0 ? (count / total) * 100 : 0;
+    return Number.isInteger(ratio) ? String(ratio) : ratio.toFixed(1).replace(/\.0$/, '');
+  };
+  const displayDistribution = hiddenTilCount > 0
+    ? [
+        ...visiblePots,
+        {
+          potId: '__others__',
+          potName: '기타',
+          tilCount: hiddenTilCount,
+        },
+      ]
+    : visiblePots;
+
   let acc = 0;
-  const segs = distribution.map(p => {
+  const segs = displayDistribution.map(p => {
     const pct = total > 0 ? p.tilCount / total : 0;
     const start = acc;
     acc += pct;
-    return { ...p, pct, start };
+    return { ...p, ratio: formatRatio(p.tilCount), pct, start };
   });
   const R = 54;
   const circumference = 2 * Math.PI * R;
-  // 디자인 시스템 도넛 색 순서: leaf → leaf-2 → peach → amber
-  const colors = [SPROUT.ink, SPROUT.leaf2, SPROUT.peach, SPROUT.amber];
+  const hasHiddenItems = hiddenPots.length > 0;
+  // 디자인 시스템 도넛 색 순서 (상위 5 + 기타까지 6색): leaf → leaf-2 → peach → amber → sky → berry
+  const colors = [SPROUT.ink, SPROUT.leaf2, SPROUT.peach, SPROUT.amber, SPROUT.sky, SPROUT.berry];
+  const getSegmentKey = (segment, index) => segment.potId ?? `${segment.potName}-${index}`;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-      <svg width="140" height="140" viewBox="0 0 140 140">
+      <svg width="140" height="140" viewBox="0 0 140 140" style={{ flex: '0 0 140px' }}>
         <circle cx="70" cy="70" r={R} fill="none" stroke={SPROUT.paper2} strokeWidth="16" />
         {segs.map((s, i) => {
           const len = s.pct * circumference;
           const dash = `${len} ${circumference - len}`;
           const offset = -s.start * circumference;
           return (
-            <circle key={s.potId} cx="70" cy="70" r={R} fill="none"
-              stroke={colors[i % 4]} strokeWidth="16"
+            <circle key={getSegmentKey(s, i)} cx="70" cy="70" r={R} fill="none"
+              stroke={colors[i % colors.length]} strokeWidth="16"
               strokeDasharray={dash} strokeDashoffset={offset}
               transform="rotate(-90 70 70)" strokeLinecap="butt"
             />
           );
         })}
         <text x="70" y="67" textAnchor="middle" style={{ fontSize: 26, fill: SPROUT.ink }}>{total}</text>
-        <text x="70" y="85" textAnchor="middle" style={{ fontSize: 10, letterSpacing: '1px', fill: SPROUT.muted }}>총 TIL</text>
+        <text x="70" y="85" textAnchor="middle" style={{ fontSize: 10, letterSpacing: '1px', fill: SPROUT.muted }}>{hasHiddenItems ? 'TOP 5+' : '총 TIL'}</text>
       </svg>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 9 }}>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 9 }}>
         {segs.map((s, i) => (
-          <div key={s.potId} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-            <div style={{ width: 11, height: 11, borderRadius: 3, background: colors[i % 4], boxShadow: 'inset 0 0 0 1px rgba(51,64,42,.12)' }} />
-            <span style={{ color: SPROUT.ink }}>{s.potName}</span>
-            <span style={{ marginLeft: 'auto', color: SPROUT.muted, fontSize: 11 }}>
+          <div key={getSegmentKey(s, i)} style={{ display: 'grid', gridTemplateColumns: '11px minmax(0, 1fr) auto', alignItems: 'center', gap: 8, fontSize: 12 }}>
+            <div style={{ width: 11, height: 11, borderRadius: 3, background: colors[i % colors.length], boxShadow: 'inset 0 0 0 1px rgba(51,64,42,.12)' }} />
+            <span title={s.potName} style={{ color: SPROUT.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{s.potName}</span>
+            <span style={{ color: SPROUT.muted, fontSize: 11, whiteSpace: 'nowrap' }}>
               {s.tilCount}개 · {s.ratio}%
             </span>
           </div>
         ))}
+        {hasHiddenItems && (
+          <div style={{ marginTop: 2, fontSize: 11, color: SPROUT.muted }}>
+            상위 {visiblePots.length}개 화분과 기타 항목을 표시해요.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -657,8 +849,8 @@ function GoalRow({ goal }) {
 function DashboardScreen({ onNav }) {
   const { user } = useUser();
   const [summary, setSummary]           = useState(null);
-  const [grassMonths, setGrassMonths]   = useState(3);
-  const [grassGrid, setGrassGrid]       = useState(buildGrassGrid([], 3));
+  const [grassState, setGrassState]     = useState(() => buildGrassState([]));
+  const [grassCells, setGrassCells]     = useState([]);
   const [weekly, setWeekly]             = useState([]);
   const [distribution, setDistribution] = useState([]);
   const [interests, setInterests]           = useState([]);
@@ -666,15 +858,17 @@ function DashboardScreen({ onNav }) {
   const [quests, setQuests]                 = useState(null);
   const [currentPoint, setCurrentPoint]     = useState(0);
 
-  // 잔디 기간 변경 시 재요청
+  // 잔디 — 항상 1년치 데이터 (클래식 테마와 동일)
   useEffect(() => {
     let active = true;
-    getGrass(grassMonths).then(data => {
+    getGrass(12).then(data => {
       if (!active) return;
-      setGrassGrid(buildGrassGrid(data?.cells ?? [], grassMonths));
+      const cells = data?.cells ?? [];
+      setGrassState(buildGrassState(cells));
+      setGrassCells(cells);
     }).catch(() => {});
     return () => { active = false; };
-  }, [grassMonths]);
+  }, []);
 
   // 관심사 기간 변경 시 재요청
   useEffect(() => {
@@ -727,7 +921,11 @@ function DashboardScreen({ onNav }) {
     return () => { active = false; };
   }, []);
 
-  const streak     = summary?.currentStreak  ?? 0;
+  const recentStreakDays = useMemo(() => buildRecentStreakDays(grassCells, 30), [grassCells]);
+  const fallbackStreak = useMemo(() => calculateCurrentStreakFromCells(grassCells), [grassCells]);
+  const apiStreak  = summary?.currentStreak  ?? 0;
+  // API 캐시가 늦게 갱신될 수 있어 잔디 셀 기반 로컬 계산값으로 현재 스트릭을 보정합니다.
+  const streak     = Math.max(apiStreak, fallbackStreak);
   const bestStreak = summary?.longestStreak  ?? 0;
   const totalTil   = summary?.totalTilCount  ?? 0;
   const totalChar  = summary?.totalCharCount ?? 0;
@@ -742,6 +940,15 @@ function DashboardScreen({ onNav }) {
   const recDate = `${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`;
   const hpTotal = goalList.length || 4;
   const hpOn = goalList.filter(g => g.done).length;
+
+  // 시간대에 맞춰 인사말을 골라 보여준다 (클래식 테마와 동일한 로직).
+  const dynamicGreeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 11) return '싱그러운 아침, 새로운 성장을 기록해 볼까요?';
+    if (hour >= 11 && hour < 17) return '활기찬 오후, 오늘의 배움을 단단하게 다져보세요.';
+    if (hour >= 17 && hour < 22) return '차분한 저녁, 하루 동안 모은 지식을 정리할 시간이에요.';
+    return '고요한 밤, 내일을 위한 작은 씨앗을 심어주세요.';
+  }, []);
 
   return (
     <div className="rt-app rt-app-dash" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', minHeight: '100%' }}>
@@ -765,23 +972,16 @@ function DashboardScreen({ onNav }) {
         </div>
       </div>
 
-      {/* 페이지 헤더 */}
-      <div className="rt-page-head">
-        <span className="rt-tag"><RtIcon name="home" /> ROOTIN · 대시보드</span>
-        <h1 className="rt-page-title">대시보드 <span className="rt-title-cursor" /></h1>
-        <p className="rt-page-sub">오늘도 학습이 한 뼘 자랐어요.</p>
-      </div>
-
       {/* Greeting hero card */}
-      <div className="rt-card rt-card--hero">
+      <div className="rt-card rt-card--hero guide-dashboard-greeting">
         <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
           <div className="rt-pot" style={{ width: 104, height: 104, flex: '0 0 auto' }}>
             <Plant stage="bloom" size={86} />
           </div>
           <div style={{ flex: 1 }}>
-            <span className="rt-tag"><RtIcon name="sprout" /> 오늘의 한 줄</span>
+            <span className="rt-tag"><RtIcon name="sprout" /> 오늘의 인사</span>
             <div className="rt-h3" style={{ marginTop: 10 }}>
-              "매일의 기록이 뿌리가 되어 꽃을 피웁니다" <span style={{ color: 'var(--leaf-3)' }}>▼</span>
+              {dynamicGreeting}
             </div>
             <div className="rt-small rt-muted" style={{ marginTop: 6 }}>
               연속 <b style={{ color: 'var(--leaf-2)' }}>{streak}일</b> 기록 중 · 오늘도 한 뼘 자랐어요
@@ -794,7 +994,7 @@ function DashboardScreen({ onNav }) {
       </div>
 
       {/* Stat tiles */}
-      <div className="rt-grid rt-grid--4">
+      <div className="rt-grid rt-grid--4 guide-dashboard-stats">
         <StatTile icon="book"  label="누적 TIL"    value={totalTil}                   suffix="개" sub="누적 작성 수" />
         <StatTile icon="flame" label="연속 기록"   value={streak}                     suffix="일" sub={`최고 ${bestStreak}일`} />
         <StatTile icon="leaf"  label="누적 글자수" value={totalChar.toLocaleString()} suffix="자" sub="총 작성 글자 수" />
@@ -803,14 +1003,12 @@ function DashboardScreen({ onNav }) {
 
       {/* Grass + Today goals */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
-        <div className="rt-card">
-          <SectionHead eyebrow="활동" title="잔디 그래프" action={
-            <SegTabs options={[['3개월', 3], ['6개월', 6], ['1년', 12]]} cur={grassMonths} onPick={setGrassMonths} />
-          } />
-          <GrassGraph data={grassGrid} />
+        <div className="rt-card guide-dashboard-grass">
+          <SectionHead eyebrow="활동" title="잔디 그래프" />
+          <GrassGraph data={grassState.grid} startDate={grassState.startDate} />
         </div>
 
-        <div className="rt-card">
+        <div className="rt-card guide-dashboard-goals">
           <SectionHead
             eyebrow={`오늘 · ${new Date().toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace('. ', '.').slice(0, 5)}`}
             title="오늘의 목표"
@@ -826,31 +1024,28 @@ function DashboardScreen({ onNav }) {
 
       {/* 3 column stats row */}
       <div className="rt-grid rt-grid--3">
-        <div className="rt-card">
+        <div className="rt-card guide-dashboard-streak">
           <SectionHead eyebrow="연속 기록" title="Streak" action={<span className="rt-badge rt-badge--leaf">최고 {bestStreak}일</span>} />
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
             <span style={{ fontSize: 40, color: 'var(--leaf-2)', lineHeight: 1 }}>{streak}</span>
             <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>일째</span>
           </div>
-          <StreakChart />
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8, fontSize: 10, color: 'var(--text-muted)' }}>
-            <span>−21d</span><span>오늘</span>
-          </div>
+          <StreakChart days={recentStreakDays} />
         </div>
 
-        <div className="rt-card">
+        <div className="rt-card guide-dashboard-distribution">
           <SectionHead eyebrow="화분별 분포" title="주제 비율" />
           <PotDistribution distribution={distribution} />
         </div>
 
-        <div className="rt-card">
+        <div className="rt-card guide-dashboard-weekly">
           <SectionHead eyebrow="이번 주" title="요일별 작성" />
           <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />
         </div>
       </div>
 
       {/* Interest line chart */}
-      <div className="rt-card">
+      <div className="rt-card guide-dashboard-interests">
         <SectionHead eyebrow="관심사 변화" title="시기별 학습 주제 흐름" action={
           <SegTabs options={[['6개월', 6], ['12개월', 12]]} cur={interestMonths} onPick={setInterestMonths} />
         } />

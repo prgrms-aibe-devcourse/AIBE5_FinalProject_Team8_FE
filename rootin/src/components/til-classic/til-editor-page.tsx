@@ -113,6 +113,9 @@ export function TilEditorPage({
   const settledPotIdRef = useRef<string | null>(null)
   const hydratedTilIdRef = useRef<string | null>(null)
   const initialPotReadyRef = useRef(false)
+  // 초기 화분(URL/네비)을 막 적용했을 때, selectedPotId 가 그 값으로 반영될 때까지 추적.
+  // 반영 전(=이전 persisted 값이 남아있을 때)에 URL 로 되돌려보내면 두 화분이 무한 토글됨.
+  const pendingInitialPotRef = useRef<string | null>(null)
   const handledEntryRef = useRef<string | null>(null)
   const normalizedInitialPotId = initialSelectedPotId == null
     ? null
@@ -248,14 +251,25 @@ export function TilEditorPage({
   useEffect(() => {
     if (!normalizedInitialPotId) {
       initialPotReadyRef.current = true
+      pendingInitialPotRef.current = null
       return
     }
     setSelectedPotId(normalizedInitialPotId)
     initialPotReadyRef.current = true
+    // 방금 초기 화분을 적용함 → selectedPotId 가 이 값으로 바뀌기 전까지는 Effect B 가 보고 보류
+    pendingInitialPotRef.current = normalizedInitialPotId
   }, [normalizedInitialPotId, setSelectedPotId])
 
   useEffect(() => {
     if (!initialPotReadyRef.current) return
+    // 초기 화분 적용 대기 중: selectedPotId 가 아직 이전(persisted) 값이면 URL 로 되돌려보내지 않음.
+    // (안 그러면 Effect A 와 서로 값을 되돌리며 두 화분이 무한 토글됨)
+    if (pendingInitialPotRef.current != null) {
+      if (selectedPotId === pendingInitialPotRef.current) {
+        pendingInitialPotRef.current = null // 반영 완료 → 이후 사용자 변경부터 동기화
+      }
+      return
+    }
     if (normalizedInitialPotId && selectedPotId == null) return
     onSelectedPotChange?.(selectedPotId)
   }, [normalizedInitialPotId, onSelectedPotChange, selectedPotId])

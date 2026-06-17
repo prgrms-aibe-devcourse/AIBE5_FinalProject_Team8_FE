@@ -904,6 +904,24 @@ const FE_THEME_TO_BE_THEME = {
 function GardenScreen({ refreshKey = 0, onOpenPot }) {
   const { user } = useUser();
   const [editMode, setEditMode] = useState(false);
+
+  // 이용 가이드 투어가 꾸미기 단계(.guide-garden-*)에 도달하면 정원 꾸미기 모드를 자동 온/오프한다.
+  // (classic 테마 정원과 동일한 rootin-guide-step 프로토콜을 공유)
+  useEffect(() => {
+    const handleGuideStep = (e) => {
+      const { action, isEnd, selector } = e.detail;
+      if (isEnd) {
+        setEditMode(false);
+        return;
+      }
+      if (selector && selector.startsWith('.guide-garden-')) {
+        setEditMode(action === 'enableGardenEditMode');
+      }
+    };
+    window.addEventListener('rootin-guide-step', handleGuideStep);
+    return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
+  }, []);
+
   const [themeId, setThemeId] = useState('meadow');
   const [layout, setLayout] = useState(DEFAULT_GARDEN_LAYOUT);
   const [decorations, setDecorations] = useState([]);
@@ -1246,17 +1264,6 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         </div>
       </div>
 
-      {/* 페이지 헤더 */}
-      <div className="rt-page-head">
-        <span className="rt-tag"><RtIcon name="sprout" /> ROOTIN · 정원</span>
-        <h1 className="rt-page-title">정원 <span className="rt-title-cursor" /></h1>
-        <p className="rt-page-sub">
-          {potsLoading
-            ? '화분을 불러오는 중이에요.'
-            : `${pots.length}개의 화분이 자라고 있어요. 오늘 ${wateredCount}개의 화분에 물을 줬어요.`}
-        </p>
-      </div>
-
       {/* 게임보이 DMG 콘솔 — 정원 씬 */}
       <div className="gb-console">
         <div className="gb-console-head">
@@ -1264,7 +1271,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
             <span className="rt-tag"><RtIcon name="star" /> MY GARDEN</span>
             <h2 className="rt-h3" style={{ margin: '10px 0 0' }}>나의 정원 디스플레이</h2>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+          <div className="guide-garden-edit" style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
             <button className="gb-key gb-key--dark" onClick={() => { playSfx('nav'); setShowCreatePot(true); }}>
               <RtIcon name="plus" /> 새 화분
             </button>
@@ -1288,7 +1295,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         </div>
 
         {/* DMG LCD 패널 */}
-        <div className="gb-garden">
+        <div className="gb-garden guide-garden-scene">
           <div className="gb-garden-bezel">
             <div className="gb-garden-beztop">
               <span className="gb-garden-led" aria-hidden="true" />
@@ -1333,7 +1340,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         {editMode && (
           <div className="gb-panel">
             {/* 배경 */}
-            <div>
+            <div className="guide-garden-theme">
               <p className="rt-eyebrow" style={{ marginBottom: 10 }}>배경</p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {GARDEN_THEMES.map(t => {
@@ -1380,14 +1387,14 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
                   <button
                     type="button"
                     onClick={removeSelectedPotDecoration}
-                    style={{ marginLeft: 8, fontSize: 11, color: 'var(--berry)', fontWeight: 700, fontFamily: 'var(--font-pixel)' }}
+                    style={{ marginLeft: 8, fontSize: 11, color: 'var(--berry)', fontWeight: 700, fontFamily: 'var(--font-pixel)', padding: '2px 8px', borderRadius: 'var(--r-pill)', border: '1px solid var(--berry)', background: 'var(--berry-soft)', cursor: 'pointer' }}
                   >
                     적용 해제
                   </button>
                 )}
               </div>
               {selectedPotAvailableHarvestedPlants.length === 0 ? (
-                <div className="rt-small" style={{ padding: '12px 14px', background: 'var(--paper-card)', border: '1px dashed var(--line-strong)', borderRadius: 6, color: 'var(--muted)' }}>
+                <div className="rt-small" style={{ padding: '12px 14px', background: 'var(--paper-card)', border: '1px dashed var(--line-strong)', borderRadius: 6, color: 'var(--muted-2)' }}>
                   {selectedGardenPot
                     ? '이 화분에서 수확한 식물이 없거나 이미 적용했어요. 해당 화분의 식물을 만개까지 키워 수확하면 여기에 추가됩니다.'
                     : '먼저 화분을 선택해 주세요.'}
@@ -1417,7 +1424,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
                         )}
                         <PixelPlant species={species} stage="full" size={44} />
                         <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--leaf)' }}>{monName}</div>
-                        <div style={{ fontSize: 9, color: 'var(--leaf-2)', fontWeight: 700 }}>+ 적용</div>
+                        <span className="gb-chip-act">+ 적용</span>
                         {h.harvestedAt && (
                           <div style={{ fontSize: 9, color: 'var(--muted)' }}>{h.harvestedAt.slice(5)}</div>
                         )}
@@ -1442,8 +1449,8 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
                           style={{ flexDirection: 'row', gap: 8, padding: '6px 12px 6px 6px', borderStyle: 'dashed' }}
                         >
                           <PottedPlant species={p.species} stage={stage} size={34} potLevel={p.level} />
-                          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--leaf)' }}>{p.emoji} {p.name}</span>
-                          <span style={{ fontSize: 11, color: 'var(--leaf-2)' }}>+ 배치</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--leaf)' }}>{p.emoji} {p.name}</span>
+                          <span className="gb-chip-act">+ 배치</span>
                         </button>
                       );
                     })}
@@ -1473,7 +1480,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         <h2 className="rt-h3">키우는 화분</h2>
       </div>
 
-      <div className="rt-grid rt-grid--3">
+      <div className="rt-grid rt-grid--3 guide-garden-pots">
         {potsLoading && (
           <div className="rt-card" style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
             화분 목록을 불러오는 중이에요.
@@ -1790,7 +1797,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onStartTil, onShowHarvest, on
       {/* 프로필 카드 */}
       <div className="rt-card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* 식물 무대 (미니 LCD) */}
-        <div className={`gb-pot-stage${isRare ? ' gb-pot-stage--rare' : ''}`}>
+        <div className={`gb-pot-stage guide-pot-detail-plant${isRare ? ' gb-pot-stage--rare' : ''}`}>
           {isRare && <RareStageFx theme={rareTheme} />}
           <span className="gb-pot-stage-badge rt-badge rt-badge--leaf"><RtIcon name="book" /> {pot.tilCount} TIL</span>
           <div style={{ paddingBottom: 26, position: 'relative', zIndex: 1 }}>
@@ -1800,7 +1807,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onStartTil, onShowHarvest, on
         </div>
 
         {/* 배지 + 화분 수정 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div className="guide-pot-detail-info" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
             <span className="rt-badge">Lv.{pot.level}</span>
             <span className="rt-badge rt-badge--leaf">{potTier.label}</span>
@@ -1818,7 +1825,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onStartTil, onShowHarvest, on
         </div>
 
         {/* 스탯 목록 */}
-        <div className="gb-stat-list">
+        <div className="gb-stat-list guide-pot-detail-growth">
           {[
             { label: '화분 경험치', value: potExperienceText, progress: pot.levelProgress },
             { label: '식물 상태', value: `${plantStageStatus} · ${plantGrowthPercent}%`, tone: 'on' },
@@ -1845,7 +1852,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onStartTil, onShowHarvest, on
         </div>
 
         {/* 액션 */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="guide-pot-detail-actions" style={{ display: 'flex', gap: 8 }}>
           <button type="button" className="rt-btn rt-btn--accent" style={{ flex: 1 }} onClick={() => { playSfx('confirm'); onStartTil(); }}>
             <RtIcon name="drop" /> TIL 작성하고 물주기
           </button>
@@ -1862,7 +1869,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onStartTil, onShowHarvest, on
       </div>
 
       {/* 진화 계통 */}
-      <div className="rt-card">
+      <div className="rt-card guide-pot-detail-evolution">
         <span className="rt-tag"><RtIcon name="leaf" /> 진화 계통</span>
         <div className="gb-evo" style={{ marginTop: 14 }}>
           {stages.map(s => {
@@ -2100,7 +2107,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onOpenTil 
           />
         </div>
 
-        <div className="gb-pot-records">
+        <div className="gb-pot-records guide-pot-detail-records">
           {/* 기록 헤더 + 컨트롤(페이지 크기 + 검색) */}
           <div className="rt-section-head">
             <div className="rt-sh-top">

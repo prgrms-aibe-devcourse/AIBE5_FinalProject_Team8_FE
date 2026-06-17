@@ -313,6 +313,47 @@
   box-shadow: 6px 6px 0 0 var(--leaf);
 }
 
+/* 임시저장 안내 다이얼로그("작성 중인 글이 있습니다") — 게임보이 픽셀 버전 */
+.til-draft-dialog .til-draft-icon {
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-chip);
+  background: var(--paper-2);
+  box-shadow: 3px 3px 0 0 var(--leaf);
+  color: var(--leaf);
+}
+.til-draft-dialog .til-draft-btn {
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-chip);
+  box-shadow: 2px 2px 0 0 var(--leaf);
+  font-family: var(--font-pixel);
+  transition: transform var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast);
+}
+.til-draft-dialog .til-draft-btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 0 var(--leaf);
+}
+.til-draft-dialog .til-draft-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--leaf);
+}
+/* 솔리드 버튼(이어쓰기·삭제)은 본문과 대비되도록 leaf-2 그림자 */
+.til-draft-dialog .til-draft-btn-primary,
+.til-draft-dialog .til-draft-btn-danger {
+  box-shadow: 2px 2px 0 0 var(--leaf-2);
+}
+.til-draft-dialog .til-draft-btn-primary:hover:not(:disabled),
+.til-draft-dialog .til-draft-btn-danger:hover:not(:disabled) {
+  box-shadow: 3px 3px 0 0 var(--leaf-2);
+}
+.til-draft-dialog .til-draft-btn-primary:active:not(:disabled),
+.til-draft-dialog .til-draft-btn-danger:active:not(:disabled) {
+  box-shadow: 0 0 0 0 var(--leaf-2);
+}
+.til-draft-dialog .til-draft-btn-danger {
+  background: var(--destructive);
+  color: var(--paper-card);
+}
+
 /* 버블 메뉴 셸 — 픽셀 바 */
 .til-bubble-menu {
   background: var(--paper-card);

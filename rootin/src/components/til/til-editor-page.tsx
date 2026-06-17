@@ -612,16 +612,13 @@ function DraftChoiceDialog({
     <Dialog open={Boolean(draft)}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-sm gap-5 border-border/70 bg-card p-7 text-center shadow-[var(--shadow-md)]"
+        className="rt-pop til-draft-dialog max-w-sm gap-5 p-7 text-center"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
       >
         <DialogHeader className="items-center text-center">
-          <span
-            className="mb-1 flex size-11 items-center justify-center rounded-full"
-            style={{ background: 'color-mix(in oklch, var(--sprout) 18%, transparent)' }}
-          >
-            <FileClock className="size-5 text-primary" />
+          <span className="til-draft-icon mb-1 flex size-11 items-center justify-center">
+            <FileClock className="size-5" />
           </span>
           <DialogTitle className="text-xl font-bold">
             {confirmingDelete ? '임시저장 글을 삭제할까요?' : '작성 중인 글이 있습니다.'}
@@ -656,7 +653,7 @@ function DraftChoiceDialog({
                 size="lg"
                 onClick={() => setConfirmingDelete(false)}
                 disabled={busy}
-                className="h-10"
+                className="til-draft-btn h-10"
               >
                 이전
               </Button>
@@ -665,7 +662,7 @@ function DraftChoiceDialog({
                 size="lg"
                 onClick={onStartFresh}
                 disabled={busy}
-                className="h-10 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="til-draft-btn til-draft-btn-danger h-10"
               >
                 삭제
               </Button>
@@ -678,7 +675,7 @@ function DraftChoiceDialog({
                 size="lg"
                 onClick={() => setConfirmingDelete(true)}
                 disabled={busy}
-                className="h-10"
+                className="til-draft-btn h-10"
               >
                 삭제하고 새로 작성
               </Button>
@@ -687,7 +684,7 @@ function DraftChoiceDialog({
                 size="lg"
                 onClick={onResume}
                 disabled={busy}
-                className="h-10 bg-primary text-primary-foreground"
+                className="til-draft-btn til-draft-btn-primary h-10 bg-primary text-primary-foreground"
               >
                 이어쓰기
               </Button>

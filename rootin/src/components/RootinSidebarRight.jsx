@@ -334,14 +334,16 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
           </PanelCard>
 
           {/* ② 지금 키우는 식물 + 경험치 + 예상 XP */}
-          <PlantHeroCard
-            dashboard={selectedPotDashboard}
-            loading={selectedPotDashboardLoading}
-            contentLength={contentLength}
-          />
+          <div className="guide-editor-plant-status">
+            <PlantHeroCard
+              dashboard={selectedPotDashboard}
+              loading={selectedPotDashboardLoading}
+              contentLength={contentLength}
+            />
+          </div>
 
           {/* ③ 이 화분의 TIL 목록 + 임시저장본 */}
-          <PanelCard className="overflow-hidden">
+          <PanelCard className="guide-editor-history overflow-hidden">
             <div className="flex items-center justify-between px-3 pb-2.5 pt-4">
               <div className="flex items-center gap-1.5 text-sm font-semibold text-[color:var(--leaf)]">
                 <FileText className="size-4 text-[var(--leaf-2)]" />

@@ -713,7 +713,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
         )}
 
         {/* 기록 목록 */}
-        <div className="gb-ai-modal-list scrollbar">
+        <div className="gb-ai-modal-list scrollbar guide-ai-modal-list">
           {loading ? (
             <div className="gb-ai-modal-msg">기록을 불러오는 중...</div>
           ) : error ? (
@@ -775,7 +775,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
           <button type="button" className="gb-ai-mbtn gb-ai-mbtn--ghost" onClick={() => { playSfx('cancel'); onClose(); }}>취소</button>
           <button
             type="button"
-            className="gb-ai-mbtn gb-ai-mbtn--go"
+            className="gb-ai-mbtn gb-ai-mbtn--go guide-ai-modal-submit"
             disabled={selectedIds.size === 0}
             onClick={handleConfirm}
           >
@@ -855,6 +855,30 @@ function AIScreen({ onOpenGuide }) {
       clearTimeout(savedTimerRef.current);
     }
   }, []);
+
+  // 이용 가이드 투어가 AI 화면 단계(.guide-ai-*)를 지날 때 화면 상태를 자동 제어한다.
+  // (classic AI 화면과 동일한 rootin-guide-step 프로토콜 공유)
+  // 게임보이 AI는 단계가 순차 해금되므로, 난이도·만들기 단계를 보여주려면 종류·화분이 선택돼 있어야 한다.
+  useEffect(() => {
+    const handleGuideStep = (e) => {
+      const { action, isEnd, selector } = e.detail;
+      if (isEnd) {
+        setModalOpen(false);
+        return;
+      }
+      if (selector && selector.startsWith('.guide-ai-')) {
+        if (action === 'ensureQuizMode') {
+          setMode('quiz');
+          // 화분 미선택 시 첫 화분을 채워 난이도·만들기 단계를 해금(기존 선택은 보존).
+          setPotId(prev => prev ?? pots[0]?.id ?? null);
+        }
+        // TIL 선택 모달 단계에서만 모달을 열고, 그 외 단계에서는 닫는다.
+        setModalOpen(action === 'openAiTilModal');
+      }
+    };
+    window.addEventListener('rootin-guide-step', handleGuideStep);
+    return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
+  }, [pots]);
 
   // 페이지 진입 시 화분 목록 + 사용자 포인트 로딩
   useEffect(() => {
@@ -1110,7 +1134,7 @@ function AIScreen({ onOpenGuide }) {
                   {n.key === 'mode' && (
                     <>
                       <div className="gb-ai-node-head"><span className="gb-ai-node-title">종류 선택</span><span className="gb-ai-node-sub">무엇을 만들까요?</span></div>
-                      <div className="gb-ai-intent">
+                      <div className="gb-ai-intent guide-ai-mode">
                         <button type="button" className={`gb-ai-quest-opt${mode === 'quiz' ? ' is-active' : ''}`} onClick={() => { playSfx('toggle'); setMode('quiz'); }}>
                           <span className="gb-ai-quest-ic" aria-hidden="true"><RtIcon name="check" /></span>
                           <span className="gb-ai-quest-t">복습 퀴즈</span>
@@ -1128,7 +1152,7 @@ function AIScreen({ onOpenGuide }) {
                   {n.key === 'pot' && (
                     <>
                       <div className="gb-ai-node-head"><span className="gb-ai-node-title">화분 선택</span><span className="gb-ai-node-sub">{selectedPot ? selectedPot.title : '선택 필요'}</span></div>
-                      <div className="gb-ai-stages scrollbar">
+                      <div className="gb-ai-stages scrollbar guide-ai-pots">
                         {potsLoading ? (
                           <div className="gb-ai-msg">화분 목록을 불러오는 중...</div>
                         ) : pots.length === 0 ? (
@@ -1150,7 +1174,7 @@ function AIScreen({ onOpenGuide }) {
                   {n.key === 'diff' && (
                     <>
                       <div className="gb-ai-node-head"><span className="gb-ai-node-title">문항 수</span><span className="gb-ai-node-sub">최대 10문제</span></div>
-                      <div className="gb-ai-dial">
+                      <div className="gb-ai-dial guide-ai-quiz-count">
                         <button type="button" className="gb-ai-dial-btn" onClick={() => setQuizCount(n2 => Math.max(1, n2 - 1))} disabled={quizCount <= 1} aria-label="문항 줄이기">−</button>
                         <div className="gb-ai-dial-screen">
                           <span className="gb-ai-dial-val">{quizCount}<span className="unit">문항</span></span>
@@ -1172,7 +1196,7 @@ function AIScreen({ onOpenGuide }) {
                       {!enough && <div className="gb-ai-warn"><RtIcon name="lock" /> 포인트가 부족해요. 활동으로 포인트를 모아보세요.</div>}
                       <button
                         type="button"
-                        className={`gb-ai-start${canGenerate && enough ? ' is-ready' : ''}`}
+                        className={`gb-ai-start guide-ai-select-til${canGenerate && enough ? ' is-ready' : ''}`}
                         onClick={() => { if (canGenerate) { playSfx('confirm'); setModalOpen(true); } }}
                         disabled={!canGenerate}
                       >
@@ -1189,7 +1213,7 @@ function AIScreen({ onOpenGuide }) {
           </ol>
 
           {/* ── 우: 플레이 스크린 (LCD) ── */}
-          <section className="gb-ai-screen">
+          <section className="gb-ai-screen guide-ai-result">
             <div className="gb-ai-bezel">
               <div className="gb-ai-bez-top">
                 <span className={`gb-ai-led${generated && !generating ? ' is-on' : ''}`} aria-hidden="true" />
@@ -1247,7 +1271,7 @@ function AIScreen({ onOpenGuide }) {
         </div>
 
         {/* ===== 전리품 보관함 ===== */}
-        <section className="gb-ai-vault">
+        <section className="gb-ai-vault guide-ai-saved-results">
           <div className="gb-ai-vault-head">
             <RtIcon name="trophy" />
             <span className="gb-ai-vault-title">저장한 학습 자료</span>

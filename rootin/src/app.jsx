@@ -30,8 +30,8 @@ import { logout, clearTokens } from './api/auth.js';
 
 // Old custom Sidebar and TopBar removed and replaced by Shadcn UI
 
-// 사용자 이용 가이드 단계 정의 — 메인(classic) 테마 화면 요소를 .guide-* 클래스로 가리키며 안내한다.
-// (게임보이 테마에는 가이드를 적용하지 않으므로 렌더는 classic 테마에서만 동작)
+// 사용자 이용 가이드 단계 정의 — 화면 요소를 .guide-* 클래스로 가리키며 안내한다.
+// classic·gameboy 두 테마 모두 동일한 .guide-* 타겟을 두므로 같은 단계 정의를 공유한다.
 const GUIDE_STEPS = {
   dashboard: [
     { selector: '.guide-dashboard-greeting', text: '📝 오늘의 한 줄과 현재 연속 기록을 확인하고, [화분 선택하기]로 정원에서 오늘 기록할 화분을 골라요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
@@ -170,8 +170,9 @@ function AppShell() {
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
-  // 이용 가이드는 메인(classic) 테마에서만 동작 — 게임보이 테마는 가이드 대상 요소(.guide-*)를 두지 않는다.
-  const guideEnabled = isClassic && !!GUIDE_STEPS[screen];
+  // 이용 가이드는 두 테마 모두에서 동작한다. 각 테마 화면이 동일한 .guide-* 타겟을 갖고,
+  // GuideOverlay는 theme prop으로 카드/스포트라이트 룩만 분기한다(positioning 로직은 공통).
+  const guideEnabled = !!GUIDE_STEPS[screen];
   const guideStorageKey = guideEnabled ? `rootin.visitedGuide.${screen}` : null;
 
   const closeGuide = useCallback(() => {
@@ -403,27 +404,29 @@ function AppShell() {
           isOpen={guideOpen}
           onClose={closeGuide}
           steps={GUIDE_STEPS[screen]}
+          theme={isClassic ? 'classic' : 'gameboy'}
         />
       )}
       {guideEnabled && !focusMode && (
         <button
           onClick={() => setGuideOpen(true)}
-          className="flex items-center justify-center border hover:bg-muted text-muted-foreground transition-all duration-200"
+          className="flex items-center justify-center transition-all duration-200"
           style={{
             position: 'fixed',
             right: '24px',
             bottom: '24px',
             zIndex: 100,
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            borderColor: 'var(--rule-2)',
-            backgroundColor: 'var(--paper)',
-            color: 'var(--ink-2)',
+            width: isClassic ? 32 : 38,
+            height: isClassic ? 32 : 38,
+            border: isClassic ? '1px solid var(--rule-2)' : '2px solid #33402a',
+            borderRadius: isClassic ? '50%' : '8px',
+            backgroundColor: isClassic ? 'var(--paper)' : '#f8f2e3',
+            color: isClassic ? 'var(--ink-2)' : '#33402a',
+            fontFamily: isClassic ? 'inherit' : '"Galmuri11", "DungGeunMo", monospace',
             fontWeight: 'bold',
             fontSize: '15px',
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+            boxShadow: isClassic ? '0 2px 8px rgba(0,0,0,0.1)' : '3px 3px 0 0 #33402a',
           }}
           title="이 화면의 이용 가이드 맵 켜기"
         >

@@ -864,14 +864,54 @@ function AIScreen({ onOpenGuide }) {
       const { action, isEnd, selector } = e.detail;
       if (isEnd) {
         setModalOpen(false);
+        setAiResult(prev => {
+          if (prev?.isGuideMock) {
+            setGenerated(false);
+            return null;
+          }
+          return prev;
+        });
         return;
       }
       if (selector && selector.startsWith('.guide-ai-')) {
         if (action === 'ensureQuizMode') {
           setMode('quiz');
+          setResultMode('quiz');
           // 화분 미선택 시 첫 화분을 채워 난이도·만들기 단계를 해금(기존 선택은 보존).
           setPotId(prev => prev ?? pots[0]?.id ?? null);
         }
+        
+        if (action === 'showAiGuideResult') {
+          setResultMode('quiz');
+          setGenerated(true);
+          setAiResult({
+            isGuideMock: true,
+            quizzes: [
+              {
+                question: "🌱 Rootin에서 매일 TIL을 꾸준히 작성하면 정원에서 어떤 변화가 일어날까요?",
+                options: ["아무 일도 일어나지 않는다", "포인트가 줄어든다", "화분의 식물이 한 단계 성장한다", "새로운 화분이 무한히 생성된다"],
+                answer: 3,
+                explanation: "TIL을 발행하여 물주기를 완료하면 식물의 성장 경험치가 올라가고 다음 단계로 진화합니다."
+              },
+              {
+                question: "📚 AI 복습 퀴즈를 만들기 위해 필요한 것은 무엇인가요?",
+                options: ["키보드와 마우스", "충분한 보유 포인트와 작성된 TIL", "새로운 화분", "친구의 초대 링크"],
+                answer: 2,
+                explanation: "AI 기능을 이용하려면 활동으로 모은 포인트와 학습할 화분의 TIL 데이터가 필요합니다."
+              }
+            ]
+          });
+        } else if (action !== 'showAiGuideResult') {
+          // 다른 단계에서는 mock 결과 숨기기
+          setAiResult(prev => {
+            if (prev?.isGuideMock) {
+              setGenerated(false);
+              return null;
+            }
+            return prev;
+          });
+        }
+        
         // TIL 선택 모달 단계에서만 모달을 열고, 그 외 단계에서는 닫는다.
         setModalOpen(action === 'openAiTilModal');
       }

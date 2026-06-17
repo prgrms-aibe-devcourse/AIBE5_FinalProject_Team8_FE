@@ -17,36 +17,50 @@ import { GuideOverlay } from './components/GuideOverlay.jsx';
 
 const GUIDE_STEPS = {
   dashboard: [
-    { selector: '.guide-dashboard-greeting', text: '📝 오늘의 한 줄과 현재 연속 기록을 확인하고, [오늘 기록하기]로 새 TIL 작성을 시작합니다.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
-    { selector: '.guide-dashboard-stats', text: '📊 누적 TIL 개수, 연속 기록일수, 전체 글자 수, 보유 포인트를 요약하여 보여주는 학습 지표판입니다.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
-    { selector: '.guide-dashboard-grass', text: '🌱 작성한 글 수에 따라 달력에 초록색 잔디가 심어지며, 공부량이 많을수록 잔디 색상이 더 짙어집니다.', placement: 'top', textOffset: { x: 0, y: -20 } },
-    { selector: '.guide-dashboard-goals', text: '🎯 매일 주어지는 목표를 확인하고, 완료한 목표만큼 물방울 포인트를 받을 수 있습니다.', placement: 'top', textOffset: { x: 0, y: -20 } },
-    { selector: '.guide-dashboard-streak', text: '🔥 최근 30일 작성량과 현재/최고 연속 기록을 함께 확인할 수 있습니다.', placement: 'top', textOffset: { x: 0, y: -20 } },
-    { selector: '.guide-dashboard-distribution', text: '📊 가꾸고 있는 여러 화분(주제) 중 어떤 분야를 가장 많이 공부했는지 비율로 분석해 줍니다.', placement: 'top', textOffset: { x: 0, y: -20 } },
-    { selector: '.guide-dashboard-weekly', text: '📅 이번 주 요일별로 글을 작성한 횟수를 그래프로 시각화하여 주간 학습 패턴을 파악합니다.', placement: 'top', textOffset: { x: 0, y: -20 } },
-    { selector: '.guide-dashboard-interests', text: '📈 시간의 흐름에 따라 나의 주된 학습 관심사가 어떻게 변화하고 이동해왔는지 보여줍니다.', placement: 'top', textOffset: { x: -80, y: -30 } }
+    { selector: '.guide-dashboard-greeting', text: '📝 오늘의 한 줄과 현재 연속 기록을 확인하고, [화분 선택하기]로 정원에서 오늘 기록할 화분을 골라요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
+    { selector: '.guide-dashboard-stats', text: '📊 누적 TIL 개수, 연속 기록일수, 전체 글자 수, 보유 포인트를 보여줘요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
+    { selector: '.guide-dashboard-grass', text: '🌱 TIL을 작성하면 잔디가 채워져요. 많이 기록한 날일수록 더 진한 색으로 표시돼요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-goals', text: '🎯 매일 주어지는 목표를 확인하고, 완료한 목표만큼 포인트를 받을 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-streak', text: '🔥 최근 30일 작성량과 현재/최고 연속 기록을 함께 확인할 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-distribution', text: '📊 가꾸고 있는 여러 화분(주제) 중 어떤 분야를 가장 많이 공부했는지 비율로 보여줘요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-weekly', text: '📅 이번 주 요일별로 글을 작성한 횟수를 그래프로 보여줘요. 주간 학습 패턴을 확인할 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-dashboard-interests', text: '📈 시간의 흐름에 따라 나의 학습 관심사가 어떻게 변화했는지 보여줘요.', placement: 'top', textOffset: { x: -80, y: -30 } }
   ],
   garden: [
-    { selector: '.guide-garden-scene', text: '🌿 매일 학습 기록(TIL)을 통해 키워낸 나의 식물들을 한눈에 모아 감상하는 정원 캔버스입니다.', placement: 'top', textOffset: { x: -120, y: -35 } },
-    { selector: '.guide-garden-pots', text: '🪴 키우는 화분의 레벨과 물주기 상태를 확인하고, 수확한 식물로 화분 위를 꾸밀 수 있습니다.', placement: 'top', textOffset: { x: 120, y: -20 } },
-    { selector: '.guide-garden-edit', text: '🎨 [정원 꾸미기] 버튼을 누르면 화분의 위치나 테마를 자유롭게 바꿀 수 있는 꾸미기 모드가 켜집니다.', placement: 'bottom', textOffset: { x: -50, y: 15 } },
-    { selector: '.guide-garden-scene', action: 'enableGardenEditMode', text: '🖐️ 꾸미기 모드에서 화분을 클릭한 채 원하는 위치로 끌어다 놓으면 자유롭게 배치할 수 있습니다.', placement: 'top', textOffset: { x: -120, y: -35 } },
-    { selector: '.guide-garden-theme', action: 'enableGardenEditMode', text: '🖼️ 숲, 가을, 밤, 미니룸 등 원하는 테마 버튼을 선택하여 정원의 배경을 취향대로 변경합니다.', placement: 'left', textOffset: { x: -30, y: 0 } },
-    { selector: '.guide-garden-edit', action: 'enableGardenEditMode', text: '💾 [꾸미기 완료] 버튼을 누르면 화분 배치와 정원 꾸미기 변경사항이 저장됩니다.', placement: 'bottom', textOffset: { x: -50, y: 15 } }
+    { selector: '.guide-garden-scene', text: '🌿 매일 작성한 TIL로 키워낸 식물들을 정원에서 한눈에 볼 수 있어요.', placement: 'top', textOffset: { x: -120, y: -35 } },
+    { selector: '.guide-garden-pots', text: '🪴 키우는 화분의 레벨과 물주기 상태를 확인하고, 수확한 식물로 화분 위를 꾸밀 수 있어요.', placement: 'top', textOffset: { x: 120, y: -20 } },
+    { selector: '.guide-garden-edit', text: '🎨 [정원 꾸미기] 버튼을 누르면 화분 위치와 테마를 바꿀 수 있는 꾸미기 모드가 켜져요.', placement: 'bottom', textOffset: { x: -50, y: 15 } },
+    { selector: '.guide-garden-scene', action: 'enableGardenEditMode', text: '🖐️ 꾸미기 모드에서 화분을 클릭한 채 원하는 위치로 끌어다 놓을 수 있어요.', placement: 'top', textOffset: { x: -120, y: -35 } },
+    { selector: '.guide-garden-theme', action: 'enableGardenEditMode', text: '🖼️ 풀밭, 노을, 달밤, 미니멀 중 원하는 테마를 골라 정원 배경을 바꿀 수 있어요.', placement: 'left', textOffset: { x: -30, y: 0 } },
+    { selector: '.guide-garden-edit', action: 'enableGardenEditMode', text: '💾 [꾸미기 완료] 버튼을 누르면 화분 배치와 정원 꾸미기 변경사항이 저장돼요.', placement: 'bottom', textOffset: { x: -50, y: 15 } }
+  ],
+  'pot-detail': [
+    { selector: '.guide-pot-detail-plant', text: '🌱 현재 화분에서 자라는 식물의 모습을 볼 수 있어요. TIL을 작성하면 경험치가 쌓이고 성장 단계가 올라가요.', placement: 'right', textOffset: { x: 40, y: -20 } },
+    { selector: '.guide-pot-detail-info', text: '🪴 화분 이름, 레벨, 소개글을 한눈에 볼 수 있어요. [화분 수정]으로 제목과 소개글을 바꿀 수 있어요.', placement: 'right', textOffset: { x: 40, y: 0 } },
+    { selector: '.guide-pot-detail-growth', text: '📈 화분 경험치와 식물 상태, 수확 가능 여부를 확인할 수 있어요. 발행한 TIL이 물주기로 반영되면 성장 수치가 올라가요.', placement: 'right', textOffset: { x: 40, y: 0 } },
+    { selector: '.guide-pot-detail-actions', text: '✍️ [TIL 작성하고 물주기]로 이 화분에 새 기록을 남길 수 있어요. [수확] 버튼으로 현재 식물을 수확할 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-pot-detail-evolution', text: '🌿 진화 계통에서 현재 식물 단계와 앞으로 성장할 단계를 미리 볼 수 있어요.', placement: 'right', textOffset: { x: 40, y: 0 } },
+    { selector: '.guide-pot-detail-records', text: '📚 이 화분에 작성한 TIL 목록이에요. 제목, 본문, 태그 검색으로 필요한 기록을 빠르게 찾을 수 있어요.', placement: 'left', textOffset: { x: -50, y: 0 } }
   ],
   editor: [
-    { selector: '.guide-editor-meta', text: '글을 누적할 대상 화분을 고르고 제목과 태그를 입력하는 메타정보 영역입니다.', placement: 'left', textOffset: { x: -80, y: 30 } },
-    { selector: '.guide-editor-toolbar', text: '글자 굵기, 이미지 업로드, 수학 공식 등의 서식을 적용할 수 있는 에디터 툴바입니다.', placement: 'bottom', textOffset: { x: -160, y: 15 } },
-    { selector: '.guide-editor-content', text: '오늘 학습한 내용을 자유롭게 작성하는 에디터 본문입니다. 마크다운 단축키를 활용할 수 있습니다.', placement: 'right', textOffset: { x: 80, y: -30 } },
-    { selector: '.guide-editor-status', text: '글을 임시 저장하거나 발행하는 버튼입니다. 최종 발행하면 선택한 화분에 물주기와 경험치 반영이 진행됩니다.', placement: 'top', textOffset: { x: 0, y: -25 } }
+    { selector: '.guide-editor-pot-select', text: '🪴 오늘 기록을 쌓을 화분을 선택해요. 발행한 TIL은 선택한 화분의 경험치와 식물 성장에 반영돼요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
+    { selector: '.guide-editor-title', text: '✏️ 오늘 공부한 내용을 한눈에 알아볼 수 있도록 TIL 제목을 입력해요.', placement: 'right', textOffset: { x: 80, y: -10 } },
+    { selector: '.guide-editor-tags', text: '🏷️ 태그를 달아두면 화분 상세, 대시보드, AI 학습에서 기록을 더 쉽게 찾을 수 있어요.', placement: 'right', textOffset: { x: 80, y: 0 } },
+    { selector: '.guide-editor-toolbar', text: '🧰 글자 굵기, 이미지 업로드, 수학 공식 같은 서식을 적용할 수 있어요.', placement: 'bottom', textOffset: { x: -160, y: 15 } },
+    { selector: '.guide-editor-content', text: '📄 오늘 학습한 내용을 자유롭게 작성하는 본문 영역이에요. 마크다운 단축키도 활용할 수 있어요.', placement: 'right', textOffset: { x: 80, y: -30 } },
+    { selector: '.guide-editor-plant-status', text: '🌱 오른쪽 패널에서 현재 키우는 식물과 이번 글로 얻을 예상 경험치를 확인할 수 있어요.', placement: 'left', textOffset: { x: -50, y: 0 } },
+    { selector: '.guide-editor-history', text: '📚 선택한 화분의 최근 TIL과 임시저장 글을 볼 수 있어요. 임시저장 글은 이어서 작성할 수 있어요.', placement: 'left', textOffset: { x: -50, y: 0 } },
+    { selector: '.guide-editor-status', text: '✅ 하단 바에서 템플릿을 불러오거나 임시저장 상태를 확인해요. 최종 발행하면 선택한 화분에 물주기와 경험치가 반영돼요.', placement: 'top', textOffset: { x: 0, y: -25 } }
   ],
   ai: [
-    { selector: '.guide-ai-mode', text: '🎯 AI 학습 목적을 선택합니다.\n\n- 복습 문제 생성: TIL을 분석해 퀴즈를 만듭니다.\n- TIL 요약: 공부한 내용의 핵심 요약본을 만듭니다.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
-    { selector: '.guide-ai-pots', text: 'AI가 학습 지식을 분석할 기준 화분을 목록에서 선택합니다. 해당 화분의 글들로 학습지가 제작됩니다.', placement: 'right', textOffset: { x: 40, y: -20 } },
-    { selector: '.guide-ai-select-til', text: '학습에 활용할 개별 TIL 글 목록을 확인하고 직접 선택하기 위해 이 버튼을 클릭합니다.', placement: 'bottom', textOffset: { x: 0, y: 10 } },
-    { selector: '.guide-ai-modal-list', action: 'openAiTilModal', text: '학습 데이터로 사용할 개별 TIL 글들을 선택합니다. 검색바나 태그 필터로 원하는 공부 기록만 빠르게 골라낼 수 있습니다.', placement: 'left', textOffset: { x: -60, y: 0 } },
-    { selector: '.guide-ai-modal-submit', action: 'openAiTilModal', text: '하단의 생성 버튼을 눌러 AI 학습지를 발행합니다. 공부 분량과 모드에 따라 물방울 포인트가 차감됩니다.', placement: 'top', textOffset: { x: 0, y: -20 } },
-    { selector: '.guide-ai-result', action: 'showAiGuideResult', text: 'AI가 출제한 퀴즈를 풀고 채점받거나 요약된 개념 노트를 학습하는 메인 결과 화면입니다.', placement: 'left', textOffset: { x: -40, y: 0 } }
+    { selector: '.guide-ai-mode', text: '🎯 AI 학습 목적을 선택해요. 복습 문제를 만들거나 TIL 내용을 요약해 핵심 개념을 정리할 수 있어요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
+    { selector: '.guide-ai-quiz-count', action: 'ensureQuizMode', text: '🔢 복습 문제를 만들 때는 원하는 문제 수량을 고를 수 있어요. 문제 수에 따라 필요한 포인트가 달라져요.', placement: 'bottom', textOffset: { x: 0, y: 12 } },
+    { selector: '.guide-ai-pots', text: '🪴 AI가 학습할 기준 화분을 선택해요. 해당 화분의 글을 바탕으로 학습지가 만들어져요.', placement: 'right', textOffset: { x: 40, y: -20 } },
+    { selector: '.guide-ai-select-til', text: '📚 버튼을 누르면 학습에 활용할 TIL 글을 직접 고를 수 있어요.', placement: 'bottom', textOffset: { x: 0, y: 10 } },
+    { selector: '.guide-ai-modal-list', action: 'openAiTilModal', text: '🔎 학습 데이터로 사용할 TIL 글을 골라요. 검색이나 태그 필터로 원하는 기록만 빠르게 찾을 수 있어요.', placement: 'left', textOffset: { x: -60, y: 0 } },
+    { selector: '.guide-ai-modal-submit', action: 'openAiTilModal', text: '✨ 하단의 생성 버튼으로 선택한 TIL 기반 AI 학습지를 만들어요. 모드에 따라 포인트가 차감돼요.', placement: 'top', textOffset: { x: 0, y: -20 } },
+    { selector: '.guide-ai-result', action: 'showAiGuideResult', text: '🧠 AI가 만든 퀴즈를 풀고 채점하거나, 요약된 개념 노트를 학습할 수 있어요.', placement: 'left', textOffset: { x: -40, y: 0 } },
+    { selector: '.guide-ai-saved-results', text: '🗂️ 저장한 AI 결과는 보관함에 모여요. 나중에 다시 열어 복습할 수 있어요.', placement: 'right', textOffset: { x: 40, y: 0 } }
   ]
 };
 
@@ -261,8 +275,8 @@ function AppShell() {
             className="flex items-center justify-center border hover:bg-muted text-muted-foreground transition-all duration-200"
             style={{
               position: 'fixed',
-              right: '16px',
-              top: '16px',
+              right: '24px',
+              bottom: '24px',
               zIndex: 100,
               width: 32,
               height: 32,

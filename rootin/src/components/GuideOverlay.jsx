@@ -283,6 +283,8 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
 
   if (!isOpen) return null;
 
+  const shouldShowExitHint = currentStep < steps.length - 1;
+
   return (
     <div
       style={{
@@ -299,29 +301,31 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
       onClick={closeGuide} // 장막의 빈 공간을 누르면 가이드가 종료됩니다.
     >
       {/* 도움말 가이드의 하단 안내 문구 */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '24px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          backgroundColor: 'var(--ink)',
-          color: '#ffffff',
-          padding: '8px 18px',
-          borderRadius: '20px',
-          fontFamily: 'var(--font-body)',
-          fontSize: '13px',
-          fontWeight: 600,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          pointerEvents: 'none',
-          zIndex: 100000,
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}
-      >
-        <span>💡 화면의 빈 공간을 클릭하면 가이드가 바로 종료됩니다.</span>
-      </div>
+      {shouldShowExitHint && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'var(--ink)',
+            color: '#ffffff',
+            padding: '8px 18px',
+            borderRadius: '20px',
+            fontFamily: 'var(--font-body)',
+            fontSize: '13px',
+            fontWeight: 600,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            pointerEvents: 'none',
+            zIndex: 100000,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span>💡 화면의 빈 공간을 클릭하면 가이드가 바로 종료됩니다.</span>
+        </div>
+      )}
 
       {/* 현재 단계의 가이드 타겟 하이라이트 박스 및 설명 텍스트 카드 렌더링 */}
       {(() => {

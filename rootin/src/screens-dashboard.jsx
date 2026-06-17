@@ -946,8 +946,8 @@ function DashboardScreen({ onNav }) {
               <span>연속 <b style={{ color: 'var(--moss-2)' }}>{streak}일</b> 기록 중</span>
             </div>
           </div>
-          <Btn variant="green" size="lg" icon={Icon.edit} onClick={() => onNav('editor')}>
-            오늘 기록하기
+          <Btn variant="green" size="lg" icon={Icon.edit} onClick={() => onNav('garden')}>
+            화분 선택하기
           </Btn>
         </div>
       </Card>

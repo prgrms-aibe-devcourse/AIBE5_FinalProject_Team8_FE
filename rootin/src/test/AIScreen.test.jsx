@@ -184,6 +184,10 @@ async function renderAndGenerateSummary() {
   );
 }
 
+function dispatchGuideStep(detail) {
+  fireEvent(window, new CustomEvent('rootin-guide-step', { detail }));
+}
+
 // ──────────────────────────────────────────────
 // API 연동 — 화분 목록 및 포인트
 // ──────────────────────────────────────────────
@@ -348,6 +352,101 @@ describe('복습 문제 수량 스텝퍼', () => {
     const summaryBtn = screen.getByRole('button', { name: /TIL 요약/i });
     fireEvent.click(summaryBtn);
     expect(screen.queryByText('문제 수량')).not.toBeInTheDocument();
+  });
+});
+
+// ──────────────────────────────────────────────
+// 사용자 가이드 action 연동
+// ──────────────────────────────────────────────
+describe('사용자 가이드 action 연동', () => {
+  it('ensureQuizMode 액션을 받으면 요약 모드에서 복습 문제 모드로 전환된다', async () => {
+    render(<AIScreen />);
+    await waitForPots();
+
+    fireEvent.click(screen.getByRole('button', { name: /TIL 요약/i }));
+    expect(screen.queryByText('문제 수량')).not.toBeInTheDocument();
+
+    dispatchGuideStep({
+      isEnd: false,
+      selector: '.guide-ai-quiz-count',
+      action: 'ensureQuizMode',
+    });
+
+    await waitFor(() => expect(screen.getByText('문제 수량')).toBeInTheDocument());
+  });
+
+  it('openAiTilModal 액션은 guideMode 모달을 열고 실제 TIL API 호출과 생성 실행을 막는다', async () => {
+    render(<AIScreen />);
+    await waitForPots();
+
+    dispatchGuideStep({
+      isEnd: false,
+      selector: '.guide-ai-modal-list',
+      action: 'openAiTilModal',
+    });
+
+    await waitFor(() =>
+      expect(screen.getByRole('dialog', { name: '학습할 TIL 선택' })).toBeInTheDocument()
+    );
+    expect(screen.getByText('React 상태 관리 복습')).toBeInTheDocument();
+    expect(screen.getByText('Spring API 설계 정리')).toBeInTheDocument();
+    expect(getMyTils).not.toHaveBeenCalled();
+
+    const submitButton = screen.getByRole('button', { name: /1개 TIL로 생성/i });
+    expect(submitButton).toBeDisabled();
+    fireEvent.click(submitButton);
+    expect(generateQuiz).not.toHaveBeenCalled();
+  });
+
+  it('showAiGuideResult 액션은 예시 퀴즈 결과와 선택지를 표시한다', async () => {
+    render(<AIScreen />);
+    await waitForPots();
+
+    dispatchGuideStep({
+      isEnd: false,
+      selector: '.guide-ai-result',
+      action: 'showAiGuideResult',
+    });
+
+    await waitFor(() =>
+      expect(screen.getByText('React에서 useEffect의 의존성 배열을 빈 배열([])로 설정하면 어떤 시점에 실행되나요?')).toBeInTheDocument()
+    );
+    expect(screen.getByRole('button', { name: /컴포넌트가 처음 화면에 나타날 때/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '①#' })).toBeInTheDocument();
+  });
+
+  it('가이드 종료 이벤트를 받으면 열린 모달과 예시 결과 상태가 정리된다', async () => {
+    render(<AIScreen />);
+    await waitForPots();
+
+    dispatchGuideStep({
+      isEnd: false,
+      selector: '.guide-ai-modal-list',
+      action: 'openAiTilModal',
+    });
+    await waitFor(() => expect(screen.getByRole('dialog', { name: '학습할 TIL 선택' })).toBeInTheDocument());
+
+    dispatchGuideStep({ isEnd: true });
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: '학습할 TIL 선택' })).not.toBeInTheDocument()
+    );
+
+    dispatchGuideStep({
+      isEnd: false,
+      selector: '.guide-ai-result',
+      action: 'showAiGuideResult',
+    });
+    await waitFor(() =>
+      expect(screen.getByText('React에서 useEffect의 의존성 배열을 빈 배열([])로 설정하면 어떤 시점에 실행되나요?')).toBeInTheDocument()
+    );
+
+    dispatchGuideStep({ isEnd: true });
+
+    await waitFor(() => {
+      expect(screen.queryByText('React에서 useEffect의 의존성 배열을 빈 배열([])로 설정하면 어떤 시점에 실행되나요?')).not.toBeInTheDocument();
+      expect(screen.getByText('화분을 선택하고 생성 버튼을 눌러주세요')).toBeInTheDocument();
+    });
   });
 });
 

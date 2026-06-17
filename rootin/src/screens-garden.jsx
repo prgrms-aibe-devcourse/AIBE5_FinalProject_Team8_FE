@@ -1837,7 +1837,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
       <div>
         <PotDetailBackButton onBack={onBack} />
       </div>
-      <Card padding={0} style={{ overflow: 'hidden' }}>
+      <Card className="guide-pot-detail-card" padding={0} style={{ overflow: 'hidden' }}>
         <div style={{
           padding: '60px 24px 24px',
           background: isRare
@@ -1853,7 +1853,9 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
             <Pill>{pot.tilCount} TIL</Pill>
           </div>
           <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center' }}>
-            <PottedPlant species={pot.species} stage={stage} size={182} glow={isRare} potLevel={pot.level} />
+            <div className="guide-pot-detail-plant">
+              <PottedPlant species={pot.species} stage={stage} size={182} glow={isRare} potLevel={pot.level} />
+            </div>
           </div>
           {monName && (
             <div style={{ marginTop: 12, fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
@@ -1862,7 +1864,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
           )}
         </div>
         <div style={{ padding: '20px 24px 22px' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="guide-pot-detail-info" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div
               title={`${pot.emoji} ${pot.name}`}
               style={{
@@ -1933,7 +1935,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
             border: '0.5px solid var(--rule)',
             borderRadius: 12,
             overflow: 'hidden',
-          }}>
+          }} className="guide-pot-detail-growth">
             {[
               { label: '화분 경험치', value: potExperienceText, progress: pot.levelProgress },
               { label: '식물 상태', value: `${plantStageStatus} · ${plantGrowthPercent}%`, tone: 'stage' },
@@ -1979,7 +1981,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
           <div style={{ marginTop: 14, fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
             {detailSubText}
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 18 }}>
+          <div className="guide-pot-detail-actions" style={{ display: 'flex', gap: 8, marginTop: 18 }}>
             <Btn variant="green" size="md" icon={Icon.drop} style={{ flex: 1 }} onClick={onStartTil}>
               TIL 작성하고 물주기
             </Btn>
@@ -1997,7 +1999,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
       </Card>
 
       {/* Evolution chain (mini) */}
-      <Card padding={18}>
+      <Card className="guide-pot-detail-evolution" padding={18}>
         <div className="eyebrow" style={{ marginBottom: 12 }}>진화 계통</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
           {['seed','sprout','leaf','bloom','full'].map(s => {
@@ -2276,8 +2278,10 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
 
         {/* Right — 유일한 스크롤 영역, 1fr로 가로 폭을 가득 채움 */}
         <div className="scrollbar-subtle" style={{ minWidth: 0, overflowY: 'auto', padding: '32px 32px 32px 16px' }}>
-          <SectionHeader eyebrow="이 화분의 기록" title={`TIL ${displayedTilCount}개`} action={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="guide-pot-detail-records" style={{ borderRadius: 14, padding: '8px 10px 12px', margin: '-8px -10px 0' }}>
+            <SectionHeader eyebrow="이 화분의 기록" title={`TIL ${displayedTilCount}개`} action={
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+
               {/* Page size selector */}
               <div
                 role="group"
@@ -2359,16 +2363,16 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
                   </button>
                 )}
               </div>
-            </div>
-          } />
-          {(suggestedTilTags.length > 0 || hasTilFilter) && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              flexWrap: 'wrap',
-              margin: '-4px 0 14px',
-            }}>
+              </div>
+            } />
+            {(suggestedTilTags.length > 0 || hasTilFilter) && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                flexWrap: 'wrap',
+                margin: '-4px 0 14px',
+              }}>
               <span className="eyebrow" style={{ marginRight: 2 }}>태그</span>
               {suggestedTilTags.map(([tag, count]) => {
                 const active = selectedTilTag === tag;
@@ -2414,16 +2418,16 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
                   </button>
                 </>
               )}
-            </div>
-          )}
-          {/* 상단 페이지네이션 */}
-          {!hasTilFilter && tilTotalPages > 1 && (
-            <div style={{ marginBottom: 12 }}>
-              <TilPagination tilPage={tilPage} tilTotalPages={tilTotalPages} onPageChange={setTilPage} />
-            </div>
-          )}
+              </div>
+            )}
+            {/* 상단 페이지네이션 */}
+            {!hasTilFilter && tilTotalPages > 1 && (
+              <div style={{ marginBottom: 12 }}>
+                <TilPagination tilPage={tilPage} tilTotalPages={tilTotalPages} onPageChange={setTilPage} />
+              </div>
+            )}
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {dashboard && tilsLoading && (
               <Card padding={22} style={{ color: 'var(--ink-3)', fontSize: 13, lineHeight: 1.6 }}>
                 이 화분의 TIL 목록을 불러오는 중이에요.
@@ -2493,14 +2497,15 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
                 </div>
               </Card>
             ))}
-          </div>
-
-          {/* 하단 페이지네이션 */}
-          {!hasTilFilter && (
-            <div style={{ marginTop: 20 }}>
-              <TilPagination tilPage={tilPage} tilTotalPages={tilTotalPages} onPageChange={setTilPage} />
             </div>
-          )}
+
+            {/* 하단 페이지네이션 */}
+            {!hasTilFilter && (
+              <div style={{ marginTop: 20 }}>
+                <TilPagination tilPage={tilPage} tilTotalPages={tilTotalPages} onPageChange={setTilPage} />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

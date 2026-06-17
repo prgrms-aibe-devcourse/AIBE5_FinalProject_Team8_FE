@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { HeroZoom } from './landing/HeroZoom.jsx';
 import { MonitorSection } from './landing/MonitorSection.jsx';
 
@@ -9,11 +10,13 @@ import { MonitorSection } from './landing/MonitorSection.jsx';
 
 export function LandingScreen({ onStart }) {
   const start = onStart ?? (() => {});
+  // 모니터 섹션이 등록하는 "소개 섹션으로 스크롤" 함수를 히어로 메뉴에서 호출
+  const scrollToRef = useRef(null);
 
   return (
     <div className="bg-[#0A0A0A] font-sans text-[#E1E0CC] selection:bg-[#E1E0CC]/30">
-      <HeroZoom onStart={start} />
-      <MonitorSection onStart={start} />
+      <HeroZoom onStart={start} onNavigate={(id) => scrollToRef.current?.(id)} />
+      <MonitorSection onStart={start} scrollToRef={scrollToRef} />
     </div>
   );
 }

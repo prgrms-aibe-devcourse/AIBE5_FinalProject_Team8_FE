@@ -150,10 +150,10 @@ const AiMock = () => (
 );
 
 const FEATURES = [
-  { n: '01', icon: PenLine, title: 'TIL 기록', desc: '노션 스타일 에디터로 오늘 배운 것을 가볍게 적습니다. 템플릿·태그·임시저장으로 기록의 문턱을 낮췄어요.', Mock: EditorMock },
-  { n: '02', icon: Sprout, title: '식물 정원', desc: 'TIL을 쓰면 화분에 물이 차고 식물이 자랍니다. 씨앗부터 만개까지 키워 수확하고 도감을 채우세요.', Mock: GardenMock },
-  { n: '03', icon: LineChart, title: '성장 대시보드', desc: '잔디 그래프와 연속 기록(스트릭), 관심사 분포로 나의 꾸준함이 눈에 보이는 결과로 쌓입니다.', Mock: DashboardMock },
-  { n: '04', icon: Sparkles, title: 'AI 학습 도구', desc: '작성한 TIL을 AI가 요약하고 복습 문제를 만들어 줍니다. 흩어진 기록이 진짜 내 지식이 되도록.', Mock: AiMock },
+  { n: '01', anchor: 'feature-til', icon: PenLine, title: 'TIL 기록', desc: '노션 스타일 에디터로 오늘 배운 것을 가볍게 적습니다. 템플릿·태그·임시저장으로 기록의 문턱을 낮췄어요.', Mock: EditorMock },
+  { n: '02', anchor: 'feature-garden', icon: Sprout, title: '식물 정원', desc: 'TIL을 쓰면 화분에 물이 차고 식물이 자랍니다. 씨앗부터 만개까지 키워 수확하고 도감을 채우세요.', Mock: GardenMock },
+  { n: '03', anchor: 'feature-dashboard', icon: LineChart, title: '성장 대시보드', desc: '잔디 그래프와 연속 기록(스트릭), 관심사 분포로 나의 꾸준함이 눈에 보이는 결과로 쌓입니다.', Mock: DashboardMock },
+  { n: '04', anchor: 'feature-ai', icon: Sparkles, title: 'AI 학습 도구', desc: '작성한 TIL을 AI가 요약하고 복습 문제를 만들어 줍니다. 흩어진 기록이 진짜 내 지식이 되도록.', Mock: AiMock },
 ];
 
 const STAGES = [
@@ -193,13 +193,13 @@ export const SiteDescriptions = ({ onStart }) => {
       </header>
 
       {/* ── 히어로 ── */}
-      <section style={{ minHeight: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 'clamp(40px, 8vh, 90px) clamp(20px, 5vw, 64px)', position: 'relative' }}>
+      <section id="intro" style={{ minHeight: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 'clamp(40px, 8vh, 90px) clamp(20px, 5vw, 64px)', position: 'relative' }}>
         <Reveal y={30} amount={0.2}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 999, background: '#DCEFE2', color: G.deep, fontSize: 13, fontWeight: 800, boxShadow: 'inset 0 1px 0 #fff, 0 2px 8px rgba(34,110,64,0.1)' }}>
             <Sprout size={15} /> 매일의 TIL을 식물로
           </span>
           <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.4rem, 6vw, 5rem)', fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.035em', margin: '24px 0 0' }}>
-            오늘 배운 것이<br />내일의 <span style={{ color: G.sprout }}>숲</span>이 됩니다
+            오늘 배운 것이<br /><span style={{ color: G.sprout }}>뿌리</span> 깊은 습관이 됩니다
           </h1>
           <p style={{ margin: '24px auto 0', maxWidth: 560, fontSize: 'clamp(1.05rem, 1.6vw, 1.3rem)', lineHeight: 1.65, color: INK2 }}>
             Rootin은 매일의 학습 기록을 식물로 키우는 게임형 학습 습관 서비스입니다.
@@ -222,7 +222,7 @@ export const SiteDescriptions = ({ onStart }) => {
       </section>
 
       {/* ── 기능 (한 섹션씩 몰입) ── */}
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '0 clamp(20px, 5vw, 64px)' }}>
+      <section id="features" style={{ maxWidth: 1180, margin: '0 auto', padding: '0 clamp(20px, 5vw, 64px)' }}>
         <Reveal style={{ textAlign: 'center', padding: 'clamp(20px,4vh,40px) 0 clamp(28px,5vh,56px)' }}>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 12.5, fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', color: G.sprout, marginBottom: 12 }}>왜 Rootin인가</div>
           <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3.6vw, 2.8rem)', fontWeight: 700, letterSpacing: '-0.025em', margin: 0 }}>기록이 성장이 되는 네 가지 방법</h2>
@@ -233,6 +233,7 @@ export const SiteDescriptions = ({ onStart }) => {
           return (
             <article
               key={f.title}
+              id={f.anchor}
               style={{ minHeight: '62vh', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'clamp(28px, 5vw, 72px)', alignItems: 'center', direction: mockLeft ? 'rtl' : 'ltr' }}
               className="rootin-site-feature"
             >

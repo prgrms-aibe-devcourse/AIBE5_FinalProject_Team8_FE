@@ -1,5 +1,5 @@
 import { motion, useScroll, useTransform, useMotionValueEvent, AnimatePresence } from 'framer-motion';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { SiteDescriptions } from './SiteDescriptions.jsx';
 import { Lock, Menu, ArrowLeft, ArrowRight, RotateCw, Plus } from 'lucide-react';
 
@@ -7,7 +7,7 @@ const CHROME_H = 60; // Safari chrome(메뉴바+툴바) 높이(px)
 const RISE = 0.85;   // 히어로 위로 떠오르는 구간(vh 배수)
 const EXPAND = 0.7;  // 풀스크린 확장 구간(vh 배수)
 
-export const MonitorSection = ({ onStart }) => {
+export const MonitorSection = ({ onStart, scrollToRef }) => {
   const trackRef = useRef(null);
   const contentRef = useRef(null);
   const metrics = useRef({ vh: 800, contentH: 2400 });
@@ -67,6 +67,38 @@ export const MonitorSection = ({ onStart }) => {
     if (v <= pExpand) return 0;
     return -lerp(0, readScroll, (v - pExpand) / (1 - pExpand));
   });
+
+  // 히어로 상단 메뉴 → 소개 섹션으로 이동.
+  // 내부 내용은 네이티브 스크롤이 아니라 contentY transform으로 움직이므로,
+  // 해당 섹션이 모니터 화면 상단에 오도록 필요한 윈도우 스크롤 위치를 역산한다.
+  const scrollToSection = useCallback((id) => {
+    const content = contentRef.current;
+    const track = trackRef.current;
+    if (!content || !track) return;
+    const el = content.querySelector(`#${id}`);
+    if (!el) return;
+
+    const { vh, contentH } = metrics.current;
+    const innerVh = Math.max(1, vh - CHROME_H);
+    const readScroll = Math.max(0, contentH - innerVh);
+    const total = (RISE + EXPAND) * vh + readScroll;
+    const pExpand = ((RISE + EXPAND) * vh) / total;
+
+    // content와 섹션은 같은 transform을 공유하므로 둘의 상대 위치는 항상 일정하다.
+    const sectionTop = el.getBoundingClientRect().top - content.getBoundingClientRect().top;
+    const clamped = Math.min(readScroll, Math.max(0, sectionTop));
+    // contentY = -clamped 가 되는 progress(v)를 역산
+    const v = readScroll === 0 ? pExpand : pExpand + (1 - pExpand) * (clamped / readScroll);
+
+    const trackTop = track.getBoundingClientRect().top + window.scrollY;
+    const target = trackTop + v * (track.offsetHeight - vh);
+    window.scrollTo({ top: target, behavior: 'smooth' });
+  }, []);
+
+  useEffect(() => {
+    if (scrollToRef) scrollToRef.current = scrollToSection;
+    return () => { if (scrollToRef) scrollToRef.current = null; };
+  }, [scrollToRef, scrollToSection]);
 
   // 화면 깨우기
   const [wakeState, setWakeState] = useState('off');

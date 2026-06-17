@@ -4,7 +4,7 @@ import { useRef } from 'react';
 // 'Rootin' 워드마크 — i를 점 없는 글자(ı)로 두고 그 위에 새싹을 얹는다.
 // (Rootin-logo-source.html 03 "글자에 새싹 넣기"). 크기·폰트는 부모에서 상속.
 // leaf1/leaf2: 새싹 잎 색(어두운 배경엔 밝게, 밝은 배경엔 진하게). animate: 등장 애니메이션.
-export const RootinWordmark = ({ leaf1 = '#74C98C', leaf2 = '#A6E0B6', animate = true }) => {
+export const RootinWordmark = ({ leaf1 = '#74C98C', leaf2 = '#A6E0B6', animate = true, sproutBottom = '0.6em', sproutWidth = '0.5em', sproutHeight = '0.33em', sproutShiftX = '0em' }) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true });
   const sprout = (
@@ -16,10 +16,10 @@ export const RootinWordmark = ({ leaf1 = '#74C98C', leaf2 = '#A6E0B6', animate =
         style={{
           position: 'absolute',
           left: '50%',
-          bottom: '0.6em',
-          transform: 'translateX(-50%)',
-          width: '0.5em',
-          height: '0.33em',
+          bottom: sproutBottom,
+          transform: `translateX(calc(-50% + ${sproutShiftX}))`,
+          width: sproutWidth,
+          height: sproutHeight,
           overflow: 'visible',
         }}
       >

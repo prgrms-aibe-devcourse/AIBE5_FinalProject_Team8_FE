@@ -77,7 +77,7 @@ const GUIDE_STEPS = {
     { selector: '.guide-ai-modal-list', action: 'openAiTilModal', text: '🔎 학습 데이터로 사용할 TIL 글을 골라요. 검색이나 태그 필터로 원하는 기록만 빠르게 찾을 수 있어요.', placement: 'left', textOffset: { x: -60, y: 0 } },
     { selector: '.guide-ai-modal-submit', action: 'openAiTilModal', text: '✨ 하단의 생성 버튼으로 선택한 TIL 기반 AI 학습지를 만들어요. 모드에 따라 포인트가 차감돼요.', placement: 'top', textOffset: { x: 0, y: -20 } },
     { selector: '.guide-ai-result', action: 'showAiGuideResult', text: '🧠 AI가 만든 퀴즈를 풀고 채점하거나, 요약된 개념 노트를 학습할 수 있어요.', placement: 'left', textOffset: { x: -40, y: 0 } },
-    { selector: '.guide-ai-saved-results', text: '🗂️ 저장한 AI 결과는 보관함에 모여요. 나중에 다시 열어 복습할 수 있어요.', placement: 'right', textOffset: { x: 40, y: 0 } }
+    { selector: '.guide-ai-saved-results', text: '🗂️ 저장한 AI 결과는 보관함에 모여요. 나중에 다시 열어 복습할 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } }
   ]
 };
 

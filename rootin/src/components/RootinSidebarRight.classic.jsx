@@ -241,40 +241,127 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
     }
   };
 
+  const plantName = selectedPotDashboard?.plant?.name ?? '기본 씨앗';
+  const species = inferSpecies(plantName);
+  const growthStage = selectedPotDashboard?.plant?.growthStage ?? 'SEED';
+  const stage = GROWTH_STAGE_TO_PIXEL_STAGE[growthStage] ?? 'seed';
+  const level = selectedPotDashboard?.level ?? 1;
+
+  const WIDTH_COLLAPSED = 78;
+
   return (
     <aside
-      className="relative shrink-0 overflow-hidden transition-[width] duration-300 ease-out"
-      style={{ width: open ? PANEL_WIDTH : 0 }}
+      className="relative shrink-0 overflow-hidden border-l border-border/60 bg-[var(--paper-2)]"
+      style={{ 
+        width: open ? `${PANEL_WIDTH}px` : `${WIDTH_COLLAPSED}px`,
+        transition: 'width 0.42s cubic-bezier(0.4, 0, 0.2, 1)',
+        zIndex: 40,
+      }}
     >
-      {/* 가장자리 토글 — 접힘/펼침 (항상 접근 가능하도록 aria-hidden 밖에 둠) */}
+      {/* 가장자리 토글 — 안쪽으로 들어간 버튼 (우측 둥근 모서리) */}
       <button
         type="button"
+        className="rl-toggle"
         onClick={onToggle}
-        aria-expanded={open}
-        aria-label={open ? '사이드 패널 접기' : '사이드 패널 펼치기'}
-        className="fixed top-1/2 z-40 flex h-14 w-7 -translate-y-1/2 items-center justify-center rounded-l-xl border border-r-0 border-border bg-card text-muted-foreground shadow-[var(--shadow-md)] transition-[right,box-shadow,color] duration-300 ease-out hover:text-primary hover:shadow-[var(--shadow-lg)]"
-        style={{ right: open ? PANEL_WIDTH : 0 }}
+        title={open ? '사이드 패널 접기' : '사이드 패널 펼치기'}
+        style={{
+          position: 'absolute', 
+          top: 23, 
+          left: -2, 
+          width: 28, 
+          height: 34, 
+          display: 'grid', 
+          placeItems: 'center', 
+          border: 'none', 
+          background: 'var(--moss)', 
+          borderRadius: '0 11px 11px 0', 
+          cursor: 'pointer', 
+          color: 'var(--on-primary)', 
+          boxShadow: '3px 3px 12px -4px color-mix(in oklch, var(--moss) 75%, transparent)', 
+          transition: 'background 0.2s ease',
+          zIndex: 50,
+        }}
       >
-        <ChevronRight className={cn('size-4 transition-transform duration-300', open ? '' : 'rotate-180')} />
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: `rotate(${open ? '180deg' : '0deg'})`, transition: 'transform 0.42s cubic-bezier(0.4,0,0.2,1)' }}>
+          <polyline points="15 18 9 12 15 6" />
+        </svg>
       </button>
 
-      {/* 패널 본문 */}
-      <div
-        className={cn(
-          'h-svh overflow-y-auto scrollbar-subtle border-l border-border/60 bg-[var(--paper-2)] transition-opacity duration-300',
-          open ? 'opacity-100' : 'opacity-0',
-        )}
-        style={{ width: PANEL_WIDTH }}
+      {/* 미니 사이드바 (접혔을 때 표시) */}
+      <div 
+        className="absolute inset-y-0 right-0 flex flex-col items-center py-5 gap-5 overflow-hidden"
+        style={{ 
+          width: WIDTH_COLLAPSED,
+          opacity: open ? 0 : 1,
+          pointerEvents: open ? 'none' : 'auto',
+          transition: 'opacity 0.2s ease',
+        }}
+        aria-hidden={open}
+      >
+        <div className="flex flex-col gap-3 w-full px-2 items-center mt-12">
+          <button
+            type="button"
+            onClick={handleNewTil}
+            title="새 TIL 작성"
+            className="flex size-11 items-center justify-center rounded-[14px] shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all"
+            style={{ background: 'var(--grad-moss)', color: 'var(--primary-foreground)' }}
+          >
+            <Plus className="size-5" />
+          </button>
+
+          {selectedPotId && draft && (
+            <button
+              type="button"
+              onClick={handleResumeDraft}
+              title="임시저장 이어쓰기"
+              className={cn(
+                "flex size-11 items-center justify-center rounded-[14px] transition-all shadow-[var(--shadow-sm)] hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5",
+                draftActive ? "ring-2 ring-[var(--amber)] ring-offset-2 ring-offset-[var(--paper-2)]" : ""
+              )}
+              style={{ background: 'color-mix(in oklch, var(--amber) 14%, var(--card))', color: 'var(--amber)' }}
+            >
+              <Pencil className="size-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="mt-auto flex flex-col items-center gap-2 pb-6">
+          <div className="text-[10px] font-bold text-muted-foreground" style={{ fontFamily: 'var(--font-display)' }}>
+            Lv.{level}
+          </div>
+          <div 
+            title={selectedPotDashboard?.title ?? '선택된 화분 없음'}
+            className="flex size-[46px] items-center justify-center rounded-[14px] border border-border bg-card shadow-sm"
+          >
+            {selectedPotDashboard ? (
+              <PixelPlant species={species} stage={stage} size={30} glow={species === 'moonlight'} />
+            ) : (
+              <div className="text-xl">🌱</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 패널 본문 (펼쳐졌을 때 표시) */}
+      <div 
+        className="absolute inset-y-0 right-0 overflow-hidden"
+        style={{ 
+          width: PANEL_WIDTH,
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? 'auto' : 'none',
+          transition: 'opacity 0.2s ease',
+        }}
         aria-hidden={!open}
       >
-        <motion.div
-          className="flex flex-col gap-3.5 p-4 pb-12"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-        >
-          {/* 새 TIL 작성 — 에디터를 비우고 새 글 시작 */}
-          <motion.button
+        <div className="h-svh overflow-y-auto scrollbar-subtle" style={{ width: PANEL_WIDTH }}>
+          <motion.div
+            className="flex flex-col gap-3.5 p-4 pb-12 pl-[34px]"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {/* 새 TIL 작성 — 에디터를 비우고 새 글 시작 */}
+            <motion.button
             type="button"
             onClick={handleNewTil}
             variants={sectionVariants}
@@ -481,6 +568,7 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
             </div>
           </PanelCard>
         </motion.div>
+      </div>
       </div>
     </aside>
   );

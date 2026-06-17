@@ -871,6 +871,25 @@ const FE_THEME_TO_BE_THEME = {
 function GardenScreen({ refreshKey = 0, onOpenPot }) {
   const { user } = useUser();
   const [editMode, setEditMode] = useState(false);
+
+  // 🎨 가이드 투어 순차 진행 시 특정 단계에 맞춰 자동으로 정원 꾸미기 모드(editMode)를 온/오프 처리합니다.
+  useEffect(() => {
+    const handleGuideStep = (e) => {
+      const { action, isEnd, selector } = e.detail;
+      if (isEnd) {
+        setEditMode(false);
+        return;
+      }
+      
+      // 정원 화면 관련 가이드가 실행 중이고, 꾸미기 기능 설명 단계에 도달하면 편집 모드를 자동 활성화합니다.
+      if (selector && selector.startsWith('.guide-garden-')) {
+        setEditMode(action === 'enableGardenEditMode');
+      }
+    };
+
+    window.addEventListener('rootin-guide-step', handleGuideStep);
+    return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
+  }, []);
   const [themeId, setThemeId] = useState('meadow');
   const [layout, setLayout] = useState(DEFAULT_GARDEN_LAYOUT);
   const [decorations, setDecorations] = useState([]);
@@ -1197,7 +1216,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
   };
 
   return (
-    <div className="pot-detail-page" style={{ padding: 32, width: '100%', maxWidth: 1220, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
 
       {/* Hero with scene */}
       <Card padding={0} style={{
@@ -1209,7 +1228,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         <div style={{ padding: '24px 28px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0, flex: '1 1 320px' }}>
             <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>나의 정원</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.02em', marginTop: 4, whiteSpace: 'nowrap' }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 700, color: 'var(--ink)', letterSpacing: '-0.02em', marginTop: 4, whiteSpace: 'nowrap' }}>
               {user?.name ?? ''}님의 정원 · TIL <span style={{ color: 'var(--moss-2)' }}>{user?.totalTil ?? 0}</span>개
             </h2>
             <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
@@ -1218,15 +1237,15 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
                 : `${pots.length}개의 화분이 자라고 있어요. 오늘 ${wateredCount}개의 화분에 물을 줬어요.`}
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
-            <Btn variant="secondary" size="md" icon={Icon.plus} onClick={() => setShowCreatePot(true)}>새 화분</Btn>
+          <div className="guide-garden-edit" style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+            <Btn variant="primary" size="md" icon={Icon.plus} onClick={() => setShowCreatePot(true)}>새 화분</Btn>
             {editMode ? (
               <Btn variant="green" size="md" icon={Icon.check} onClick={handleSaveLayout} disabled={layoutSaving}>
                 {layoutSaving ? '저장 중...' : '꾸미기 완료'}
               </Btn>
             ) : (
               <Btn
-                variant="primary"
+                variant="accent"
                 size="md"
                 onClick={() => {
                   setEditMode(true);
@@ -1240,7 +1259,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         </div>
 
         {/* Scene */}
-        <div style={{ padding: '0 20px 20px' }}>
+        <div className="guide-garden-scene" style={{ padding: '0 20px 20px' }}>
           <GardenScene
             pots={pots}
             theme={theme}
@@ -1268,7 +1287,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
               alignItems: 'flex-start',
             }}>
               {/* Backgrounds */}
-              <div>
+              <div className="guide-garden-theme">
                 <div className="eyebrow" style={{ marginBottom: 10 }}>배경</div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   {GARDEN_THEMES.map(t => {
@@ -1442,7 +1461,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
           <Pill>전체 {pots.length}</Pill>
         </div>
       } />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
+      <div className="guide-garden-pots" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18 }}>
         {potsLoading && (
           <Card padding={24} style={{ minHeight: 320, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
             화분 목록을 불러오는 중이에요.
@@ -1586,7 +1605,7 @@ function CreatePotModal({ userId, onClose, onCreated }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
             <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>New Pot</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
               새 화분 만들기
             </h2>
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.6 }}>
@@ -1965,7 +1984,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
               TIL 작성하고 물주기
             </Btn>
             <Btn
-              variant={pot.canHarvest ? 'green' : 'secondary'}
+              variant={pot.canHarvest ? 'accent' : 'secondary'}
               size="md"
               onClick={onShowHarvest}
               disabled={dashboard && !pot.canHarvest}
@@ -2124,7 +2143,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
         <Card padding={28} style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 36, marginBottom: 12 }}>🌱</div>
           <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>Garden Detail</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
             화분 정보를 불러오지 못했어요
           </h2>
           <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8, lineHeight: 1.6 }}>
@@ -2224,7 +2243,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
 
   return (
     <div style={{
-      height: 'calc(100vh - 64px)',
+      height: '100vh',
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
@@ -2233,15 +2252,16 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
       width: '100%',
       fontFamily: 'var(--font-body)',
     }}>
-      <div className="pot-detail-layout" style={{
+      <div style={{
         flex: 1,
         minHeight: 0,
         display: 'grid',
-        gridTemplateColumns: 'minmax(350px, 400px) minmax(0, 760px)',
+        gridTemplateColumns: 'minmax(340px, 400px) minmax(0, 1fr)',
       }}>
 
-        {/* Left — 독립 스크롤 컬럼 */}
-        <div style={{ overflowY: 'auto', padding: '32px 16px 32px 32px' }}>
+        {/* Left — 독립 고정 영역: 오른쪽 목록을 스크롤해도 전혀 움직이지 않아 항상 보임.
+            내용이 길어 넘칠 때만 조용히 스크롤(스크롤바 숨김) → 화면엔 우측 스크롤바 1개만 노출 */}
+        <div className="scrollbar-hide scroll-shadow" style={{ overflowY: 'auto', padding: '32px 16px 32px 32px' }}>
           <PotDetailSidebar
             pot={pot}
             stage={stage}
@@ -2254,8 +2274,8 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
 
         </div>
 
-        {/* Right — 독립 스크롤 컬럼 */}
-        <div className="pot-detail-records" style={{ minWidth: 0, overflowY: 'auto', padding: '32px 32px 32px 16px' }}>
+        {/* Right — 유일한 스크롤 영역, 1fr로 가로 폭을 가득 채움 */}
+        <div className="scrollbar-subtle" style={{ minWidth: 0, overflowY: 'auto', padding: '32px 32px 32px 16px' }}>
           <SectionHeader eyebrow="이 화분의 기록" title={`TIL ${displayedTilCount}개`} action={
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {/* Page size selector */}
@@ -2771,7 +2791,7 @@ function DeletePotModal({ pot, onClose, onDeleted }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
             <div className="eyebrow" style={{ color: '#b8536a' }}>Delete Pot</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
               {pot.name} 화분을 삭제할까요?
             </h2>
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.6 }}>
@@ -2827,7 +2847,7 @@ function DeletePotModal({ pot, onClose, onDeleted }) {
           <Btn type="button" variant="secondary" size="lg" style={{ flex: 1 }} onClick={onClose} disabled={loading}>
             취소
           </Btn>
-          <Btn type="button" variant="danger" size="lg" style={{ flex: 1, background: '#b8536a', color: '#fff', borderColor: '#b8536a' }} onClick={handleDelete} disabled={loading}>
+          <Btn type="button" variant="danger" size="lg" style={{ flex: 1 }} onClick={handleDelete} disabled={loading}>
             {loading ? '삭제 중...' : '삭제'}
           </Btn>
         </div>
@@ -2903,7 +2923,7 @@ function EditPotModal({ pot, onClose, onUpdated, onDeleteRequest }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
           <div>
             <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>Edit Pot</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
               화분 정보 수정
             </h2>
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 6, lineHeight: 1.6 }}>
@@ -3015,7 +3035,7 @@ function HarvestResult({ result, onClose, potLevel }) {
     <>
       <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
       <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>수확 완료</div>
-      <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+      <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
         {result.harvestedPlantName} 수확!
       </h2>
       <div style={{
@@ -3095,7 +3115,7 @@ function HarvestModal({ pot, onClose, onHarvested }) {
               <PottedPlant species={pot.species} stage={pot.stage ?? 'full'} size={142} glow={pot.species === 'moonlight'} potLevel={pot.level} />
             </div>
             <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>수확하기</div>
-            <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 6 }}>
               {pot.emoji} {pot.name}의 식물을 수확할까요?
             </h2>
             <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8, lineHeight: 1.6 }}>

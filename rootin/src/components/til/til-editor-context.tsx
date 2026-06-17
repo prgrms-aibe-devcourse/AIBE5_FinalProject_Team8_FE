@@ -12,7 +12,6 @@ import {
 } from 'react'
 import type { Editor } from '@tiptap/react'
 import { getGardenDashboard, getPots } from '@/api/pot.js'
-import { useUser } from '@/context/UserContext.jsx'
 import {
   createTil,
   saveDraft as apiSaveDraft,
@@ -59,6 +58,9 @@ export type DraftData = {
   tags: string[]
   potId: string | null
   content: string
+  createdAt?: string | null
+  updatedAt?: string | null
+  savedAt?: string | null
 }
 
 type TilEditorContextValue = {
@@ -72,6 +74,7 @@ type TilEditorContextValue = {
   setSelectedPotId: (v: string | null) => void
   pots: Pot[]
   potsLoading: boolean
+  refreshPots: () => void
   selectedPotDashboard: PotDashboard | null
   selectedPotDashboardLoading: boolean
   templates: Template[]
@@ -117,23 +120,18 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
   // 사이드바가 현재 편집 중인 TIL 강조 + 저장 안 된 변경 여부를 알 수 있도록 노출
   const [currentTilId, setCurrentTilId] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
-  const { user } = useUser()
 
-  // 진입 시 화분 목록 로딩
-  // pots API는 임시로 X-USER-ID 헤더의 사용자 화분을 반환하므로,
-  // TIL 발행(JWT 사용자)과 동일한 사용자가 되도록 실제 userId를 전달한다.
-  useEffect(() => {
-    const userId = user?.userId ?? localStorage.getItem('userId')
-    if (!userId) {
-      setPotsLoading(false)
-      return
-    }
+  // 화분 목록 수동 새로고침 함수 정의
+  const refreshPots = useCallback(() => {
     setPotsLoading(true)
-    getPots(userId)
-      .then((data) => setPots(Array.isArray(data) ? (data as Pot[]) : []))
-      .catch(() => setPots([]))
+    getPots()
+      .then((data) => setPots(data as Pot[]))
+      .catch((error) => {
+        console.error('화분 목록 조회 실패:', error)
+        setPots([])
+      })
       .finally(() => setPotsLoading(false))
-  }, [user?.userId])
+  }, [])
 
   // 화분을 선택했을 때만 상세 대시보드를 1회 조회합니다.
   // 글 작성 중 예상 경험치는 프론트에서 계산하므로, 타이핑할 때마다 서버를 호출하지 않습니다.
@@ -227,6 +225,9 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
       tags: draft.tags ?? [],
       potId: draft.potId != null ? String(draft.potId) : null,
       content: draft.content ?? '',
+      createdAt: draft.createdAt ?? null,
+      updatedAt: draft.updatedAt ?? draft.modifiedAt ?? null,
+      savedAt: draft.savedAt ?? null,
     }
   }, [])
 
@@ -291,6 +292,7 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     setSelectedPotId,
     pots,
     potsLoading,
+    refreshPots,
     selectedPotDashboard,
     selectedPotDashboardLoading,
     templates,

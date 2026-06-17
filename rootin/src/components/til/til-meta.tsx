@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select'
 import { useTilEditor } from './til-editor-context'
 import { playSfx } from '@/lib/sfx.js'
+import { normalizeTilTag, TIL_TAG_MAX_COUNT, TIL_TAG_MAX_LENGTH } from './til-policy'
 
 const TODAY = new Date().toLocaleDateString('ko-KR', {
   year: 'numeric',
@@ -26,14 +27,32 @@ export function TilMeta() {
   const [tagInput, setTagInput] = useState('')
   const [adding, setAdding] = useState(false)
   const titleRef = useRef<HTMLTextAreaElement>(null)
+  const [tagError, setTagError] = useState('')
 
   const addTag = () => {
-    const t = tagInput.trim().replace(/^#/, '')
-    if (t && !tags.includes(t) && tags.length < 8) {
+    const t = normalizeTilTag(tagInput)
+    if (!t) {
+      setTagInput('')
+      setAdding(false)
+      setTagError('')
+      return
+    }
+    if (t.length > TIL_TAG_MAX_LENGTH) {
+      setTagError(`태그는 ${TIL_TAG_MAX_LENGTH}자 이하로 입력해주세요.`)
+      return
+    }
+    if (tags.includes(t)) {
+      setTagInput('')
+      setAdding(false)
+      setTagError('')
+      return
+    }
+    if (tags.length < TIL_TAG_MAX_COUNT) {
       setTags((prev) => [...prev, t])
     }
     setTagInput('')
     setAdding(false)
+    setTagError('')
   }
 
   return (
@@ -119,8 +138,18 @@ export function TilMeta() {
           <input
             autoFocus
             value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
+            onChange={(e) => {
+              const nextValue = e.target.value
+              if (normalizeTilTag(nextValue).length > TIL_TAG_MAX_LENGTH) {
+                setTagError(`태그는 ${TIL_TAG_MAX_LENGTH}자까지만 입력돼요.`)
+                return
+              }
+              setTagInput(nextValue)
+              setTagError('')
+            }}
             onBlur={addTag}
+            aria-invalid={Boolean(tagError)}
+            aria-describedby={tagError ? 'til-tag-error' : undefined}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 e.preventDefault()
@@ -128,13 +157,14 @@ export function TilMeta() {
               } else if (e.key === 'Escape') {
                 setTagInput('')
                 setAdding(false)
+                setTagError('')
               }
             }}
-            placeholder="태그 입력"
+            placeholder={`태그 입력 (${TIL_TAG_MAX_LENGTH}자 이하)`}
             className="w-24 rounded-[var(--r-chip)] border-2 border-[var(--leaf-2)] bg-[var(--paper-card)] px-2.5 py-1 text-xs text-[color:var(--leaf)] outline-none placeholder:text-muted-foreground/50"
           />
         ) : (
-          tags.length < 8 && (
+          tags.length < TIL_TAG_MAX_COUNT && (
             <button
               type="button"
               onClick={() => setAdding(true)}
@@ -144,6 +174,11 @@ export function TilMeta() {
               태그
             </button>
           )
+        )}
+        {tagError && (
+          <span id="til-tag-error" className="text-xs font-medium text-destructive">
+            {tagError}
+          </span>
         )}
       </div>
 

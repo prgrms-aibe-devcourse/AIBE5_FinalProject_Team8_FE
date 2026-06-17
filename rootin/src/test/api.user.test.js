@@ -14,10 +14,16 @@ beforeEach(() => {
 
 describe('getMe', () => {
   it('GET /api/v1/users/me 를 호출한다', async () => {
-    request.mockResolvedValue({ userId: 1, nickname: '소나무' });
+    request.mockResolvedValue({ userId: 1, nickname: '소나무', createdAt: '2024-03-15T10:00:00Z' });
     const result = await getMe();
     expect(request).toHaveBeenCalledWith('/api/v1/users/me');
     expect(result.nickname).toBe('소나무');
+  });
+
+  it('응답에 createdAt 필드가 포함된다', async () => {
+    request.mockResolvedValue({ userId: 1, nickname: '소나무', createdAt: '2024-03-15T10:00:00Z' });
+    const result = await getMe();
+    expect(result.createdAt).toBe('2024-03-15T10:00:00Z');
   });
 });
 

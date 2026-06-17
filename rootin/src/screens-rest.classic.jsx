@@ -1,16 +1,25 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Eye, EyeOff, Mail, Lock, User, Check, ArrowLeft } from 'lucide-react';
 import { getPlants } from './api/collection.js';
 import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult } from './api/ai.js';
 import { getPots } from './api/pot.js';
 import { getMyTils } from './api/til.js';
-import { Icon, Pill, Btn, Card, SectionHeader } from './ui.jsx';
+import { Icon, Pill, Btn, Card, SectionHeader, Spinner } from './ui.jsx';
 import { PixelPlant } from './pixel-plants.jsx';
-import { Plant, RootinLogo, STAGE_META } from './plants.jsx';
+import { RootinWordmark } from './landing/RootinWordmark.jsx';
+import { PixelPals } from './auth-pixel-pals.jsx';
 import { useUser } from './context/UserContext.jsx';
 import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
 
 // Collection (식물도감), AI, Profile, Auth screens
+
+// 화면 테마 보관함 — 원본(classic) / 게임보이(gameboy) 전환
+const THEME_OPTIONS = [
+  { id: 'classic', emoji: '🌿', name: '원본', desc: '깔끔한 식물 테마' },
+  { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔' },
+];
 
 // BE speciesKey → PixelPlant species 키 매핑
 const SPECIES_TO_PIXEL = {
@@ -167,7 +176,7 @@ function CollectionScreen() {
   const stats = dex?.stats;
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto' }}>
 
       {/* 헤더 */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, gap: 14, flexWrap: 'wrap' }}>
@@ -201,9 +210,7 @@ function CollectionScreen() {
               <Pill tone="default">총 {stats.total}칸</Pill>
               <Pill tone="green">일반 {stats.common}칸</Pill>
               <Pill tone="navy">희귀 {stats.rare}칸</Pill>
-              <Btn variant="green" size="sm">
-                {stats.collected} / {stats.total} 수집
-              </Btn>
+              <Pill tone="warn">{stats.collected} / {stats.total} 수집</Pill>
             </div>
           )}
         </div>
@@ -273,7 +280,7 @@ const formatDate = (iso) => {
  *   onConfirm  — (tilIds: number[]) => void
  *   onClose    — () => void
  */
-function AiTilSelectModal({ potId, onConfirm, onClose }) {
+function AiTilSelectModal({ potId, onConfirm, onClose, onOpenGuide }) {
   const [tils, setTils]               = useState([]);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading]         = useState(true);
@@ -469,16 +476,29 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
               AI가 분석할 TIL을 골라주세요
             </div>
           </div>
-          <button
-            aria-label="닫기"
-            onClick={onClose}
-            style={{
-              width: 28, height: 28, borderRadius: 7,
-              border: '0.5px solid var(--rule-2)', background: '#fff',
-              fontSize: 14, color: 'var(--ink-2)', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >✕</button>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {/* 도움말(?) 버튼 추가 - 모달용 가이드 투어를 트리거합니다 */}
+            <button
+              onClick={() => onOpenGuide?.()}
+              title="이 모달의 이용 가이드 보기"
+              style={{
+                width: 28, height: 28, borderRadius: 7,
+                border: '0.5px solid var(--rule-2)', background: '#fff',
+                fontSize: 13, fontWeight: 'bold', color: 'var(--ink-2)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >?</button>
+            <button
+              aria-label="닫기"
+              onClick={onClose}
+              style={{
+                width: 28, height: 28, borderRadius: 7,
+                border: '0.5px solid var(--rule-2)', background: '#fff',
+                fontSize: 14, color: 'var(--ink-2)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >✕</button>
+          </div>
         </div>
 
         {/* 검색 */}
@@ -544,8 +564,8 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
           </div>
         )}
 
-        {/* TIL 목록 */}
-        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }} className="scrollbar">
+        {/* TIL 목록 - 가이드 타겟팅을 위해 guide-ai-modal-list 클래스를 설정합니다 */}
+        <div className="guide-ai-modal-list scrollbar" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
           {loading ? (
             <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
               TIL 목록을 불러오는 중...
@@ -626,6 +646,7 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
         <div style={{ display: 'flex', gap: 8 }}>
           <Btn variant="secondary" size="md" style={{ flex: 1 }} onClick={onClose}>취소</Btn>
           <Btn
+            className="guide-ai-modal-submit"
             variant="green" size="md"
             style={{ flex: 2, opacity: selectedIds.size === 0 ? 0.45 : 1, cursor: selectedIds.size === 0 ? 'not-allowed' : 'pointer' }}
             disabled={selectedIds.size === 0}
@@ -693,7 +714,7 @@ function PotCard({ pot, selected, onClick }) {
   );
 }
 
-function AIScreen() {
+function AIScreen({ onOpenGuide }) {
   const { user } = useUser();
   const [mode, setMode] = useState('quiz'); // quiz | summary — 입력 UI 탭 선택
   const [resultMode, setResultMode] = useState('quiz'); // quiz | summary — 현재 표시 중인 결과 타입
@@ -722,6 +743,37 @@ function AIScreen() {
 
   // TIL 선택 모달
   const [modalOpen, setModalOpen] = useState(false);
+
+  // 📝 가이드 투어 도중 설명용 AI 예시 결과지 데이터를 렌더링하기 위한 가짜 상태(Mock State)입니다.
+  const [guideMockActive, setGuideMockActive] = useState(false);
+
+  // 📝 가이드 투어 순차 진행 시 특정 단계에 맞춰 자동으로 TIL 선택 모달(modalOpen)을 열고 닫는 로직을 구현합니다.
+  useEffect(() => {
+    const handleGuideStep = (e) => {
+      const { action, isEnd, selector } = e.detail;
+      if (isEnd) {
+        setModalOpen(false);
+        setGuideMockActive(false);
+        return;
+      }
+      
+      // AI 학습 가이드가 실행 중일 때 각 단계별로 화면의 모드나 팝업을 자동 제어합니다.
+      if (selector && selector.startsWith('.guide-ai-')) {
+        // TIL 선택 모달을 설명하는 단계에서는 모달을 자동으로 오픈합니다.
+        if (action === 'openAiTilModal' && potId) {
+          setModalOpen(true);
+        } else {
+          setModalOpen(false);
+        }
+
+        // 결과 화면을 설명하는 단계에서는 실제 생성 결과가 없어도 가이드용 예시 데이터를 노출합니다.
+        setGuideMockActive(action === 'showAiGuideResult');
+      }
+    };
+
+    window.addEventListener('rootin-guide-step', handleGuideStep);
+    return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
+  }, [potId]);
   // 마지막으로 선택한 tilIds (다시 생성 시 재사용)
   const [lastTilIds, setLastTilIds] = useState([]);
 
@@ -887,6 +939,19 @@ function AIScreen() {
     }
   };
 
+  const guideMockQuizzes = guideMockActive ? [
+    { id: 1, question: 'React에서 useEffect의 의존성 배열을 빈 배열([])로 설정하면 어떤 시점에 실행되나요?', options: ['컴포넌트가 처음 화면에 나타날 때(마운트)', '상태가 바뀔 때마다', '화면에서 사라질 때만', '렌더링되기 직전'], answer: 1, explanation: '의존성 배열이 빈 배열인 경우 컴포넌트가 마운트될 때 최초 1회만 동작합니다.' },
+    { id: 2, question: '마크다운 문법에서 가장 큰 제목을 표현할 때 쓰는 기호는 무엇인가요?', options: ['#', '##', '###', '####'], answer: 1, explanation: '# 기호를 사용하면 HTML의 h1 태그와 같은 가장 큰 제목이 생성됩니다.' },
+  ] : [];
+  const guideMockSummary = guideMockActive
+    ? '오늘 학습한 React 핵심 개념과 마크다운 작성 팁에 관한 요약입니다. 컴포넌트 생명주기와 훅의 올바른 사용법이 분석되었습니다.'
+    : '';
+  const guideMockKeyPoints = guideMockActive ? [
+    'useEffect의 의존성 관리 및 메모리 누수 방지 기법 학습',
+    'Shadcn UI와 Tailwind CSS를 활용한 반응형 웹 인터페이스 배치',
+    'AI 학습지 생성 시의 포인트 소모 규칙 확인',
+  ] : [];
+
   return (
     <>
     <div style={{ padding: 32, width: '100%', display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24, maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
@@ -897,12 +962,13 @@ function AIScreen() {
         <SectionHeader eyebrow="입력" title="학습 소스 선택" />
         <Card padding={18} style={{ marginBottom: 16 }}>
           <div className="eyebrow" style={{ marginBottom: 8 }}>목적</div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          {/* 가이드 하이라이트 매칭을 위해 guide-ai-mode 클래스를 추가합니다 */}
+          <div className="guide-ai-mode" style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setMode('quiz')} style={{
               flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'quiz' ? 'var(--ink)' : '#fff',
+              background: mode === 'quiz' ? 'var(--coral)' : '#fff',
               color: mode === 'quiz' ? '#fff' : 'var(--ink-2)',
-              border: '0.5px solid ' + (mode === 'quiz' ? 'var(--ink)' : 'var(--rule-2)'),
+              border: '0.5px solid ' + (mode === 'quiz' ? 'var(--coral)' : 'var(--rule-2)'),
               fontSize: 12.5, fontWeight: 500, textAlign: 'left',
             }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 4 }}>📝 복습 문제 생성</div>
@@ -910,9 +976,9 @@ function AIScreen() {
             </button>
             <button onClick={() => setMode('summary')} style={{
               flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'summary' ? 'var(--ink)' : '#fff',
+              background: mode === 'summary' ? 'var(--coral)' : '#fff',
               color: mode === 'summary' ? '#fff' : 'var(--ink-2)',
-              border: '0.5px solid ' + (mode === 'summary' ? 'var(--ink)' : 'var(--rule-2)'),
+              border: '0.5px solid ' + (mode === 'summary' ? 'var(--coral)' : 'var(--rule-2)'),
               fontSize: 12.5, fontWeight: 500, textAlign: 'left',
             }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 4 }}>✨ TIL 요약</div>
@@ -963,7 +1029,7 @@ function AIScreen() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflow: 'auto', paddingRight: 4 }} className="scrollbar">
+          <div className="guide-ai-pots scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflow: 'auto', paddingRight: 4 }}>
             {potsLoading ? (
               <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
                 화분 목록을 불러오는 중...
@@ -985,11 +1051,15 @@ function AIScreen() {
           </div>
 
           <Btn
+            className="guide-ai-select-til"
             variant="green" size="lg"
             style={{ width: '100%', marginTop: 14, opacity: potId ? 1 : 0.45, cursor: potId ? 'pointer' : 'not-allowed' }}
             onClick={() => potId && !generating && setModalOpen(true)}
           >
-            {generating ? '생성 중...' : (mode === 'quiz' ? `🌱 복습 문제 ${quizCount}개 만들기` : '✨ 요약 생성하기')} · {mode === 'quiz' ? quizCount * 10 : 50} 포인트 사용
+            {generating
+              ? '생성 중...'
+              : `${mode === 'quiz' ? `🌱 복습 문제 ${quizCount}개 만들기` : '✨ 요약 생성하기'} · ${mode === 'quiz' ? quizCount * 10 : 50} 포인트 사용`
+            }
           </Btn>
           <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-3)', textAlign: 'center' }}>
             현재 보유: <b style={{ color: 'var(--ink)' }}>{remainPoint}P</b> · 포인트는 활동으로 적립돼요
@@ -1073,23 +1143,31 @@ function AIScreen() {
           ) : null}
         />
 
-        <Card padding={28}>
+        <Card className="guide-ai-result" padding={28}>
           {generating ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '60px 0', color: 'var(--ink-3)' }}>
-              <div style={{ fontSize: 32 }}>🌱</div>
+              <Spinner size={48} color="var(--moss)" ariaHidden={true} />
               <div style={{ fontSize: 13.5, color: 'var(--ink-2)', fontFamily: 'var(--font-display)' }}>AI가 TIL을 분석하고 있어요...</div>
             </div>
-          ) : !generated ? (
+          ) : (!generated && !guideMockActive) ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '60px 0' }}>
               <div style={{ fontSize: 40, opacity: 0.35 }}>{mode === 'quiz' ? '📝' : '✨'}</div>
               <div style={{ fontSize: 13.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)' }}>
                 화분을 선택하고 생성 버튼을 눌러주세요
               </div>
             </div>
-          ) : resultMode === 'quiz' ? (
-            <QuizResult pot={selectedPot} quizCount={quizCount} quizzes={aiResult?.quizzes ?? null} />
+          ) : (resultMode === 'quiz' || (guideMockActive && mode === 'quiz')) ? (
+            <QuizResult
+              pot={selectedPot ?? { name: '예시 화분(JavaScript 입문)' }}
+              quizCount={2}
+              quizzes={guideMockActive ? guideMockQuizzes : (aiResult?.quizzes ?? [])}
+            />
           ) : (
-            <SummaryResult pot={selectedPot} summary={aiResult?.summary ?? null} keyPoints={aiResult?.keyPoints ?? null} />
+            <SummaryResult
+              pot={selectedPot ?? { name: '예시 화분(JavaScript 입문)' }}
+              summary={guideMockActive ? guideMockSummary : (aiResult?.summary ?? '')}
+              keyPoints={guideMockActive ? guideMockKeyPoints : (aiResult?.keyPoints ?? [])}
+            />
           )}
         </Card>
       </div>
@@ -1100,6 +1178,7 @@ function AIScreen() {
         potId={potId}
         onConfirm={handleModalConfirm}
         onClose={handleModalClose}
+        onOpenGuide={onOpenGuide}
       />
     )}
     </>
@@ -1260,11 +1339,6 @@ function SummaryResult({ pot, summary, keyPoints }) {
 
 // === Profile Screen ===
 
-const THEME_OPTIONS = [
-  { id: 'classic', emoji: '🌿', name: '원본', desc: '깔끔한 식물 테마' },
-  { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔 테마' },
-];
-
 function ProfileScreen() {
   const { user, updateUser, clearUser } = useUser();
   const { theme, setTheme } = useTheme();
@@ -1415,7 +1489,7 @@ function ProfileScreen() {
   const profileImageUrl = user?.profileImageUrl ?? null;
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1300, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
+    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
 
       <Card padding={28}>
         {/* 뷰 모드: 가로 배치 / 편집 모드: 아바타+폼 세로 구조 */}
@@ -1521,7 +1595,7 @@ function ProfileScreen() {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
+                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
                 <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 13 }}>@{user?.handle ?? ''}</span>
               </div>
               <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>{bio}</div>
@@ -1579,10 +1653,10 @@ function ProfileScreen() {
         </div>
       </Card>
 
-      {/* 테마 보관함 — 화면 디자인 선택 */}
+      {/* 테마 보관함 — 원본/게임보이 전환 */}
       <Card padding={24}>
         <SectionHeader eyebrow="화면 테마" title="테마 보관함" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginTop: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
           {THEME_OPTIONS.map((opt) => {
             const active = theme === opt.id;
             return (
@@ -1592,19 +1666,21 @@ function ProfileScreen() {
                 onClick={() => setTheme(opt.id)}
                 aria-pressed={active}
                 style={{
-                  textAlign: 'left', padding: '16px 18px', borderRadius: 12,
-                  border: active ? '2px solid var(--moss)' : '1px solid var(--rule-2)',
-                  background: active ? 'var(--paper-2)' : '#fff',
-                  cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6,
+                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5,
+                  padding: 16,
+                  borderRadius: 14,
+                  border: active ? '1.5px solid var(--moss)' : '1px solid var(--rule)',
+                  background: active ? 'color-mix(in oklch, var(--moss) 8%, var(--paper))' : 'var(--paper)',
+                  boxShadow: active ? '0 2px 12px color-mix(in oklch, var(--moss) 22%, transparent)' : 'none',
+                  cursor: 'pointer', textAlign: 'left', transition: 'all 0.18s ease',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>
-                    {opt.emoji} {opt.name}
-                  </span>
-                  {active && <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--moss)' }}>✓ 사용 중</span>}
-                </div>
-                <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>{opt.desc}</span>
+                <span style={{ fontSize: 26, lineHeight: 1 }}>{opt.emoji}</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{opt.name}</span>
+                <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{opt.desc}</span>
+                <span style={{ marginTop: 3, fontSize: 11.5, fontWeight: 600, color: active ? 'var(--moss)' : 'var(--ink-3)' }}>
+                  {active ? '● 장착됨' : '○ 선택'}
+                </span>
               </button>
             );
           })}
@@ -1649,7 +1725,7 @@ function ProfileScreen() {
           >
             <div className="eyebrow" style={{ color: 'var(--moss-2)', marginBottom: 4 }}>계정 관리</div>
             <h3 style={{
-              fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 700,
+              fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 700,
               color: 'var(--ink)', marginBottom: 22,
             }}>
               비밀번호 변경
@@ -1762,6 +1838,106 @@ function parseApiError(err) {
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '';
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// 비밀번호 조건 + 보안 등급 (21st.dev "Password update Block" 패턴을 Rootin에 맞게 이식)
+function passwordChecks(pw) {
+  const checks = {
+    length: pw.length >= 8,
+    upper: /[A-Z]/.test(pw),
+    number: /[0-9]/.test(pw),
+    special: /[^A-Za-z0-9]/.test(pw),
+  };
+  const score = Object.values(checks).filter(Boolean).length;
+  const LEVELS = [
+    { label: '',          color: 'var(--ink-3)' },
+    { label: '약함',      color: '#E08A6B' },
+    { label: '보통',      color: '#E6B14E' },
+    { label: '강함',      color: '#4F7C52' },
+    { label: '매우 강함', color: '#2F8F54' },
+  ];
+  return { checks, score, level: LEVELS[score] };
+}
+
+// 입력 필드 — 좌측 아이콘 + 포커스 링 애니메이션 + 실시간 유효 체크
+function AuthField({ icon: IconC, type = 'text', placeholder, value, onChange, disabled, name, focusField, setFocusField, onKeyDown, valid, showValid, rightSlot, autoComplete }) {
+  const focused = focusField === name;
+  const accent = '#2F8F54';
+  return (
+    <div style={{ position: 'relative' }}>
+      <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', display: 'inline-flex', color: focused ? accent : 'var(--ink-3)', transition: 'color 0.18s' }}>
+        <IconC size={17} />
+      </span>
+      <input
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        autoComplete={autoComplete}
+        onFocus={() => setFocusField(name)}
+        onBlur={() => setFocusField(f => (f === name ? null : f))}
+        onKeyDown={onKeyDown}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '13px 40px',
+          borderRadius: 12, fontSize: 14, outline: 'none',
+          background: '#fff', color: 'var(--ink)',
+          border: `1px solid ${focused ? accent : (showValid && valid ? '#9CC7AB' : 'var(--rule-2)')}`,
+          boxShadow: focused ? '0 0 0 3px rgba(47,143,84,0.12)' : 'none',
+          transition: 'border-color 0.18s, box-shadow 0.18s',
+        }}
+      />
+      {rightSlot
+        ? <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }}>{rightSlot}</div>
+        : (
+          <AnimatePresence>
+            {showValid && valid && (
+              <motion.span
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 22 }}
+                style={{ position: 'absolute', right: 12, top: '50%', display: 'inline-flex', width: 18, height: 18, marginTop: -9, borderRadius: '50%', background: accent, color: '#fff', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Check size={12} strokeWidth={3} />
+              </motion.span>
+            )}
+          </AnimatePresence>
+        )}
+    </div>
+  );
+}
+
+// 실시간 요건 한 줄
+function ReqItem({ ok, label }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: ok ? '#2F8F54' : 'var(--ink-3)', transition: 'color 0.2s' }}>
+      <span style={{ display: 'inline-flex', width: 15, height: 15, borderRadius: '50%', alignItems: 'center', justifyContent: 'center', background: ok ? '#2F8F54' : 'transparent', border: ok ? 'none' : '1.5px solid var(--rule-2)', color: '#fff', transform: ok ? 'scale(1)' : 'scale(0.92)', transition: 'background 0.2s, transform 0.2s' }}>
+        {ok && <Check size={10} strokeWidth={3.2} />}
+      </span>
+      {label}
+    </div>
+  );
+}
+
+// 비밀번호 보안 등급 미터
+function StrengthMeter({ pc }) {
+  return (
+    <div style={{ marginTop: 2 }}>
+      <div style={{ display: 'flex', gap: 5, marginBottom: 6 }}>
+        {[0, 1, 2, 3].map(i => (
+          <span key={i} style={{ flex: 1, height: 5, borderRadius: 3, background: i < pc.score ? pc.level.color : 'var(--rule-2)', transition: 'background 0.3s' }} />
+        ))}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5 }}>
+        <span style={{ color: 'var(--ink-3)' }}>보안 등급</span>
+        <span style={{ color: pc.level.color, fontWeight: 700 }}>{pc.level.label || '—'}</span>
+      </div>
+    </div>
+  );
+}
+
 function AuthScreen({ onAuth, onBackToLanding }) {
   const [mode, setMode] = useState('login'); // login | signup
   const [email, setEmail] = useState('');
@@ -1769,6 +1945,8 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+  const [focusField, setFocusField] = useState(null);
 
   // Google SDK 초기화
   useEffect(() => {
@@ -1847,87 +2025,78 @@ function AuthScreen({ onAuth, onBackToLanding }) {
     setNickname('');
   }
 
+  // 실시간 검증 파생값
+  const emailValid = EMAIL_RE.test(email);
+  const pc = passwordChecks(password);
+
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1.1fr 1fr', background: 'var(--paper)' }}>
+    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '1.05fr 0.95fr', background: 'var(--paper)' }}>
 
-      {/* Left visual */}
-      <div style={{
-        background: 'linear-gradient(135deg, #1a3a5c 0%, #2a5a8c 60%, #3d8b5e 130%)',
-        color: '#fff',
-        padding: '60px 60px 40px',
-        display: 'flex', flexDirection: 'column',
-        position: 'relative', overflow: 'hidden',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, zIndex: 2 }}>
-          <RootinLogo size={40} />
-          <div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em' }}>Rootin</div>
-            <div style={{ fontSize: 11, color: '#a8d5b5', fontFamily: 'var(--font-display)', letterSpacing: '0.1em', marginTop: 2 }}>루틴처럼, 뿌리처럼</div>
-          </div>
+      {/* ── 왼쪽: 따뜻한 정원 + 마우스를 따라보는 도트 식물 ── */}
+      <div style={{ position: 'relative', overflow: 'hidden', borderRight: '1px solid var(--rule-2)', color: 'var(--ink)', display: 'flex', flexDirection: 'column', padding: 'clamp(36px, 4.5vw, 60px)', background: 'linear-gradient(180deg, #FBF5E8 0%, #F3E9D4 56%, #ECDFC4 100%)' }}>
+        {/* 따뜻한 햇살 + 종이결 + 정원 바닥 */}
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(85% 50% at 80% -8%, rgba(255,235,186,0.75), transparent 55%)' }} />
+        <div style={{ position: 'absolute', inset: 0, opacity: 0.05, pointerEvents: 'none', backgroundImage: 'repeating-radial-gradient(circle at 0 0, #4a341c 0, #4a341c 1px, transparent 1px, transparent 100%)', backgroundSize: '3px 3px' }} />
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', background: 'radial-gradient(120% 68% at 50% 122%, rgba(116,201,140,0.30), transparent 60%)' }} />
+
+        {/* 브랜드 워드마크 — Rootin-logo-source.html 03(Fredoka·글자에 새싹) 적용 */}
+        <div style={{ position: 'relative', zIndex: 2, fontFamily: "'Fredoka', var(--font-display)", fontWeight: 600, fontSize: 42, letterSpacing: '-0.015em', lineHeight: 1, color: '#25342A' }}>
+          <RootinWordmark leaf1="#2F8F54" leaf2="#74C98C" animate={false} sproutBottom="0.66em" sproutWidth="0.42em" sproutHeight="0.29em" sproutShiftX="0.05em" />
         </div>
 
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', zIndex: 2 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 38, fontWeight: 600, lineHeight: 1.3, letterSpacing: '-0.02em' }}>
-            매일의 기록이<br />
-            <span style={{ color: '#a8d5b5' }}>뿌리가 되어</span><br />
-            꽃을 피웁니다.
+        {/* 헤드라인 */}
+        <div style={{ position: 'relative', zIndex: 2, marginTop: 'clamp(28px, 6vh, 60px)' }}>
+          <div style={{ fontSize: 11, letterSpacing: '0.34em', textTransform: 'uppercase', color: 'var(--moss-2)', opacity: 0.85, fontFamily: 'var(--font-display)' }}>
+            {mode === 'login' ? 'Welcome back' : 'Start growing'}
           </div>
-          <div style={{ fontSize: 14, color: 'rgba(232, 245, 236, 0.7)', marginTop: 22, lineHeight: 1.7, maxWidth: 380 }}>
-            오늘 배운 한 줄을 화분에 심으면, 식물이 자랍니다.<br />
-            기록이 쌓일수록 정원도 깊어져요.
-          </div>
+          <h2 style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 'clamp(2rem, 3.2vw, 3.1rem)', lineHeight: 1.06, letterSpacing: '-0.045em', margin: '18px 0 0', color: 'var(--ink)' }}>
+            오늘 배운 한 줄이<br /><span style={{ color: '#2F8F54' }}>뿌리</span> 깊은 습관이 됩니다
+          </h2>
+          <p style={{ maxWidth: 340, marginTop: 20, fontSize: 13.5, lineHeight: 1.7, color: 'var(--ink-2)', borderLeft: '1px solid var(--rule-2)', paddingLeft: 16 }}>
+            매일의 기록을 심으면 도트 식물이 자라요. 화분 친구들이 기다리고 있어요 — 마우스를 움직여 보세요.
+          </p>
         </div>
 
-        {/* decorative plant illustrations */}
-        <div style={{ position: 'absolute', bottom: 32, left: 60, right: 60, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', opacity: 0.95, zIndex: 1 }}>
-          {['seed','sprout','leaf','bloom','full'].map((s, i) => (
-            <div key={s} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <Plant stage={s} size={62} color="#ffd0e0" />
-              <div style={{ fontSize: 10, color: '#a8d5b5', fontFamily: 'var(--font-display)', letterSpacing: '0.06em' }}>{STAGE_META[s].label}</div>
-            </div>
-          ))}
+        {/* 도트 식물 (비밀번호 입력 중엔 시선을 내림) */}
+        <div style={{ position: 'relative', zIndex: 2, flex: 1, display: 'flex', alignItems: 'flex-end', paddingBottom: 'clamp(10px, 4vh, 36px)' }}>
+          <PixelPals shy={focusField === 'password'} />
         </div>
 
-        {/* subtle bg pattern */}
-        <div style={{ position: 'absolute', inset: 0, opacity: 0.05, backgroundImage: 'radial-gradient(circle at 20% 80%, #fff 1px, transparent 1px), radial-gradient(circle at 80% 20%, #fff 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+        {/* 푸터 */}
+        <div style={{ position: 'relative', zIndex: 2, display: 'flex', gap: 22, fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.04em' }}>
+          <span>개인정보</span><span>이용약관</span><span>문의</span>
+        </div>
       </div>
 
-      {/* Right form */}
-      <div style={{ padding: '60px 80px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        {onBackToLanding && (
-          <button
-            type="button"
-            onClick={onBackToLanding}
-            style={{
-              alignSelf: 'flex-start',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              marginBottom: 24,
-              color: 'var(--ink-3)',
-              fontSize: 12.5,
-              fontFamily: 'var(--font-display)',
-            }}
-          >
-            ← 처음으로
-          </button>
-        )}
-        <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>{mode === 'login' ? 'Welcome back' : 'Start growing'}</div>
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 30, fontWeight: 700, color: 'var(--ink)', marginTop: 8, letterSpacing: '-0.02em' }}>
-          {mode === 'login' ? '다시 만나서 반가워요' : '새로운 정원 시작하기'}
-        </h1>
-        <div style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 8 }}>
-          {mode === 'login' ? '오늘의 한 줄을 기록할 시간이에요.' : '이메일만 있으면 바로 첫 화분을 받아요.'}
-        </div>
+      {/* ── 오른쪽: 입력 폼 (재구성 · 21st.dev 패턴 이식) ── */}
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '40px clamp(32px, 5vw, 72px)', background: 'var(--paper)' }}>
+        <div style={{ width: '100%', maxWidth: 384, margin: '0 auto' }}>
+          {onBackToLanding && (
+            <button
+              type="button"
+              onClick={onBackToLanding}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 26, padding: '7px 14px 7px 11px', borderRadius: 999, background: '#fff', border: '1px solid var(--rule-2)', color: 'var(--ink-2)', fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--font-display)', boxShadow: '0 1px 2px rgba(46,42,33,0.05)', cursor: 'pointer' }}
+            >
+              <ArrowLeft size={15} strokeWidth={2.5} /> 처음으로
+            </button>
+          )}
 
-        {/* Social */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 28 }}>
+          {/* 헤더 */}
+          <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>{mode === 'login' ? 'Welcome back' : 'Start growing'}</div>
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 700, color: 'var(--ink)', marginTop: 6, letterSpacing: '-0.02em' }}>
+            {mode === 'login' ? '다시 만나서 반가워요' : '새로운 정원 시작하기'}
+          </h1>
+          <div style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 6 }}>
+            {mode === 'login' ? '오늘의 한 줄을 기록할 시간이에요.' : '이메일만 있으면 바로 첫 화분을 받아요.'}
+          </div>
+
+          {/* Google */}
           <button
             onClick={handleGoogleLogin}
             disabled={loading || !GOOGLE_CLIENT_ID}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-              padding: '12px 16px', borderRadius: 10,
+              width: '100%', marginTop: 26, padding: '12px 16px', borderRadius: 12,
               background: '#fff', border: '1px solid var(--rule-2)',
               fontSize: 13.5, fontWeight: 500, color: 'var(--ink)',
               opacity: (!GOOGLE_CLIENT_ID || loading) ? 0.5 : 1,
@@ -1942,99 +2111,97 @@ function AuthScreen({ onAuth, onBackToLanding }) {
             </svg>
             Google로 계속하기{!GOOGLE_CLIENT_ID && <span style={{ fontSize: 10.5, color: '#888', marginLeft: 4 }}>(미설정)</span>}
           </button>
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '24px 0', color: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-display)' }}>
-          <div style={{ flex: 1, height: 0.5, background: 'var(--rule-2)' }} />
-          <span>또는 이메일로</span>
-          <div style={{ flex: 1, height: 0.5, background: 'var(--rule-2)' }} />
-        </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '22px 0', color: 'var(--ink-3)', fontSize: 11, fontFamily: 'var(--font-display)' }}>
+            <div style={{ flex: 1, height: 0.5, background: 'var(--rule-2)' }} />
+            <span>또는 이메일로</span>
+            <div style={{ flex: 1, height: 0.5, background: 'var(--rule-2)' }} />
+          </div>
 
-        {/* Form */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {mode === 'signup' && (
-            <div>
-              <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>닉네임</label>
-              <input
-                placeholder="정원에서 불릴 이름"
-                value={nickname}
-                onChange={e => setNickname(e.target.value)}
-                disabled={loading}
-                style={{
-                  width: '100%', padding: '12px 14px', marginTop: 6,
-                  borderRadius: 10, border: '0.5px solid var(--rule-2)',
-                  fontSize: 14, outline: 'none', background: '#fff',
-                  boxSizing: 'border-box',
-                }}
+          {/* 입력 필드 — 아이콘 + 포커스 애니메이션 + 실시간 유효 체크 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {mode === 'signup' && (
+              <AuthField
+                icon={User} name="nickname" placeholder="정원에서 불릴 이름"
+                value={nickname} onChange={e => setNickname(e.target.value)} disabled={loading}
+                focusField={focusField} setFocusField={setFocusField}
+                valid={!!nickname.trim()} showValid
               />
+            )}
+            <AuthField
+              icon={Mail} type="email" name="email" placeholder="you@example.com" autoComplete="off"
+              value={email} onChange={e => setEmail(e.target.value)} disabled={loading}
+              focusField={focusField} setFocusField={setFocusField}
+              valid={emailValid} showValid={mode === 'signup'}
+            />
+            <AuthField
+              icon={Lock} type={showPw ? 'text' : 'password'} name="password" placeholder="••••••••"
+              value={password} onChange={e => setPassword(e.target.value)} disabled={loading}
+              focusField={focusField} setFocusField={setFocusField}
+              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+              rightSlot={(
+                <button
+                  type="button"
+                  onClick={() => setShowPw(v => !v)}
+                  aria-label={showPw ? '비밀번호 숨기기' : '비밀번호 보기'}
+                  style={{ display: 'inline-flex', color: 'var(--ink-3)', padding: 4 }}
+                >
+                  {showPw ? <EyeOff size={17} /> : <Eye size={17} />}
+                </button>
+              )}
+            />
+          </div>
+
+          {/* 회원가입: 실시간 조건 + 비밀번호 보안 등급 */}
+          <AnimatePresence initial={false}>
+            {mode === 'signup' && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                style={{ overflow: 'hidden' }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12, padding: '13px 15px', borderRadius: 12, background: '#fff', border: '1px solid var(--rule-2)' }}>
+                  <ReqItem ok={emailValid} label="올바른 이메일 형식" />
+                  <ReqItem ok={pc.checks.length} label="비밀번호 8자 이상 (필수)" />
+                  <div style={{ height: 1, background: 'var(--rule-2)', margin: '2px 0' }} />
+                  <StrengthMeter pc={pc} />
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 2 }}>
+                    {[{ ok: pc.checks.upper, l: '대문자' }, { ok: pc.checks.number, l: '숫자' }, { ok: pc.checks.special, l: '특수문자' }].map(p => (
+                      <span key={p.l} style={{ fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 999, background: p.ok ? '#EAF3EC' : 'var(--paper-2)', color: p.ok ? '#2F8F54' : 'var(--ink-3)', border: `1px solid ${p.ok ? '#BFE0C9' : 'var(--rule-2)'}`, transition: 'background 0.2s, color 0.2s, border-color 0.2s' }}>
+                        {p.ok ? '✓ ' : ''}{p.l}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 에러 메시지 */}
+          {error && (
+            <div style={{ marginTop: 14, padding: '10px 14px', borderRadius: 8, background: '#fef2f2', border: '0.5px solid #fca5a5', fontSize: 12.5, color: '#b91c1c' }}>
+              {error}
             </div>
           )}
-          <div>
-            <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>이메일</label>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              disabled={loading}
-              style={{
-                width: '100%', padding: '12px 14px', marginTop: 6,
-                borderRadius: 10, border: '0.5px solid var(--rule-2)',
-                fontSize: 14, outline: 'none', background: '#fff',
-                boxSizing: 'border-box',
-              }}
-            />
-            {mode === 'signup' && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 4 }}>해당 이메일로 인증메일을 전송합니다.</div>}
-          </div>
-          <div>
-            <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>비밀번호</label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              disabled={loading}
-              onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-              style={{
-                width: '100%', padding: '12px 14px', marginTop: 6,
-                borderRadius: 10, border: '0.5px solid var(--rule-2)',
-                fontSize: 14, outline: 'none', background: '#fff',
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
-        </div>
 
-        {/* 에러 메시지 */}
-        {error && (
-          <div style={{
-            marginTop: 14,
-            padding: '10px 14px',
-            borderRadius: 8,
-            background: '#fef2f2',
-            border: '0.5px solid #fca5a5',
-            fontSize: 12.5,
-            color: '#b91c1c',
-          }}>
-            {error}
+          <Btn
+            variant="primary"
+            size="lg"
+            style={{ width: '100%', marginTop: 16, opacity: loading ? 0.7 : 1 }}
+            onClick={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? '처리 중…' : mode === 'login' ? '정원으로 들어가기 →' : '첫 화분 받기 →'}
+          </Btn>
+
+          <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12.5, color: 'var(--ink-3)' }}>
+            {mode === 'login' ? '아직 계정이 없으세요? ' : '이미 계정이 있으세요? '}
+            <button onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')} style={{ color: 'var(--moss-2)', fontWeight: 500 }}>
+              {mode === 'login' ? '회원가입' : '로그인'}
+            </button>
           </div>
-        )}
-
-        <Btn
-          variant="primary"
-          size="lg"
-          style={{ width: '100%', marginTop: 16, opacity: loading ? 0.7 : 1 }}
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? '처리 중…' : mode === 'login' ? '정원으로 들어가기 →' : '첫 화분 받기 →'}
-        </Btn>
-
-        <div style={{ textAlign: 'center', marginTop: 18, fontSize: 12.5, color: 'var(--ink-3)' }}>
-          {mode === 'login' ? '아직 계정이 없으세요? ' : '이미 계정이 있으세요? '}
-          <button onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')} style={{ color: 'var(--moss-2)', fontWeight: 500 }}>
-            {mode === 'login' ? '회원가입' : '로그인'}
-          </button>
         </div>
       </div>
     </div>

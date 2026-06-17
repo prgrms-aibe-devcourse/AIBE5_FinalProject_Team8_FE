@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Card, Pill, Btn, StatTile, SectionHeader, Icon } from './ui.jsx';
+import { Card, Pill, Btn, StatTile, SectionHeader, ProgressBar, Icon } from './ui.jsx';
 import { Plant } from './plants.jsx';
 import { getSummary, getGrass, getWeekly, getDistribution, getInterests, getQuests } from './api/dashboard.js';
 import { getPointSummary } from './api/points.js';
@@ -9,6 +9,9 @@ import { getPointSummary } from './api/points.js';
 const GRASS_WEEKS = 52;
 const STREAK_CHAR_COUNT_CAP = 1200;
 const STREAK_MAX_BAR_HEIGHT = 82;
+
+// 섹션 카드 공통 — 은은한 상단 채광 sheen + 떠 있는 그림자(온실 깊이감)
+const CARD_SHEEN = { background: 'var(--grad-sheen)', boxShadow: 'var(--shadow-md)' };
 
 function getGrassStartDate(referenceDate = new Date(), weeks = GRASS_WEEKS) {
   const start = new Date(referenceDate);
@@ -52,13 +55,20 @@ function transformWeekly(weeklyData = []) {
 // ─── 컴포넌트 ──────────────────────────────────────────────────
 
 function GrassGraph({ data, startDate }) {
-  const colors = ['#eef2ee', '#cfe8d6', '#9dd0b0', '#5fb088', '#2e6b48'];
+  const colors = ['#ECE4D2', '#CFE2BC', '#A2C885', '#6CA15C', '#3E6F3A'];
   const weekDays = ['', '월', '', '수', '', '금', ''];
-  const cellSize = 14;
-  const gap = 4;
+  const weeks = data.length || GRASS_WEEKS;
+
+  // viewBox 좌표계 — SVG가 width:100%로 컨테이너에 맞춰 통째로 스케일되므로
+  // 셀·레이블이 같은 비율로 줄어 1년치(52주)가 가로 스크롤 없이 한눈에 들어오고,
+  // 셀과 요일/월 레이블의 정렬이 어떤 폭에서도 깨지지 않는다.
+  const cell = 13, gap = 3, dayLabelW = 18, monthRowH = 14;
+  const step = cell + gap;
+  const vbW = dayLabelW + weeks * step - gap;
+  const vbH = monthRowH + 7 * step - gap;
 
   // 각 주(column)의 시작일로 월 레이블 계산
-  const start = new Date(startDate ?? getGrassStartDate(new Date(), data.length || GRASS_WEEKS));
+  const start = new Date(startDate ?? getGrassStartDate(new Date(), weeks));
   const monthLabels = data.map((_, w) => {
     const cur = new Date(start);
     cur.setDate(start.getDate() + w * 7);
@@ -70,38 +80,27 @@ function GrassGraph({ data, startDate }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        {/* 요일 레이블 — 월 레이블 행 높이(20px)만큼 상단 패딩 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap, fontFamily: 'var(--font-body)', fontSize: 10.5, fontWeight: 500, color: 'var(--ink-3)', paddingTop: 20 }}>
-          {weekDays.map((d, i) => (
-            <div key={i} style={{ width: 16, height: cellSize, lineHeight: `${cellSize}px` }}>{d}</div>
-          ))}
-        </div>
-        <div>
-          {/* 월 레이블 행 */}
-          <div style={{ display: 'flex', gap, marginBottom: 5 }}>
-            {monthLabels.map((label, wi) => (
-              <div key={wi} style={{ width: cellSize, fontSize: 10.5, fontFamily: 'var(--font-body)', fontWeight: 500, color: 'var(--ink-2)', overflow: 'visible', whiteSpace: 'nowrap' }}>
-                {label}
-              </div>
-            ))}
-          </div>
-          {/* 잔디 그리드 */}
-          <div style={{ display: 'flex', gap }}>
-            {data.map((week, wi) => (
-              <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap }}>
-                {week.map((v, di) => (
-                  <div key={di} style={{
-                    width: cellSize, height: cellSize, borderRadius: 3,
-                    background: colors[v],
-                    border: v === 0 ? '0.5px solid var(--rule)' : 'none',
-                  }} />
-                ))}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <svg viewBox={`0 0 ${vbW} ${vbH}`} width="100%" style={{ display: 'block', height: 'auto' }}>
+        {/* 월 레이블 */}
+        {monthLabels.map((label, w) => label ? (
+          <text key={`m${w}`} x={dayLabelW + w * step} y={monthRowH - 4}
+            fontSize="9" style={{ fontFamily: 'var(--font-body)', fontWeight: 500, fill: 'var(--ink-2)' }}>{label}</text>
+        ) : null)}
+        {/* 요일 레이블 */}
+        {weekDays.map((d, i) => d ? (
+          <text key={`d${i}`} x={dayLabelW - 5} y={monthRowH + i * step + cell - 3} textAnchor="end"
+            fontSize="9" style={{ fontFamily: 'var(--font-body)', fontWeight: 500, fill: 'var(--ink-3)' }}>{d}</text>
+        ) : null)}
+        {/* 잔디 셀 */}
+        {data.map((week, w) =>
+          week.map((v, d) => (
+            <rect key={`${w}-${d}`} x={dayLabelW + w * step} y={monthRowH + d * step}
+              width={cell} height={cell} rx="2.5"
+              style={{ fill: colors[v], stroke: v === 0 ? 'var(--rule)' : 'transparent', strokeWidth: 0.5 }} />
+          ))
+        )}
+      </svg>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 14, fontFamily: 'var(--font-body)', fontSize: 11.5, fontWeight: 500, color: 'var(--ink-2)' }}>
         <span>적음</span>
         {colors.map((c, i) => (
@@ -220,7 +219,7 @@ function StreakActivityChart({ days }) {
                 height,
                 minWidth: 0,
                 borderRadius: day.active ? '5px 5px 2px 2px' : 3,
-                background: day.active ? 'linear-gradient(180deg, #3d8b5e, #2e6b48)' : 'var(--rule)',
+                background: day.active ? 'linear-gradient(180deg, var(--moss), var(--moss-2))' : 'var(--rule)',
                 opacity: day.active ? 1 : 0.65,
                 outline: isToday && day.active ? '1px solid rgba(46, 107, 72, 0.28)' : 'none',
                 outlineOffset: 2,
@@ -344,7 +343,7 @@ function PotDistribution({ distribution }) {
   const R = 56;
   const circumference = 2 * Math.PI * R;
   const hasHiddenItems = hiddenPots.length > 0;
-  const colors = ['#1f4f3a', '#2563eb', '#d97706', '#7c3aed', '#db2777', '#9ca3af'];
+  const colors = ['#4F7C52', '#E6B14E', '#E08A6B', '#7FA9B5', '#B79BC9', '#9A9082'];
   const getSegmentKey = (segment, index) => segment.potId ?? `${segment.potName}-${index}`;
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
@@ -395,7 +394,7 @@ function PotDistribution({ distribution }) {
 
 // ── 관심사 누적 영역 차트 ──────────────────────────
 
-const COLORS = ['#1a3a5c', '#3d8b5e', '#c8733a', '#534ab7', '#c45c8a'];
+const COLORS = ['#4F7C52', '#E6B14E', '#E08A6B', '#7FA9B5', '#B79BC9'];
 const W = 700, H = 220;
 const PAD = { top: 14, right: 16, bottom: 36, left: 40 };
 const normalizeTag = tag => String(tag ?? '').trim();
@@ -650,7 +649,7 @@ function InterestStackedAreaChart({ interests }) {
             영역 높이 = 작성량
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <svg width="32" height="8"><rect x="0" y="2" width="8" height="5" rx="2.5" fill="#1a3a5c"/><rect x="12" y="2" width="8" height="5" rx="2.5" fill="#3d8b5e"/><rect x="24" y="2" width="8" height="5" rx="2.5" fill="#c8733a"/></svg>
+            <svg width="32" height="8"><rect x="0" y="2" width="8" height="5" rx="2.5" fill="#4F7C52"/><rect x="12" y="2" width="8" height="5" rx="2.5" fill="#E6B14E"/><rect x="24" y="2" width="8" height="5" rx="2.5" fill="#E08A6B"/></svg>
             색상 = 학습 주제
           </span>
         </div>
@@ -677,7 +676,7 @@ function InterestStackedAreaChart({ interests }) {
           {/* X축 월 라벨 */}
           {monthLabels.map((label, i) => (
             <text key={i} x={xScale(i)} y={H - 6} textAnchor="middle"
-              fontSize={10} fill={hoveredIdx === i ? '#1a3a5c' : '#bbb'} fontWeight={hoveredIdx === i ? 600 : 400}>
+              fontSize={10} fill={hoveredIdx === i ? 'var(--ink)' : '#bbb'} fontWeight={hoveredIdx === i ? 600 : 400}>
               {label}
             </text>
           ))}
@@ -748,25 +747,44 @@ function InterestStackedAreaChart({ interests }) {
         </svg>
       </div>
 
-      {/* 요약 카드 */}
-      {totals.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-          {[
-            { label: '누적 최다 주제',     t: topSum,          sub: `${topSum?.sum ?? 0}개` },
-            { label: '이번 달 최다 주제',  t: topThis,         sub: `${topThis?.lastCount ?? 0}개 · ${topThis?.lastRatio ?? 0}%` },
-            { label: '이번 달 비중 1위',   t: topMonthlyRatio, sub: `${topMonthlyRatio?.lastRatio ?? 0}% · ${topMonthlyRatio?.lastCount ?? 0}개` },
-          ].map(({ label, t, sub }) => t ? (
-            <div key={label} style={{
-              flex: 1, background: 'var(--paper-2)', borderRadius: 10, padding: '10px 14px',
-              borderLeft: `3px solid ${t.color}`,
-            }}>
-              <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginBottom: 3 }}>{label}</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: t.color, fontFamily: 'var(--font-display)' }}>{t.tag}</div>
-              <div style={{ fontSize: 10.5, color: 'var(--ink-3)', marginTop: 2 }}>{sub}</div>
-            </div>
-          ) : null)}
-        </div>
-      )}
+      {/* 요약 카드 — 학습 주제 하이라이트 (식물색 마커 + 비중 growth 바) */}
+      {totals.length > 0 && (() => {
+        const cumTotal = totals.reduce((s, x) => s + x.sum, 0) || 1;
+        const cards = [
+          { label: '누적 최다 주제',    t: topSum,          metric: `${topSum?.sum ?? 0}개`,                                       pct: Math.round(((topSum?.sum ?? 0) / cumTotal) * 100) },
+          { label: '이번 달 최다 주제', t: topThis,         metric: `${topThis?.lastCount ?? 0}개 · ${topThis?.lastRatio ?? 0}%`,  pct: topThis?.lastRatio ?? 0 },
+          { label: '이번 달 비중 1위',  t: topMonthlyRatio, metric: `${topMonthlyRatio?.lastRatio ?? 0}% · ${topMonthlyRatio?.lastCount ?? 0}개`, pct: topMonthlyRatio?.lastRatio ?? 0 },
+        ];
+        return (
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            {cards.map(({ label, t, metric, pct }) => t ? (
+              <div key={label} style={{
+                flex: 1, minWidth: 0,
+                display: 'flex', flexDirection: 'column',
+                borderRadius: 16, padding: '15px 17px 16px',
+                background: `linear-gradient(155deg, color-mix(in oklch, ${t.color} 11%, var(--card)) 0%, var(--card) 72%)`,
+                border: `1px solid color-mix(in oklch, ${t.color} 26%, var(--rule))`,
+                boxShadow: 'var(--shadow-sm)',
+              }}>
+                {/* 라벨 + 식물색 마커 점 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: t.color, flexShrink: 0, boxShadow: `0 0 0 4px color-mix(in oklch, ${t.color} 16%, transparent)` }} />
+                  <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', fontFamily: 'var(--font-display)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                </div>
+                {/* 주제명 */}
+                <div title={t.tag} style={{ fontSize: 20, fontWeight: 700, color: t.color, fontFamily: 'var(--font-display)', letterSpacing: '-0.015em', marginTop: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.tag}</div>
+                {/* 비중 growth 바 + 수치 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 11 }}>
+                  <div style={{ flex: 1, height: 5, borderRadius: 999, background: `color-mix(in oklch, ${t.color} 14%, var(--paper-3))`, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, pct))}%`, background: t.color, borderRadius: 999, transition: 'width 500ms cubic-bezier(.2,.7,.3,1)' }} />
+                  </div>
+                  <span style={{ fontSize: 11, color: 'var(--ink-2)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>{metric}</span>
+                </div>
+              </div>
+            ) : null)}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -791,7 +809,7 @@ function GoalRow({ goal }) {
       <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)', textDecoration: goal.done ? 'line-through' : 'none', opacity: goal.done ? 0.6 : 1 }}>
         {goal.label}
       </div>
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: 11.5, fontWeight: 600, color: goal.done ? 'var(--moss-2)' : 'var(--ink-3)' }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 11.5, fontWeight: 700, color: goal.done ? 'var(--moss-2)' : '#8a6310' }}>
         +{goal.point}P
       </div>
     </div>
@@ -889,20 +907,43 @@ function DashboardScreen({ onNav }) {
   const earnedToday = quests?.earnedToday ?? 0;
   const totalToday  = quests?.totalToday  ?? 0;
 
+  const dynamicGreeting = useMemo(() => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 11) return { text: "싱그러운 아침, 새로운 성장을 기록해 볼까요?", grad: "linear-gradient(90deg, #2D5A27 0%, #68923F 100%)" };
+    if (hour >= 11 && hour < 17) return { text: "활기찬 오후, 오늘의 배움을 단단하게 다져보세요.", grad: "linear-gradient(90deg, #C27616 0%, #D8563A 100%)" };
+    if (hour >= 17 && hour < 22) return { text: "차분한 저녁, 하루 동안 모은 지식을 정리할 시간이에요.", grad: "linear-gradient(90deg, #2B4C5F 0%, #528091 100%)" };
+    return { text: "고요한 밤, 내일을 위한 작은 씨앗을 심어주세요.", grad: "linear-gradient(90deg, #514266 0%, #8C75A1 100%)" };
+  }, []);
+
   return (
     <div style={{ padding: 32, width: '100%', display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
 
       {/* Greeting card */}
-      <Card padding={24} style={{ background: 'linear-gradient(120deg, #ebf5ef 0%, #f5f7f5 50%, #f9f6ed 100%)', border: '0.5px solid var(--leaf)' }}>
+      <Card className="guide-dashboard-greeting" padding={24} style={{
+        background: 'radial-gradient(135% 130% at 90% -25%, color-mix(in oklch, var(--amber) 26%, transparent) 0%, transparent 48%), linear-gradient(120deg, var(--primary-weak) 0%, var(--primary-weak2) 55%, var(--honey-weak) 100%)',
+        border: '0.5px solid var(--leaf)',
+        boxShadow: 'var(--shadow-md), inset 0 1px 0 color-mix(in oklch, white 55%, transparent)',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-          <Plant stage="bloom" size={86} />
+          <div className="til-plant-float" style={{ flexShrink: 0 }}>
+            <Plant stage="bloom" size={86} />
+          </div>
           <div style={{ flex: 1 }}>
-            <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>오늘의 한 줄</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 600, color: 'var(--ink)', marginTop: 6, letterSpacing: '-0.01em' }}>
-              "매일의 기록이 뿌리가 되어 꽃을 피웁니다"
+            <div style={{ 
+              fontFamily: 'var(--font-display)', 
+              fontSize: 23, 
+              fontWeight: 700, 
+              letterSpacing: '-0.01em',
+              background: dynamicGreeting.grad,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              display: 'inline-block'
+            }}>
+              {dynamicGreeting.text}
             </div>
-            <div style={{ fontSize: 12.5, color: 'var(--ink-2)', marginTop: 6 }}>
-              연속 <b style={{ color: 'var(--moss-2)' }}>{streak}일</b> 기록 중
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--ink-2)', marginTop: 8 }}>
+              <span style={{ color: 'var(--coral)', display: 'inline-flex' }}>{Icon.flame}</span>
+              <span>연속 <b style={{ color: 'var(--moss-2)' }}>{streak}일</b> 기록 중</span>
             </div>
           </div>
           <Btn variant="green" size="lg" icon={Icon.edit} onClick={() => onNav('editor')}>
@@ -912,77 +953,88 @@ function DashboardScreen({ onNav }) {
       </Card>
 
       {/* Stat tiles */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        <StatTile label="누적 TIL"    value={totalTil}                   suffix="개" sub="누적 작성 수" />
-        <StatTile label="연속 기록"   value={streak}                     suffix="일" sub={`최고 ${bestStreak}일`} tone="green" />
-        <StatTile label="누적 글자수" value={totalChar.toLocaleString()} suffix="자" sub="총 작성 글자 수" />
-        <StatTile label="포인트"      value={currentPoint}               suffix="P"  sub="AI 토큰으로 사용 가능" tone="brown" />
+      <div className="guide-dashboard-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <StatTile label="누적 TIL"    value={totalTil}                   suffix="개" sub="누적 작성 수"      icon={Icon.edit}  accent="moss" />
+        <StatTile label="연속 기록"   value={streak}                     suffix="일" sub={`최고 ${bestStreak}일`} icon={Icon.flame} accent="coral" />
+        <StatTile label="누적 글자수" value={totalChar.toLocaleString()} suffix="자" sub="총 작성 글자 수"    icon={Icon.book}  accent="ink" />
+        <StatTile label="포인트"      value={currentPoint}               suffix="P"  sub="AI 토큰으로 사용 가능" icon={Icon.coin}  accent="amber" highlight />
       </div>
 
-      {/* Grass + Today goals */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
-        <Card padding={22}>
-          <SectionHeader eyebrow="활동" title="잔디 그래프" />
-          <GrassGraph data={grassState.grid} startDate={grassState.startDate} />
-        </Card>
+      {/* 📊 하단 활동 분석 및 그래프 영역 전체를 가이드 타겟으로 설정합니다 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* Grass + Today goals */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 16 }}>
+          <Card className="guide-dashboard-grass" padding={22} style={{ minWidth: 0, ...CARD_SHEEN }}>
+            <SectionHeader eyebrow="활동" title="잔디 그래프" accent="var(--moss)" />
+            <GrassGraph data={grassState.grid} startDate={grassState.startDate} />
+          </Card>
 
-        <Card padding={22}>
-          <SectionHeader
-            eyebrow={`오늘 · ${new Date().toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace('. ', '.').slice(0, 5)}`}
-            title="오늘의 목표"
-            action={
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: 11.5, color: 'var(--moss-2)', fontWeight: 600 }}>
-                {earnedToday} / {totalToday}P
-              </span>
-            }
-          />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {goalList.map(g => <GoalRow key={g.id} goal={g} />)}
-          </div>
-        </Card>
-      </div>
+          <Card className="guide-dashboard-goals" padding={22} style={CARD_SHEEN}>
+            <SectionHeader
+              eyebrow={`오늘 · ${new Date().toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }).replace('. ', '.').slice(0, 5)}`}
+              title="오늘의 목표"
+              accent="var(--amber)"
+              action={
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: 11.5, color: '#8a6310', fontWeight: 700 }}>
+                  {earnedToday} / {totalToday}P
+                </span>
+              }
+            />
+            <div style={{ marginBottom: 14 }}>
+              <ProgressBar
+                value={totalToday > 0 ? earnedToday / totalToday : 0}
+                color="var(--amber)"
+                bg="var(--amber-soft)"
+                height={6}
+              />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {goalList.map(g => <GoalRow key={g.id} goal={g} />)}
+            </div>
+          </Card>
+        </div>
 
-      {/* 3 column stats row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-        <Card padding={22}>
-          <SectionHeader eyebrow="연속 기록" title="Streak" action={
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <Pill tone="green">현재 {streak}일째</Pill>
-              <Pill tone="green">최고 {bestStreak}일</Pill>
+        {/* 3 column stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          <Card className="guide-dashboard-streak" padding={22} style={CARD_SHEEN}>
+            <SectionHeader eyebrow="연속 기록" title="Streak" accent="var(--coral)" action={
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <Pill tone="green">현재 {streak}일째</Pill>
+                <Pill tone="green">최고 {bestStreak}일</Pill>
+              </div>
+            } />
+            <StreakActivityChart days={recentStreakDays} />
+          </Card>
+
+          <Card className="guide-dashboard-distribution" padding={22} style={CARD_SHEEN}>
+            <SectionHeader eyebrow="화분별 분포" title="주제 비율" accent="var(--moss)" />
+            <PotDistribution distribution={distribution} />
+          </Card>
+
+          <Card className="guide-dashboard-weekly" padding={22} style={{ display: 'flex', flexDirection: 'column', ...CARD_SHEEN }}>
+            <SectionHeader eyebrow="이번 주" title="요일별 작성" accent="var(--moss)" />
+            <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />
+          </Card>
+        </div>
+
+        {/* Interest line chart */}
+        <Card className="guide-dashboard-interests" padding={22} style={CARD_SHEEN}>
+          <SectionHeader eyebrow="관심사 변화" title="시기별 학습 주제 흐름" accent="var(--moss)" action={
+            <div style={{ display: 'flex', gap: 4 }}>
+              {[['6개월', 6], ['12개월', 12]].map(([label, m]) => (
+                <button key={m} onClick={() => setInterestMonths(m)} style={{
+                  padding: '5px 10px', fontSize: 11.5, borderRadius: 7,
+                  background: interestMonths === m ? 'var(--coral)' : 'transparent',
+                  color: interestMonths === m ? '#fff' : 'var(--ink-2)',
+                  border: interestMonths === m ? 'none' : '0.5px solid var(--rule-2)',
+                  fontFamily: 'var(--font-display)', fontWeight: 500, cursor: 'pointer',
+                }}>{label}</button>
+              ))}
             </div>
           } />
-          <StreakActivityChart days={recentStreakDays} />
-        </Card>
-
-        <Card padding={22}>
-          <SectionHeader eyebrow="화분별 분포" title="주제 비율" />
-          <PotDistribution distribution={distribution} />
-        </Card>
-
-        <Card padding={22} style={{ display: 'flex', flexDirection: 'column' }}>
-          <SectionHeader eyebrow="이번 주" title="요일별 작성" />
-          <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />
+          <InterestStackedAreaChart interests={interests} />
         </Card>
       </div>
-
-      {/* Interest line chart */}
-      <Card padding={22}>
-        <SectionHeader eyebrow="관심사 변화" title="시기별 학습 주제 흐름" action={
-          <div style={{ display: 'flex', gap: 4 }}>
-            {[['6개월', 6], ['12개월', 12]].map(([label, m]) => (
-              <button key={m} onClick={() => setInterestMonths(m)} style={{
-                padding: '5px 10px', fontSize: 11.5, borderRadius: 7,
-                background: interestMonths === m ? 'var(--ink)' : 'transparent',
-                color: interestMonths === m ? '#fff' : 'var(--ink-2)',
-                border: interestMonths === m ? 'none' : '0.5px solid var(--rule-2)',
-                fontFamily: 'var(--font-display)', fontWeight: 500, cursor: 'pointer',
-              }}>{label}</button>
-            ))}
-          </div>
-        } />
-        <InterestStackedAreaChart interests={interests} />
-      </Card>
-
     </div>
   );
 }

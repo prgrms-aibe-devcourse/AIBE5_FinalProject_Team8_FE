@@ -30,6 +30,14 @@ const SPROUT = {
 // months → 주 수 (3개월≈13주, 6개월≈26주, 1년≈52주)
 const MONTHS_TO_WEEKS = { 3: 13, 6: 26, 12: 52 };
 
+// 로컬 기준 날짜 키(YYYY-MM-DD). toISOString()은 UTC라 KST 등에서 하루 밀리므로 사용 금지.
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 // BE cells([{date, tilCount, charCount, level}]) → N주×7일 2D 배열 (0~4)
 function buildGrassGrid(cells = [], months = 3) {
   const levelMap = {};
@@ -44,7 +52,7 @@ function buildGrassGrid(cells = [], months = 3) {
     Array.from({ length: 7 }, (_, d) => {
       const dt = new Date(start);
       dt.setDate(start.getDate() + w * 7 + d);
-      return levelMap[dt.toISOString().split('T')[0]] ?? 0;
+      return levelMap[formatDateKey(dt)] ?? 0;
     })
   );
 }

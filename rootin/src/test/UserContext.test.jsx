@@ -10,6 +10,7 @@ vi.mock('../api/user.js', () => ({
     bio: '안녕하세요',
     point: 100,
     tilCount: 5,
+    createdAt: '2024-03-15T10:00:00Z',
   }),
 }));
 
@@ -63,7 +64,56 @@ describe('UserContext', () => {
       bio: '안녕하세요',
       point: 100,
       tilCount: 5,
+      createdAt: '2024-03-15T10:00:00Z',
     });
+  });
+
+  it('createdAt이 있으면 joinedAt이 한국어 날짜(년 월 일)로 변환된다', () => {
+    const apiUser = { userId: 1, nickname: '소나무', bio: '', point: 0, tilCount: 0, createdAt: '2024-03-15T10:00:00Z' };
+    let capturedUser;
+    function Capture() {
+      const { user } = useUser();
+      capturedUser = user;
+      return null;
+    }
+    render(
+      <UserProvider initialUser={apiUser}>
+        <Capture />
+      </UserProvider>
+    );
+    expect(capturedUser.joinedAt).toBe('2024년 3월 15일');
+  });
+
+  it('createdAt이 없으면 joinedAt이 빈 문자열이다', () => {
+    const apiUser = { userId: 1, nickname: '소나무', bio: '', point: 0, tilCount: 0 };
+    let capturedUser;
+    function Capture() {
+      const { user } = useUser();
+      capturedUser = user;
+      return null;
+    }
+    render(
+      <UserProvider initialUser={apiUser}>
+        <Capture />
+      </UserProvider>
+    );
+    expect(capturedUser.joinedAt).toBe('');
+  });
+
+  it('createdAt이 유효하지 않은 문자열이면 joinedAt이 빈 문자열이다', () => {
+    const apiUser = { userId: 1, nickname: '소나무', bio: '', point: 0, tilCount: 0, createdAt: 'invalid-date' };
+    let capturedUser;
+    function Capture() {
+      const { user } = useUser();
+      capturedUser = user;
+      return null;
+    }
+    render(
+      <UserProvider initialUser={apiUser}>
+        <Capture />
+      </UserProvider>
+    );
+    expect(capturedUser.joinedAt).toBe('');
   });
 
   it('initialUser를 정규화해서 name/bio를 올바르게 노출한다', () => {

@@ -214,7 +214,8 @@ export function TilStatusIsland({
         hidden ? 'translate-y-6 opacity-0' : 'translate-y-0 opacity-100',
       )}
     >
-      <div className="til-status-bar pointer-events-auto flex items-center gap-3 px-4 py-2.5">
+      <div className="til-status-bar guide-editor-status pointer-events-auto flex items-center gap-3 px-4 py-2.5">
+
         <TemplateMenu />
 
         <span className="h-4 w-px bg-[var(--line-strong)]" />

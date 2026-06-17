@@ -127,7 +127,8 @@ export function EditorToolbarIsland({
             exit={{ opacity: 0, y: -14, scale: 0.96 }}
             transition={{ type: 'spring', damping: 22, stiffness: 320 }}
             className={cn(
-              'til-toolbar-bar pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-0.5',
+              // til-toolbar-bar=게임보이 툴바 스타일 / guide-editor-toolbar=가이드 오버레이 타겟
+              'til-toolbar-bar guide-editor-toolbar pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-0.5',
               'px-2 py-1.5',
             )}
           >

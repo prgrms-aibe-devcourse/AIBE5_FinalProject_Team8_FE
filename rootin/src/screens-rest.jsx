@@ -883,21 +883,23 @@ function AIScreen({ onOpenGuide }) {
         
         if (action === 'showAiGuideResult') {
           setResultMode('quiz');
+          setQuizCount(2); // 예시 결과는 2문항 — 배지·안내 문구와 실제 렌더 문항 수를 일치시킴
           setGenerated(true);
+          // QuizResult가 읽는 실제 응답 형태(choices·answer 문자열·hint)로 구성해야 선택지가 렌더된다.
           setAiResult({
             isGuideMock: true,
             quizzes: [
               {
                 question: "🌱 Rootin에서 매일 TIL을 꾸준히 작성하면 정원에서 어떤 변화가 일어날까요?",
-                options: ["아무 일도 일어나지 않는다", "포인트가 줄어든다", "화분의 식물이 한 단계 성장한다", "새로운 화분이 무한히 생성된다"],
-                answer: 3,
-                explanation: "TIL을 발행하여 물주기를 완료하면 식물의 성장 경험치가 올라가고 다음 단계로 진화합니다."
+                choices: ["아무 일도 일어나지 않는다", "포인트가 줄어든다", "화분의 식물이 한 단계 성장한다", "새로운 화분이 무한히 생성된다"],
+                answer: "화분의 식물이 한 단계 성장한다",
+                hint: "TIL을 발행해 물주기를 완료하면 성장 경험치가 쌓여요.",
               },
               {
                 question: "📚 AI 복습 퀴즈를 만들기 위해 필요한 것은 무엇인가요?",
-                options: ["키보드와 마우스", "충분한 보유 포인트와 작성된 TIL", "새로운 화분", "친구의 초대 링크"],
-                answer: 2,
-                explanation: "AI 기능을 이용하려면 활동으로 모은 포인트와 학습할 화분의 TIL 데이터가 필요합니다."
+                choices: ["키보드와 마우스", "충분한 보유 포인트와 작성된 TIL", "새로운 화분", "친구의 초대 링크"],
+                answer: "충분한 보유 포인트와 작성된 TIL",
+                hint: "활동으로 모은 포인트와 학습할 화분의 기록이 필요해요.",
               }
             ]
           });

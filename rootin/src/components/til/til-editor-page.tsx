@@ -34,7 +34,6 @@ import { TrailingNode } from './extensions/trailing-node'
 import { ResizableImage } from './extensions/resizable-image'
 import { EditorToolbarIsland } from './editor-toolbar-island'
 import { EditorBubbleMenu } from './editor-bubble-menu'
-import { SidebarTrigger } from '@/components/ui/sidebar'
 
 import { TilStatusIsland } from './til-status-island'
 import { TilMeta } from './til-meta'
@@ -63,6 +62,8 @@ export function TilEditorPage({
   onSelectedPotChange,
   focusMode = false,
   onToggleFocus,
+  contentShift = 0,
+  rightContentShift = 0,
 }: {
   onNav?: (screen: string) => void
   initialSelectedPotId?: number | string | null
@@ -72,6 +73,8 @@ export function TilEditorPage({
   onSelectedPotChange?: (potId: string | null) => void
   focusMode?: boolean
   onToggleFocus?: () => void
+  contentShift?: number
+  rightContentShift?: number
   initialTil?: {
     id?: number | string
     tilId?: number | string
@@ -443,16 +446,6 @@ export function TilEditorPage({
 
   return (
     <div className="relative flex h-screen flex-col overflow-hidden bg-background">
-      {/* 좌상단 떠있는 사이드바 토글 (집중 모드에선 숨김) — 캔버스 기준 배치라 사이드바 로고를 가리지 않음 */}
-      {!focusMode && (
-        <div className="pointer-events-none absolute left-4 top-4 z-30">
-          <SidebarTrigger
-            aria-label="사이드바 토글"
-            className="til-pulltab pointer-events-auto size-9 rounded-full text-muted-foreground"
-          />
-        </div>
-      )}
-
       {/* 떠있는 툴바 아일랜드 (집중 모드에선 숨김) */}
       {!focusMode && editor ? (
         <EditorToolbarIsland editor={editor} onToggleFocus={onToggleFocus} />
@@ -474,6 +467,13 @@ export function TilEditorPage({
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{
+          // 좌측/우측 사이드바를 접어 줄어든 만큼 좌우 패딩으로 보정 → 본문이 제자리에 머문다.
+          // 사이드바 width 애니메이션과 동일한 커브/시간으로 맞춰 매 프레임 위치가 고정된다.
+          paddingLeft: focusMode ? 0 : contentShift,
+          paddingRight: focusMode ? 0 : rightContentShift,
+          transition: 'padding-left 0.42s cubic-bezier(0.4, 0, 0.2, 1), padding-right 0.42s cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
       >
         <main className="mx-auto w-full max-w-3xl px-5 pb-40 pt-24 md:px-6">
           <div className="guide-editor-meta">

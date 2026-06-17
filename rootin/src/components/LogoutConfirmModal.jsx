@@ -134,7 +134,7 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
               height: 42,
               borderRadius: 10,
               border: 'none',
-              background: 'var(--ink)',
+              background: 'var(--coral)',
               color: '#fff',
               fontSize: 14,
               fontWeight: 600,

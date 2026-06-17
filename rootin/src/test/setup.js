@@ -36,4 +36,32 @@ if (typeof window.localStorage?.clear !== 'function') {
   });
 }
 
+// framer-motion의 viewport 기능(useInView/whileInView)이 사용 — jsdom 미구현 폴리필
+if (typeof globalThis.IntersectionObserver === 'undefined') {
+  class IntersectionObserver {
+    constructor(callback) {
+      this.callback = callback;
+    }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return [];
+    }
+  }
+  globalThis.IntersectionObserver = IntersectionObserver;
+  window.IntersectionObserver = IntersectionObserver;
+}
+
+// ResizeObserver — 랜딩 모니터가 내부 높이 측정에 사용 (jsdom 미구현)
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  globalThis.ResizeObserver = ResizeObserver;
+  window.ResizeObserver = ResizeObserver;
+}
+
 window.alert = vi.fn();

@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { getPlants } from './api/collection.js';
 import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
 import { GardenScreen, PotDetailScreen, TilDetailScreen } from './screens-garden.jsx';
@@ -100,13 +99,18 @@ function AppShell() {
   //  마운트 시점 값과의 비교로는 변화를 감지할 수 없다.)
   const [growthCelebratePotId, setGrowthCelebratePotId] = useState(null);
   // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
-  const [leftOpen, setLeftOpen] = useState(true);
+  // 좌측 사이드바 열림 상태는 SidebarProvider가 토글 시 기록하는 sidebar_state 쿠키에서 복원한다(새로고침 후에도 유지).
+  const [leftOpen, setLeftOpen] = useState(() => {
+    try {
+      const m = document.cookie.match(/(?:^|;\s*)sidebar_state=(true|false)/);
+      return m ? m[1] === 'true' : true;
+    } catch { return true; }
+  });
   const [rightOpen, setRightOpen] = useState(() => {
     const v = typeof localStorage !== 'undefined' ? localStorage.getItem('rootin.tilRightOpen') : null;
     return v === null ? true : v === 'true';
   });
   const [focusMode, setFocusMode] = useState(false);
-  const [collectionStats, setCollectionStats] = useState(null);
   const [guideOpen, setGuideOpen] = useState(false);
 
   const toggleRightPanel = () => setRightOpen((o) => {
@@ -128,29 +132,6 @@ function AppShell() {
     }
   };
   const closeLogoutModal = () => setLogoutModalOpen(false);
-
-  useEffect(() => {
-    if (!authed) {
-      setCollectionStats(null);
-      return;
-    }
-
-    let active = true;
-
-    getPlants()
-      .then(data => {
-        if (active) {
-          setCollectionStats(data?.stats ?? null);
-        }
-      })
-      .catch(error => {
-        if (active) {
-          console.error('식물도감 요약 조회 중 오류 발생:', error);
-        }
-      });
-
-    return () => { active = false; };
-  }, [authed]);
 
   const screen = getScreenFromPath(location.pathname);
   // 풀스크린 비전-디스플레이 프레임(어두운 룸 + 모니터 베젤)을 적용할 화면.

@@ -886,8 +886,8 @@ function DashboardScreen({ onNav }) {
               연속 <b style={{ color: 'var(--leaf-2)' }}>{streak}일</b> 기록 중 · 오늘도 한 뼘 자랐어요
             </div>
           </div>
-          <button className="rt-btn rt-btn--accent" onClick={() => { playSfx('confirm'); onNav('editor'); }}>
-            <RtIcon name="plus" /> 오늘 기록하기
+          <button className="rt-btn rt-btn--accent" onClick={() => { playSfx('confirm'); onNav('garden'); }}>
+            <RtIcon name="sprout" /> 화분 선택하기
           </button>
         </div>
       </div>

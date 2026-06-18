@@ -24,6 +24,7 @@ import { TilEditorProvider as TilEditorProviderClassic } from '@/components/til-
 import { TilEditorProvider } from '@/components/til/til-editor-context';
 import { LogoutConfirmModal } from '@/components/LogoutConfirmModal.jsx';
 import { logout, clearTokens } from './api/auth.js';
+import { useSmoothScroll } from './hooks/useSmoothScroll.js';
 
 // App shell — sidebar + topbar + route-based screen routing
 
@@ -112,6 +113,11 @@ function AppShell() {
   });
   const [focusMode, setFocusMode] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  // 부드러운 스크롤 — 인증 앱과 랜딩·로그인 모두 실제 스크롤 주체는 window 다.
+  // (SidebarProvider 가 height 고정이 아니라 minHeight:100vh 라 .scrollbar 는 콘텐츠만큼 자라며
+  //  스크롤은 window 에서 일어난다. 에디터처럼 자체 스크롤러를 가진 화면은 allowNestedScroll 로 보존)
+  // 라우트 전환마다 재생성해 Lenis 의 내부 타깃을 현재 스크롤 위치로 깨끗하게 맞춘다.
+  useSmoothScroll({ enabled: true, resetKey: location.pathname });
 
   const toggleRightPanel = () => setRightOpen((o) => {
     const next = !o;

@@ -1,6 +1,7 @@
 import { motion, useScroll, useTransform, useMotionValueEvent, AnimatePresence } from 'framer-motion';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { SiteDescriptions } from './SiteDescriptions.jsx';
+import { getLenis } from '../hooks/useSmoothScroll.js';
 import { Lock, Menu, ArrowLeft, ArrowRight, RotateCw, Plus } from 'lucide-react';
 
 const CHROME_H = 60; // Safari chrome(메뉴바+툴바) 높이(px)
@@ -92,7 +93,10 @@ export const MonitorSection = ({ onStart, scrollToRef }) => {
 
     const trackTop = track.getBoundingClientRect().top + window.scrollY;
     const target = trackTop + v * (track.offsetHeight - vh);
-    window.scrollTo({ top: target, behavior: 'smooth' });
+    // window Lenis 가 활성이면 Lenis 경유로(네이티브 scrollTo 충돌 방지), 아니면 네이티브로.
+    const lenis = getLenis();
+    if (lenis) lenis.scrollTo(target, { duration: 1.1 });
+    else window.scrollTo({ top: target, behavior: 'smooth' });
   }, []);
 
   useEffect(() => {

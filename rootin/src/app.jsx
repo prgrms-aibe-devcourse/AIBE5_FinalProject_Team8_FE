@@ -1,20 +1,37 @@
 import { useState, useEffect, useCallback } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { DashboardScreen } from './screens-dashboard.jsx';
 import { EditorScreen } from './screens-editor.jsx';
-import { GardenScreen, PotDetailScreen } from './screens-garden.jsx';
+import { GardenScreen, PotDetailScreen, TilDetailScreen } from './screens-garden.jsx';
 import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens-rest.jsx';
 import { LandingScreen } from './screens-landing.jsx';
 import { NotFoundScreen } from './screens-error.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { GameBoySidebar } from '@/components/GameBoySidebar.jsx';
 import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
+import { GuideOverlay } from './components/GuideOverlay.jsx';
+import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
+import { DashboardScreen as DashboardClassic } from './screens-dashboard.classic.jsx';
+import { GardenScreen as GardenClassic, PotDetailScreen as PotDetailClassic } from './screens-garden.classic.jsx';
+import { CollectionScreen as CollectionClassic, AIScreen as AIClassic, ProfileScreen as ProfileClassic } from './screens-rest.classic.jsx';
+import { LogoutConfirmModal as LogoutConfirmModalClassic } from '@/components/LogoutConfirmModal.classic.jsx';
+import { EditorScreen as EditorClassic } from './screens-editor.classic.jsx';
+import { RootinSidebarRight as RootinSidebarRightClassic } from '@/components/RootinSidebarRight.classic.jsx';
+import { TilEditorProvider as TilEditorProviderClassic } from '@/components/til-classic/til-editor-context';
 import { TilEditorProvider } from '@/components/til/til-editor-context';
 import { LogoutConfirmModal } from '@/components/LogoutConfirmModal.jsx';
 import { logout, clearTokens } from './api/auth.js';
-import { GuideOverlay } from './components/GuideOverlay.jsx';
+import { useSmoothScroll } from './hooks/useSmoothScroll.js';
 
+// App shell — sidebar + topbar + route-based screen routing
+
+// Old custom Sidebar and TopBar removed and replaced by Shadcn UI
+
+// 사용자 이용 가이드 단계 정의 — 화면 요소를 .guide-* 클래스로 가리키며 안내한다.
+// classic·gameboy 두 테마 모두 동일한 .guide-* 타겟을 두므로 같은 단계 정의를 공유한다.
 const GUIDE_STEPS = {
   dashboard: [
     { selector: '.guide-dashboard-greeting', text: '📝 오늘의 한 줄과 현재 연속 기록을 확인하고, [화분 선택하기]로 정원에서 오늘 기록할 화분을 골라요.', placement: 'bottom', textOffset: { x: 0, y: 15 } },
@@ -60,12 +77,13 @@ const GUIDE_STEPS = {
     { selector: '.guide-ai-modal-list', action: 'openAiTilModal', text: '🔎 학습 데이터로 사용할 TIL 글을 골라요. 검색이나 태그 필터로 원하는 기록만 빠르게 찾을 수 있어요.', placement: 'left', textOffset: { x: -60, y: 0 } },
     { selector: '.guide-ai-modal-submit', action: 'openAiTilModal', text: '✨ 하단의 생성 버튼으로 선택한 TIL 기반 AI 학습지를 만들어요. 모드에 따라 포인트가 차감돼요.', placement: 'top', textOffset: { x: 0, y: -20 } },
     { selector: '.guide-ai-result', action: 'showAiGuideResult', text: '🧠 AI가 만든 퀴즈를 풀고 채점하거나, 요약된 개념 노트를 학습할 수 있어요.', placement: 'left', textOffset: { x: -40, y: 0 } },
-    { selector: '.guide-ai-saved-results', text: '🗂️ 저장한 AI 결과는 보관함에 모여요. 나중에 다시 열어 복습할 수 있어요.', placement: 'right', textOffset: { x: 40, y: 0 } }
+    { selector: '.guide-ai-saved-results', text: '🗂️ 저장한 AI 결과는 보관함에 모여요. 나중에 다시 열어 복습할 수 있어요.', placement: 'top', textOffset: { x: 0, y: -20 } }
   ]
 };
 
 function AppShell() {
   const { setUserFromApi, clearUser } = useUser();
+  const { theme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [authed, setAuthed] = useState(!!localStorage.getItem('accessToken'));
@@ -76,40 +94,82 @@ function AppShell() {
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
   const [gardenRefreshKey, setGardenRefreshKey] = useState(0);
+  // 발행 후 화분 복귀 시 식물 성장 연출(물주기)을 1회 발동시키는 신호.
+  // "이 화분을 축하하라"는 일회성 potId. 화면이 소비하면 onCelebrated로 다시 null이 된다.
+  // (카운터 대신 potId를 쓰는 이유: 화분 상세는 발행 직후 새로 마운트되므로
+  //  마운트 시점 값과의 비교로는 변화를 감지할 수 없다.)
+  const [growthCelebratePotId, setGrowthCelebratePotId] = useState(null);
+  // 에디터 화면 UI 상태 — 좌측 사이드바(controlled), 오른쪽 아일랜드 패널, 집중 모드
+  // 좌측 사이드바 열림 상태는 SidebarProvider가 토글 시 기록하는 sidebar_state 쿠키에서 복원한다(새로고침 후에도 유지).
   const [leftOpen, setLeftOpen] = useState(() => {
-    if (typeof document === 'undefined') return true;
-    const m = document.cookie.match(/(?:^|;\s*)sidebar_state=(true|false)/);
-    return m ? m[1] === 'true' : true;
+    try {
+      const m = document.cookie.match(/(?:^|;\s*)sidebar_state=(true|false)/);
+      return m ? m[1] === 'true' : true;
+    } catch { return true; }
   });
   const [rightOpen, setRightOpen] = useState(() => {
     const v = typeof localStorage !== 'undefined' ? localStorage.getItem('rootin.tilRightOpen') : null;
     return v === null ? true : v === 'true';
   });
   const [focusMode, setFocusMode] = useState(false);
-  const [leftFreedWidth, setLeftFreedWidth] = useState(0);
-  const rightFreedWidth = rightOpen ? 0 : 266;
   const [guideOpen, setGuideOpen] = useState(false);
+  // 부드러운 스크롤 — 인증 앱과 랜딩·로그인 모두 실제 스크롤 주체는 window 다.
+  // (SidebarProvider 가 height 고정이 아니라 minHeight:100vh 라 .scrollbar 는 콘텐츠만큼 자라며
+  //  스크롤은 window 에서 일어난다. 에디터처럼 자체 스크롤러를 가진 화면은 allowNestedScroll 로 보존)
+  // 라우트 전환마다 재생성해 Lenis 의 내부 타깃을 현재 스크롤 위치로 깨끗하게 맞춘다.
+  useSmoothScroll({ enabled: true, resetKey: location.pathname });
 
   const toggleRightPanel = () => setRightOpen((o) => {
     const next = !o;
-    try { localStorage.setItem('rootin.tilRightOpen', String(next)); } catch { }
+    try { localStorage.setItem('rootin.tilRightOpen', String(next)); } catch { /* noop */ }
     return next;
   });
   const toggleFocusMode = () => setFocusMode((f) => !f);
+
+  const confirmLogout = async () => {
+    try {
+      await logout().catch(() => {}); // 서버 세션 무효화 (best-effort)
+    } finally {
+      clearTokens();
+      clearUser();
+      setAuthed(false);
+      setLogoutModalOpen(false);
+      navigate('/landing', { replace: true });
+    }
+  };
+  const closeLogoutModal = () => setLogoutModalOpen(false);
+
   const screen = getScreenFromPath(location.pathname);
+  // 풀스크린 비전-디스플레이 프레임(어두운 룸 + 모니터 베젤)을 적용할 화면.
+  // 게임보이/CRT로 개편된 화면을 여기에 추가하면 양쪽 여백 없이 풀폭 + 테두리가 입혀진다.
+  const baseFramed = screen === 'dashboard' || screen === 'garden' || screen === 'pot-detail' || screen === 'collection' || screen === 'ai' || screen === 'profile';
+  // 테마 토글: classic 테마에서는 게임보이 베젤/사이드바를 끄고 원본 셸(RootinSidebarLeft)로 렌더한다.
+  // 대상 화면(대시보드/정원/화분상세/도감/AI/프로필)은 classic 구현이 있다. 에디터·TIL상세는 게임보이 유지.
+  const CLASSIC_SHELL_SCREENS = ['dashboard', 'garden', 'pot-detail', 'collection', 'ai', 'profile', 'editor'];
+  const useClassicShell = theme === 'classic' && CLASSIC_SHELL_SCREENS.includes(screen);
+  const framed = baseFramed && !useClassicShell;
+  // 에디터 스택을 테마별로 선택 (Provider·화면·우측 패널은 같은 til 트리/컨텍스트끼리 묶여야 한다)
+  const isClassic = theme === 'classic';
+  const TilProvider = isClassic ? TilEditorProviderClassic : TilEditorProvider;
+  const EditorComp = isClassic ? EditorClassic : EditorScreen;
+  const RightPanel = isClassic ? RootinSidebarRightClassic : RootinSidebarRight;
+  const reduceMotion = useReducedMotion();
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
-  const editorEntryMode = getEditorModeFromSearch(location.search);
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
-  const guideStorageKey = GUIDE_STEPS[screen] ? `rootin.visitedGuide.${screen}` : null;
+  // 이용 가이드는 두 테마 모두에서 동작한다. 각 테마 화면이 동일한 .guide-* 타겟을 갖고,
+  // GuideOverlay는 theme prop으로 카드/스포트라이트 룩만 분기한다(positioning 로직은 공통).
+  const guideEnabled = !!GUIDE_STEPS[screen];
+  const guideStorageKey = guideEnabled ? `rootin.visitedGuide.${screen}` : null;
 
   const closeGuide = useCallback(() => {
     if (guideStorageKey) {
-      try { localStorage.setItem(guideStorageKey, 'true'); } catch { }
+      try { localStorage.setItem(guideStorageKey, 'true'); } catch { /* noop */ }
     }
     setGuideOpen(false);
   }, [guideStorageKey]);
 
+  // 화면 첫 방문 시(메인 테마) 이용 가이드를 1초 뒤 한 번 자동으로 열어준다. (방문 기록은 localStorage)
   useEffect(() => {
     if (authed && guideStorageKey) {
       const hasVisited = localStorage.getItem(guideStorageKey);
@@ -122,6 +182,12 @@ function AppShell() {
     }
   }, [authed, guideStorageKey]);
 
+  // TIL 작성 페이지에 진입할 때마다 오른쪽 패널(템플릿/임시저장)을 항상 펼친다.
+  // (진입 시점에만 강제로 열고, 이후 세션 내 토글은 그대로 동작)
+  useEffect(() => {
+    if (screen === 'editor') setRightOpen(true);
+  }, [screen]);
+
   const handleNav = (nextScreen) => {
     setFocusMode(false);
     if (nextScreen?.startsWith?.('/')) {
@@ -132,8 +198,6 @@ function AppShell() {
       setEditorInitialPotId(null);
       setEditorInitialTil(null);
       setEditorReturnScreen(null);
-      navigate('/editor?mode=new');
-      return;
     }
     navigate(screenToPath(nextScreen, potFocus));
   };
@@ -143,7 +207,7 @@ function AppShell() {
     setEditorInitialPotId(potId);
     setEditorInitialTil(null);
     setEditorReturnScreen(`/garden/pots/${potId}`);
-    navigate(`/editor?potId=${potId}&mode=new`);
+    navigate(`/editor?potId=${potId}`);
   };
 
   const openEditorForTil = (til) => {
@@ -154,20 +218,28 @@ function AppShell() {
     navigate(returnPotId ? `/editor?potId=${returnPotId}` : '/editor');
   };
 
+  // 사이드바에서 임시저장본 "이어쓰기" — 수정 모드를 해제해 신규 작성 상태로 되돌림
+  // (에디터 본문 적용은 context.resumeDraft가 담당)
   const resumeEditorDraft = (potId) => {
     setEditorInitialPotId(potId ?? null);
     setEditorInitialTil(null);
-    navigate(potId ? `/editor?potId=${potId}&mode=resume` : '/editor?mode=resume', { replace: true });
+    navigate(potId ? `/editor?potId=${potId}` : '/editor', { replace: true });
   };
 
+  // 사이드바 "새 TIL 작성" — 수정 모드 해제(신규 작성 상태). 선택한 화분은 유지.
+  // (에디터 비우기는 context.startNewTil이 담당)
   const startNewEditorTil = () => {
     setEditorInitialTil(null);
   };
 
   const handleTilPublished = (publishedPotId) => {
     if (editorReturnScreen?.startsWith?.('/garden/pots/')) {
-      setPotFocus(publishedPotId ?? editorInitialPotId ?? potFocus);
+      // publishedPotId는 에디터의 selectedPotId(문자열)에서 오므로 숫자로 정규화한다.
+      // (라우트 potId는 숫자라 문자열과 비교하면 연출이 발동하지 않는다.)
+      const celebratePotId = parseRoutePotId(publishedPotId) ?? editorInitialPotId ?? potFocus;
+      setPotFocus(celebratePotId);
       setPotDetailRefreshKey(key => key + 1);
+      setGrowthCelebratePotId(celebratePotId);
     } else if (editorReturnScreen === '/garden') {
       setGardenRefreshKey(key => key + 1);
     }
@@ -204,118 +276,160 @@ function AppShell() {
   }
 
   return (
-    <TilEditorProvider>
-      <SidebarProvider
-        open={focusMode ? false : leftOpen}
-        onOpenChange={setLeftOpen}
-        style={{ display: 'flex', minHeight: '100vh', background: 'var(--paper)', minWidth: 1180, '--sidebar-width': '18rem' }}
-        data-screen-label={screen}
-      >
+    <TilProvider>
+    <SidebarProvider
+      open={focusMode ? false : leftOpen}
+      onOpenChange={setLeftOpen}
+      style={{
+        display: 'flex', minHeight: '100vh', minWidth: 1180,
+        // 게임보이 에디터·TIL 상세는 베젤 없는 크림 화면. classic 에디터는 원본 종이 배경(var(--paper)).
+        background: framed ? 'transparent' : ((!useClassicShell && (screen === 'editor' || screen === 'til-detail')) ? '#efe7d3' : 'var(--paper)'),
+        position: framed ? 'relative' : undefined,
+        zIndex: framed ? 0 : undefined,
+      }}
+      data-screen-label={screen}
+    >
+      {framed && <><div className="rt-vision-room" /><div className="rt-vision-screen-bg" /></>}
+      {useClassicShell ? (
         <RootinSidebarLeft
-          current={screen.startsWith('pot') ? 'garden' : screen}
+          current={screen.startsWith('pot') || screen === 'til-detail' ? 'garden' : screen}
           onNav={handleNav}
           onLogout={() => setLogoutModalOpen(true)}
-          onCollapseChange={setLeftFreedWidth}
         />
-        <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
-          <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<DashboardScreen onNav={handleNav} />} />
-              <Route path="/editor" element={(
-                <EditorScreen
-                  onNav={handleNav}
-                  initialSelectedPotId={activeEditorPotId}
-                  entryMode={editorEntryMode}
-                  initialTil={editorInitialTil}
-                  afterPublishScreen={editorReturnScreen ?? (activeEditorPotId ? `/garden/pots/${activeEditorPotId}` : '/dashboard')}
-                  onPublished={handleTilPublished}
-                  onSelectedPotChange={syncEditorPotQuery}
-                  focusMode={focusMode}
-                  onToggleFocus={toggleFocusMode}
-                  contentShift={leftFreedWidth}
-                  rightContentShift={rightFreedWidth}
-                />
-              )} />
-              <Route path="/garden" element={<GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
-              <Route path="/garden/pots/:potId" element={(
-                <PotDetailRoute
-                  refreshKey={potDetailRefreshKey}
-                  onBack={() => navigate('/garden')}
-                  onStartTil={openEditorForPot}
-                  onEditTil={openEditorForTil}
-                />
-              )} />
-              <Route path="/collection" element={<CollectionScreen />} />
-              <Route path="/ai" element={<AIScreen onOpenGuide={() => setGuideOpen(true)} />} />
-              <Route path="/profile" element={<ProfileScreen />} />
-              <Route path="*" element={<NotFoundScreen />} />
-            </Routes>
-          </div>
-        </SidebarInset>
-        {screen === 'editor' && !focusMode && (
-          <RootinSidebarRight
-            onEditTil={openEditorForTil}
-            onResumeDraft={resumeEditorDraft}
-            onNewTil={startNewEditorTil}
-            open={rightOpen}
-            onToggle={toggleRightPanel}
-          />
-        )}
-        {guideOpen && GUIDE_STEPS[screen] && (
-          <GuideOverlay
-            isOpen={guideOpen}
-            onClose={closeGuide}
-            steps={GUIDE_STEPS[screen]}
-          />
-        )}
-        {GUIDE_STEPS[screen] && !focusMode && (
-          <button
-            onClick={() => setGuideOpen(true)}
-            className="flex items-center justify-center border hover:bg-muted text-muted-foreground transition-all duration-200"
-            style={{
-              position: 'fixed',
-              right: '24px',
-              bottom: '24px',
-              zIndex: 100,
-              width: 32,
-              height: 32,
-              borderRadius: '50%',
-              borderColor: 'var(--rule-2)',
-              backgroundColor: 'var(--paper)',
-              color: 'var(--ink-2)',
-              fontWeight: 'bold',
-              fontSize: '15px',
-              cursor: 'pointer',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-            }}
-            title="이 화면의 이용 가이드 맵 켜기"
-          >
-            ?
-          </button>
-        )}
-      </SidebarProvider>
-      {logoutModalOpen && (
-        <LogoutConfirmModal
-          onConfirm={async () => {
-            try {
-              await logout().catch(() => { });
-            } finally {
-              clearTokens();
-              clearUser();
-              setAuthed(false);
-              setLogoutModalOpen(false);
-              navigate('/landing', { replace: true });
-            }
-          }}
-          onClose={() => setLogoutModalOpen(false)}
+      ) : (
+        <GameBoySidebar
+          current={screen.startsWith('pot') || screen === 'til-detail' ? 'garden' : screen}
+          onNav={handleNav}
+          onLogout={() => setLogoutModalOpen(true)}
+          forceHidden={focusMode}
         />
       )}
-    </TilEditorProvider>
+      <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
+        <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={theme === 'classic' ? <DashboardClassic onNav={handleNav} /> : <DashboardScreen onNav={handleNav} />} />
+            <Route path="/editor" element={(
+              <EditorComp
+                onNav={handleNav}
+                initialSelectedPotId={activeEditorPotId}
+                initialTil={editorInitialTil}
+                afterPublishScreen={editorReturnScreen ?? (activeEditorPotId ? `/garden/pots/${activeEditorPotId}` : '/dashboard')}
+                onPublished={handleTilPublished}
+                onSelectedPotChange={syncEditorPotQuery}
+                focusMode={focusMode}
+                onToggleFocus={toggleFocusMode}
+              />
+            )} />
+            <Route path="/garden" element={theme === 'classic'
+              ? <GardenClassic refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />
+              : <GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
+            <Route path="/garden/pots/:potId" element={(
+              <PotDetailRoute
+                theme={theme}
+                refreshKey={potDetailRefreshKey}
+                celebratePotId={growthCelebratePotId}
+                onCelebrated={() => setGrowthCelebratePotId(null)}
+                onBack={() => navigate('/garden')}
+                onStartTil={openEditorForPot}
+                onEditTil={openEditorForTil}
+                onOpenTil={(potId, tilId) => navigate(`/garden/pots/${potId}/tils/${tilId}`)}
+              />
+            )} />
+            <Route path="/garden/pots/:potId/tils/:tilId" element={(
+              <TilDetailRoute
+                onBack={(potId) => navigate(`/garden/pots/${potId}`)}
+                onEdit={openEditorForTil}
+                onDeleted={(potId) => {
+                  setPotDetailRefreshKey(key => key + 1);
+                  navigate(`/garden/pots/${potId}`);
+                }}
+              />
+            )} />
+            <Route path="/collection" element={theme === 'classic' ? <CollectionClassic /> : <CollectionScreen />} />
+            <Route path="/ai" element={theme === 'classic' ? <AIClassic onOpenGuide={() => setGuideOpen(true)} /> : <AIScreen />} />
+            <Route path="/profile" element={theme === 'classic' ? <ProfileClassic /> : <ProfileScreen />} />
+            <Route path="*" element={<NotFoundScreen />} />
+          </Routes>
+        </div>
+      </SidebarInset>
+      {screen === 'editor' && !focusMode && (
+        <RightPanel
+          onEditTil={openEditorForTil}
+          onResumeDraft={resumeEditorDraft}
+          onNewTil={startNewEditorTil}
+          open={rightOpen}
+          onToggle={toggleRightPanel}
+        />
+      )}
+      {/* 모니터 베젤 — 화면 전환 시 부드럽게 등장/소멸.
+          에디터 진입(framed→false): 베젤이 확대되며 페이드아웃 → 모니터 속으로 빨려들어가는 느낌.
+          에디터 이탈(false→framed): 베젤이 제자리로 모이며 페이드인. */}
+      <AnimatePresence initial={false}>
+        {framed && (
+          <motion.div
+            key="vision-frame"
+            className="rt-vision-frame"
+            aria-hidden="true"
+            initial={reduceMotion ? false : { opacity: 0, scale: 1.12 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.18 }}
+            transition={{ duration: reduceMotion ? 0.12 : 0.55, ease: [0.4, 0, 0.7, 1] }}
+          >
+            <span className="vf-label">ROOTIN VISION-DISPLAY · 16:9 DOT MATRIX</span>
+            <div className="vf-brand">
+              <span className="vf-led" /><span>POWER</span>
+              <span className="vf-word">Rootin</span>
+              <span>DOT-MATRIX VISION DISPLAY™ · MODEL RT-9</span>
+            </div>
+            <div className="vf-grille"><i /><i /><i /><i /><i /><span className="vf-knob" /></div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {guideEnabled && guideOpen && (
+        <GuideOverlay
+          isOpen={guideOpen}
+          onClose={closeGuide}
+          steps={GUIDE_STEPS[screen]}
+          theme={isClassic ? 'classic' : 'gameboy'}
+        />
+      )}
+      {guideEnabled && !focusMode && (
+        <button
+          onClick={() => setGuideOpen(true)}
+          className="flex items-center justify-center transition-all duration-200"
+          style={{
+            position: 'fixed',
+            right: '24px',
+            bottom: '24px',
+            zIndex: 100,
+            width: isClassic ? 32 : 38,
+            height: isClassic ? 32 : 38,
+            border: isClassic ? '1px solid var(--rule-2)' : '2px solid #33402a',
+            borderRadius: isClassic ? '50%' : '8px',
+            backgroundColor: isClassic ? 'var(--paper)' : '#f8f2e3',
+            color: isClassic ? 'var(--ink-2)' : '#33402a',
+            fontFamily: isClassic ? 'inherit' : '"Galmuri11", "DungGeunMo", monospace',
+            fontWeight: 'bold',
+            fontSize: '15px',
+            cursor: 'pointer',
+            boxShadow: isClassic ? '0 2px 8px rgba(0,0,0,0.1)' : '3px 3px 0 0 #33402a',
+          }}
+          title="이 화면의 이용 가이드 맵 켜기"
+        >
+          ?
+        </button>
+      )}
+    </SidebarProvider>
+    {logoutModalOpen && (theme === 'classic'
+      ? <LogoutConfirmModalClassic onConfirm={confirmLogout} onClose={closeLogoutModal} />
+      : <LogoutConfirmModal onConfirm={confirmLogout} onClose={closeLogoutModal} />
+    )}
+    </TilProvider>
   );
 }
 
-function PotDetailRoute({ refreshKey, onBack, onStartTil, onEditTil }) {
+function PotDetailRoute({ theme, refreshKey, celebratePotId, onCelebrated, onBack, onStartTil, onEditTil, onOpenTil }) {
   const { potId } = useParams();
   const numericPotId = parseRoutePotId(potId);
 
@@ -323,18 +437,53 @@ function PotDetailRoute({ refreshKey, onBack, onStartTil, onEditTil }) {
     return <Navigate to="/garden" replace />;
   }
 
+  // classic 화분 상세는 TIL을 전용 라우트가 아니라 에디터(onEditTil)로 연다.
+  if (theme === 'classic') {
+    return (
+      <PotDetailClassic
+        potId={numericPotId}
+        refreshKey={refreshKey}
+        onBack={onBack}
+        onStartTil={onStartTil}
+        onEditTil={onEditTil}
+      />
+    );
+  }
+
   return (
     <PotDetailScreen
       potId={numericPotId}
       refreshKey={refreshKey}
+      celebratePotId={celebratePotId}
+      onCelebrated={onCelebrated}
       onBack={onBack}
       onStartTil={onStartTil}
-      onEditTil={onEditTil}
+      onOpenTil={(tilId) => onOpenTil(numericPotId, tilId)}
+    />
+  );
+}
+
+function TilDetailRoute({ onBack, onEdit, onDeleted }) {
+  const { potId, tilId } = useParams();
+  const numericPotId = parseRoutePotId(potId);
+  const numericTilId = parseRoutePotId(tilId);
+
+  if (numericPotId == null || numericTilId == null) {
+    return <Navigate to="/garden" replace />;
+  }
+
+  return (
+    <TilDetailScreen
+      tilId={numericTilId}
+      onBack={() => onBack(numericPotId)}
+      onEdit={onEdit}
+      onDeleted={() => onDeleted(numericPotId)}
     />
   );
 }
 
 function getScreenFromPath(pathname) {
+  if (/^\/garden\/pots\/[^/]+\/tils\/[^/]+$/.test(pathname)) return 'til-detail';
   if (/^\/garden\/pots\/[^/]+$/.test(pathname)) return 'pot-detail';
   if (isRoutePath(pathname, 'editor')) return 'editor';
   if (isRoutePath(pathname, 'garden')) return 'garden';
@@ -353,11 +502,6 @@ function getPotIdFromPath(pathname) {
 function getEditorPotIdFromSearch(search) {
   const params = new URLSearchParams(search);
   return parseRoutePotId(params.get('potId'));
-}
-
-function getEditorModeFromSearch(search) {
-  const mode = new URLSearchParams(search).get('mode');
-  return mode === 'new' || mode === 'resume' ? mode : null;
 }
 
 function screenToPath(screen, potId) {
@@ -385,16 +529,20 @@ function isRoutePath(pathname, route) {
 
 function App() {
   const handleAuthExpired = useCallback(() => {
+    // 토큰 만료 시 페이지 리로드로 로그아웃 처리
     window.location.reload();
   }, []);
 
   return (
     <BrowserRouter>
       <UserProvider onAuthExpired={handleAuthExpired}>
-        <AppShell />
+        <ThemeProvider>
+          <AppShell />
+        </ThemeProvider>
       </UserProvider>
     </BrowserRouter>
   );
 }
+
 
 export default App;

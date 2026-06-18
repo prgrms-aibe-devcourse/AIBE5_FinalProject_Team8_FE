@@ -1,37 +1,14 @@
 'use client'
 
 import 'katex/dist/katex.min.css'
+import '@/til-editor.css'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion, useScroll, useSpring } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import Link from '@tiptap/extension-link'
-import TextStyle from '@tiptap/extension-text-style'
-import Color from '@tiptap/extension-color'
-import Highlight from '@tiptap/extension-highlight'
-import TextAlign from '@tiptap/extension-text-align'
-import TaskList from '@tiptap/extension-task-list'
-import TaskItem from '@tiptap/extension-task-item'
-import Subscript from '@tiptap/extension-subscript'
-import Superscript from '@tiptap/extension-superscript'
-import Placeholder from '@tiptap/extension-placeholder'
-import { Mathematics } from '@tiptap/extension-mathematics'
-import Youtube from '@tiptap/extension-youtube'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableHeader from '@tiptap/extension-table-header'
-import TableCell from '@tiptap/extension-table-cell'
-import { createLowlight, common } from 'lowlight'
-
 import { FileClock, Minimize2 } from 'lucide-react'
 
-import { createCodeBlock } from './extensions/code-block'
-import { FontSize } from './extensions/font-size'
-import { Callout } from './extensions/callout'
-import { TrailingNode } from './extensions/trailing-node'
-import { ResizableImage } from './extensions/resizable-image'
+import { createTilExtensions } from './til-extensions'
 import { EditorToolbarIsland } from './editor-toolbar-island'
 import { EditorBubbleMenu } from './editor-bubble-menu'
 
@@ -40,6 +17,7 @@ import { TilMeta } from './til-meta'
 import { useTilEditor, type DraftData } from './til-editor-context'
 import { getTooLongTilTags, TIL_TAG_MAX_LENGTH } from './til-policy'
 import { updateTil } from '@/api/til.js'
+import { playSfx } from '@/lib/sfx.js'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -49,8 +27,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-
-const lowlight = createLowlight(common)
 
 export function TilEditorPage({
   onNav,
@@ -62,8 +38,6 @@ export function TilEditorPage({
   onSelectedPotChange,
   focusMode = false,
   onToggleFocus,
-  contentShift = 0,
-  rightContentShift = 0,
 }: {
   onNav?: (screen: string) => void
   initialSelectedPotId?: number | string | null
@@ -73,8 +47,6 @@ export function TilEditorPage({
   onSelectedPotChange?: (potId: string | null) => void
   focusMode?: boolean
   onToggleFocus?: () => void
-  contentShift?: number
-  rightContentShift?: number
   initialTil?: {
     id?: number | string
     tilId?: number | string
@@ -113,6 +85,9 @@ export function TilEditorPage({
   const settledPotIdRef = useRef<string | null>(null)
   const hydratedTilIdRef = useRef<string | null>(null)
   const initialPotReadyRef = useRef(false)
+  // 초기 화분(URL/네비)을 막 적용했을 때, selectedPotId 가 그 값으로 반영될 때까지 추적.
+  // 반영 전(=이전 persisted 값이 남아있을 때)에 URL 로 되돌려보내면 두 화분이 무한 토글됨.
+  const pendingInitialPotRef = useRef<string | null>(null)
   const handledEntryRef = useRef<string | null>(null)
   const normalizedInitialPotId = initialSelectedPotId == null
     ? null
@@ -123,37 +98,7 @@ export function TilEditorPage({
 
   const editor = useEditor({
     immediatelyRender: false,
-    extensions: [
-      StarterKit.configure({ codeBlock: false }),
-      Underline,
-      Link.configure({
-        openOnClick: false,
-        autolink: true,
-        HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
-      }),
-      TextStyle,
-      Color,
-      FontSize,
-      Highlight.configure({ multicolor: true }),
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      Subscript,
-      Superscript,
-      createCodeBlock(lowlight),
-      Callout,
-      Mathematics,
-      ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),
-      Youtube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
-      Table.configure({ resizable: true, HTMLAttributes: { class: 'til-table' } }),
-      TableRow,
-      TableHeader,
-      TableCell,
-      Placeholder.configure({
-        placeholder: '오늘 배운 것을 자유롭게 기록해보세요. “/” 없이 위 도구 모음을 사용하세요…',
-      }),
-      TrailingNode,
-    ],
+    extensions: createTilExtensions({ editing: true }),
     content: '',
     editorProps: {
       attributes: {
@@ -248,14 +193,25 @@ export function TilEditorPage({
   useEffect(() => {
     if (!normalizedInitialPotId) {
       initialPotReadyRef.current = true
+      pendingInitialPotRef.current = null
       return
     }
     setSelectedPotId(normalizedInitialPotId)
     initialPotReadyRef.current = true
+    // 방금 초기 화분을 적용함 → selectedPotId 가 이 값으로 바뀌기 전까지는 Effect B 가 보고 보류
+    pendingInitialPotRef.current = normalizedInitialPotId
   }, [normalizedInitialPotId, setSelectedPotId])
 
   useEffect(() => {
     if (!initialPotReadyRef.current) return
+    // 초기 화분 적용 대기 중: selectedPotId 가 아직 이전(persisted) 값이면 URL 로 되돌려보내지 않음.
+    // (안 그러면 Effect A 와 서로 값을 되돌리며 두 화분이 무한 토글됨)
+    if (pendingInitialPotRef.current != null) {
+      if (selectedPotId === pendingInitialPotRef.current) {
+        pendingInitialPotRef.current = null // 반영 완료 → 이후 사용자 변경부터 동기화
+      }
+      return
+    }
     if (normalizedInitialPotId && selectedPotId == null) return
     onSelectedPotChange?.(selectedPotId)
   }, [normalizedInitialPotId, onSelectedPotChange, selectedPotId])
@@ -444,8 +400,33 @@ export function TilEditorPage({
   const { scrollYProgress } = useScroll({ container: scrollRef })
   const scrollFill = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 })
 
+  // 본문 컬럼을 좌/우 사이드바 토글과 무관하게 항상 "뷰포트 중앙"에 고정.
+  // 사이드바·패널을 여닫아 인셋(쓰기 영역) 폭이 바뀌면, 바뀐 만큼 반대로 보정해
+  // 화면 중앙을 유지한다 → 이리저리 움직이지 않고 한쪽으로 치우치지도 않음.
+  const [centerOffset, setCenterOffset] = useState(0)
+  // 첫 페인트 "전"에(useLayoutEffect) 보정값을 적용해 초기 튐을 막는다.
+  // 정수 반올림 + 값이 바뀔 때만 갱신해 서브픽셀 진동을 막고, ResizeObserver 로 인셋 폭 변화를
+  // 따라가 본문을 뷰포트 중앙에 유지한다(우측 모니터와 겹치지 않도록 좌측으로 보정).
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const recompute = () => {
+      const rect = el.getBoundingClientRect()
+      const next = Math.round(window.innerWidth / 2 - (rect.left + rect.width / 2))
+      setCenterOffset((prev) => (prev === next ? prev : next))
+    }
+    recompute()
+    const ro = new ResizeObserver(recompute)
+    ro.observe(el)
+    window.addEventListener('resize', recompute)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', recompute)
+    }
+  }, [])
+
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-background">
+    <div className="rt-app rt-app-editor relative flex h-screen flex-col overflow-hidden">
       {/* 떠있는 툴바 아일랜드 (집중 모드에선 숨김) */}
       {!focusMode && editor ? (
         <EditorToolbarIsland editor={editor} onToggleFocus={onToggleFocus} />
@@ -455,7 +436,7 @@ export function TilEditorPage({
       {focusMode && (
         <button
           type="button"
-          onClick={onToggleFocus}
+          onClick={() => { playSfx('toggle'); onToggleFocus?.() }}
           className="til-pulltab fixed right-4 top-4 z-30 flex h-9 items-center gap-1.5 rounded-full px-3.5 text-xs font-medium text-muted-foreground"
         >
           <Minimize2 className="size-4" />
@@ -466,16 +447,16 @@ export function TilEditorPage({
       {/* Writing canvas — 네이티브 스크롤(확실히 동작), 네이티브 스크롤바는 숨김 */}
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{
-          // 좌측/우측 사이드바를 접어 줄어든 만큼 좌우 패딩으로 보정 → 본문이 제자리에 머문다.
-          // 사이드바 width 애니메이션과 동일한 커브/시간으로 맞춰 매 프레임 위치가 고정된다.
-          paddingLeft: focusMode ? 0 : contentShift,
-          paddingRight: focusMode ? 0 : rightContentShift,
-          transition: 'padding-left 0.42s cubic-bezier(0.4, 0, 0.2, 1), padding-right 0.42s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
+        className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-        <main className="mx-auto w-full max-w-3xl px-5 pb-40 pt-24 md:px-6">
+        <main
+          className="mx-auto w-full px-5 pb-40 pt-24 md:px-8"
+          style={{
+            // 사이드바(좌 ~400px) 침범 없이 최대한 넓게, 그리고 뷰포트 중앙 고정
+            maxWidth: 'min(56rem, calc(100vw - 50rem))',
+            transform: `translateX(${centerOffset}px)`,
+          }}
+        >
           <div className="guide-editor-meta">
             <TilMeta />
           </div>
@@ -494,6 +475,7 @@ export function TilEditorPage({
                 <div className="guide-editor-content">
                   <EditorContent editor={editor} />
                 </div>
+                <RetroCaret editor={editor} />
               </>
             ) : (
               <div className="space-y-3">
@@ -505,17 +487,14 @@ export function TilEditorPage({
         </main>
       </div>
 
-      {/* 하단 스크롤 진행 게이지 — 트랙 위로 초록 막대가 좌→우로 차오름 (스프링) */}
-      <div
-        className="relative h-1.5 w-full shrink-0 overflow-hidden"
-        style={{ background: 'color-mix(in oklch, var(--moss) 9%, transparent)' }}
-      >
+      {/* 하단 스크롤 진행 게이지 — 픽셀 LCD 바가 좌→우로 차오름 (스프링) */}
+      <div className="til-scroll-track relative h-1.5 w-full shrink-0 overflow-hidden">
         <motion.div
           aria-hidden
           className="absolute inset-y-0 left-0 w-full origin-left"
           style={{
             scaleX: scrollFill,
-            background: 'linear-gradient(90deg, var(--moss) 0%, var(--sprout) 100%)',
+            background: 'var(--leaf-2)',
           }}
         />
       </div>
@@ -543,6 +522,57 @@ export function TilEditorPage({
       />
     </div>
   )
+}
+
+// 레트로 커스텀 캐럿 — 네이티브 캐럿(.ProseMirror caret-color:transparent)을 숨기고,
+// ProseMirror 의 캐럿 위치(coordsAtPos)를 추적해 깜빡이는 요소를 그린다.
+// 포커스 + 빈 선택(=캐럿)일 때만 표시. 깜빡임은 CSS(til-caret-blink)가 항상 처리.
+function RetroCaret({ editor }: { editor: ReturnType<typeof useEditor> }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    if (!editor) return
+    const update = () => {
+      const el = ref.current
+      if (!el) return
+      const view = editor.view
+      const sel = editor.state.selection
+      if (!view.hasFocus() || !sel.empty) {
+        el.classList.remove('is-on')
+        return
+      }
+      let coords
+      try {
+        coords = view.coordsAtPos(sel.head)
+      } catch {
+        el.classList.remove('is-on')
+        return
+      }
+      const host = el.parentElement
+      if (!host) return
+      const hostRect = host.getBoundingClientRect()
+      const h = Math.max(12, coords.bottom - coords.top)
+      el.style.left = `${coords.left - hostRect.left + 2}px` // 글자와 살짝 간격
+      el.style.top = `${coords.top - hostRect.top}px`
+      el.style.height = `${h}px`
+      el.style.width = `${Math.round(h * 0.5)}px` // 블록 폭 — 줄 높이에 비례
+      el.classList.add('is-on')
+    }
+    const schedule = () => requestAnimationFrame(update)
+    schedule()
+    editor.on('selectionUpdate', schedule)
+    editor.on('transaction', schedule)
+    editor.on('focus', schedule)
+    editor.on('blur', update)
+    window.addEventListener('resize', schedule)
+    return () => {
+      editor.off('selectionUpdate', schedule)
+      editor.off('transaction', schedule)
+      editor.off('focus', schedule)
+      editor.off('blur', update)
+      window.removeEventListener('resize', schedule)
+    }
+  }, [editor])
+  return <span ref={ref} className="til-retro-caret" aria-hidden="true" />
 }
 
 function formatDraftTime(draft: DraftData | null) {
@@ -582,16 +612,13 @@ function DraftChoiceDialog({
     <Dialog open={Boolean(draft)}>
       <DialogContent
         showCloseButton={false}
-        className="max-w-sm gap-5 border-border/70 bg-card p-7 text-center shadow-[var(--shadow-md)]"
+        className="rt-pop til-draft-dialog max-w-sm gap-5 p-7 text-center"
         onEscapeKeyDown={(event) => event.preventDefault()}
         onInteractOutside={(event) => event.preventDefault()}
       >
         <DialogHeader className="items-center text-center">
-          <span
-            className="mb-1 flex size-11 items-center justify-center rounded-full"
-            style={{ background: 'color-mix(in oklch, var(--sprout) 18%, transparent)' }}
-          >
-            <FileClock className="size-5 text-primary" />
+          <span className="til-draft-icon mb-1 flex size-11 items-center justify-center">
+            <FileClock className="size-5" />
           </span>
           <DialogTitle className="text-xl font-bold">
             {confirmingDelete ? '임시저장 글을 삭제할까요?' : '작성 중인 글이 있습니다.'}
@@ -626,7 +653,7 @@ function DraftChoiceDialog({
                 size="lg"
                 onClick={() => setConfirmingDelete(false)}
                 disabled={busy}
-                className="h-10"
+                className="til-draft-btn h-10"
               >
                 이전
               </Button>
@@ -635,7 +662,7 @@ function DraftChoiceDialog({
                 size="lg"
                 onClick={onStartFresh}
                 disabled={busy}
-                className="h-10 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="til-draft-btn til-draft-btn-danger h-10"
               >
                 삭제
               </Button>
@@ -648,7 +675,7 @@ function DraftChoiceDialog({
                 size="lg"
                 onClick={() => setConfirmingDelete(true)}
                 disabled={busy}
-                className="h-10"
+                className="til-draft-btn h-10"
               >
                 삭제하고 새로 작성
               </Button>
@@ -657,7 +684,7 @@ function DraftChoiceDialog({
                 size="lg"
                 onClick={onResume}
                 disabled={busy}
-                className="h-10 bg-primary text-primary-foreground"
+                className="til-draft-btn til-draft-btn-primary h-10 bg-primary text-primary-foreground"
               >
                 이어쓰기
               </Button>

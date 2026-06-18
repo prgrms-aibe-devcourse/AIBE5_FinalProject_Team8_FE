@@ -1,0 +1,389 @@
+/* =========================================================================
+   ROOTIN — TIL 작성 페이지 "Vision Display" 스킨
+   대시보드/정원과 동일한 게임보이 픽셀 콘솔 톤으로 에디터 크롬을 통일한다.
+   - 크롬(툴바·메타·상태바·팝업·우측 패널): 픽셀(Galmuri) + 하드 그림자 + LCD
+   - 본문 prose(.til-prose): "LCD 화면 위의 종이" — 가독성 유지(읽기 좋은 글꼴)
+   토큰은 .rt-app(=sprout.css) 스코프를 그대로 사용. 포털(body)로 빠지는 팝업은
+   .rt-pop / .til-bubble-menu 에 토큰을 로컬 재선언해 동일 톤을 입힌다.
+   ========================================================================= */
+
+/* 읽기 좋은 본문 글꼴 — 픽셀 폰트 상속을 끊는다.
+   에디터는 풀스크린(베젤 없음) — .rt-app 기본 크림 배경을 그대로 사용. */
+.rt-app.rt-app-editor {
+  --til-read-font: 'Pretendard Variable', Pretendard, 'Noto Sans KR', system-ui, sans-serif;
+}
+
+/* 에디터 내부 카드도 대시보드처럼 또렷한 하드 픽셀 그림자로 */
+.rt-app.rt-app-editor .rt-card {
+  border: 2px solid var(--leaf);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 5px 5px 0 0 var(--leaf);
+}
+
+/* ---------------------------------------------------------------- */
+/* 1) 크롬 — 떠있는 툴바 / 상태바 / 풀탭 / 발행 버튼 / 스크롤 게이지   */
+/* ---------------------------------------------------------------- */
+.rt-app-editor .til-toolbar-bar {
+  background: var(--paper-card);
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-card);
+  box-shadow: 5px 5px 0 0 var(--leaf);
+  backdrop-filter: none;
+}
+
+.rt-app-editor .til-status-bar {
+  background: var(--paper-card);
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-card);
+  box-shadow: 4px 4px 0 0 var(--leaf);
+  backdrop-filter: none;
+}
+
+/* 접힘 손잡이/토글 키 — 둥근 글래스 → 사각 픽셀 키 */
+.rt-app-editor .til-pulltab {
+  background: var(--paper-card);
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-chip);
+  box-shadow: 2px 2px 0 0 var(--leaf);
+  color: var(--leaf);
+  backdrop-filter: none;
+  transition: transform var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast);
+}
+.rt-app-editor .til-pulltab:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 0 var(--leaf);
+  color: var(--leaf);
+}
+.rt-app-editor .til-pulltab:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--leaf);
+}
+
+/* 발행 버튼 — moss 그라데이션 → 하드 픽셀 솔리드 버튼 */
+.rt-app-editor .til-publish-btn {
+  background-image: none;
+  background: var(--leaf);
+  color: var(--paper-card);
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-chip);
+  box-shadow: 2px 2px 0 0 var(--leaf-2);
+}
+.rt-app-editor .til-publish-btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  background: var(--leaf-2);
+  box-shadow: 3px 3px 0 0 var(--leaf-2);
+}
+.rt-app-editor .til-publish-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--leaf-2);
+}
+
+/* 하단 스크롤 진행 게이지 — 픽셀 LCD 바 */
+.rt-app-editor .til-scroll-track {
+  background: var(--paper-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+/* 메타 제목 — 큰 글씨는 픽셀 대신 가독성 좋은 글꼴 유지 */
+.rt-app-editor .til-title {
+  color: var(--leaf);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ---------------------------------------------------------------- */
+/* 2) 하이브리드 본문 prose — 읽기 좋은 글꼴 + leaf/paper 리테마      */
+/* ---------------------------------------------------------------- */
+.rt-app-editor .til-prose .ProseMirror {
+  font-family: var(--til-read-font);
+  color: var(--leaf);
+  -webkit-font-smoothing: antialiased;
+  font-smooth: auto;
+  text-rendering: optimizeLegibility;
+  caret-color: transparent; /* 네이티브 캐럿 숨김 → 레트로 커스텀 캐럿(.til-retro-caret) 사용 */
+}
+
+/* 읽기 전용 TIL 뷰(TilContentView) — 에디터 본문 스킨을 그대로 쓰되,
+   작성용 최소 높이(50vh)만 해제해 짧은 글에서 빈 공간이 생기지 않게 한다. */
+.til-reader-view .til-prose .ProseMirror {
+  min-height: 0;
+}
+
+/* ---------------------------------------------------------------- */
+/* 레트로 커스텀 캐럿 — CRT 글로우 막대 + 항상 하드 깜빡임             */
+/* 위치는 RetroCaret(JS)이 잡고, 모양/깜빡임은 여기서 정의.            */
+/* 모양 교체: 블록은 width 키우고 mix-blend-mode:multiply, 언더스코어는 */
+/* height 2~3px + top 을 baseline 으로(아래 주석) 바꾸면 됨.           */
+/* ---------------------------------------------------------------- */
+.rt-app-editor .til-prose,
+.rt-app-editor .til-title-wrap { position: relative; }
+/* 제목(textarea) 네이티브 캐럿 숨김 → 레트로 블록 캐럿 사용 */
+.rt-app-editor .til-title { caret-color: transparent; }
+.til-retro-caret {
+  position: absolute;
+  display: none;
+  /* 폭/높이/위치는 RetroCaret(JS)이 설정(블록 폭은 줄 높이에 비례, 글자와 ~2px 간격) */
+  border-radius: 2px;
+  /* 반투명 블록 — 다음 글자가 비쳐 보여 가독성 유지 */
+  background: color-mix(in oklch, var(--leaf-2, #5d7a4f) 46%, transparent);
+  box-shadow: 0 0 6px 0 color-mix(in oklch, var(--leaf-2, #5d7a4f) 55%, transparent);
+  pointer-events: none;
+  z-index: 4;
+  will-change: opacity;
+}
+.til-retro-caret.is-on {
+  display: block;
+  animation: til-caret-blink 1.06s step-end infinite;
+}
+@keyframes til-caret-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .til-retro-caret.is-on { animation: none; opacity: 1; }
+}
+.rt-app-editor .til-prose .ProseMirror h1,
+.rt-app-editor .til-prose .ProseMirror h2,
+.rt-app-editor .til-prose .ProseMirror h3 {
+  color: var(--leaf);
+}
+
+/* 인라인 코드(코드블럭 내부 code 는 제외) */
+.rt-app-editor .til-prose .ProseMirror :not(pre) > code {
+  background: var(--paper-2);
+  color: var(--leaf);
+  border: 1px solid var(--line-strong);
+}
+
+/* 링크 / 인용구 / 구분선 */
+.rt-app-editor .til-prose .ProseMirror a {
+  color: var(--leaf-2);
+}
+.rt-app-editor .til-prose .ProseMirror blockquote {
+  border-left-color: var(--leaf-2);
+  color: var(--muted-2);
+  background: linear-gradient(90deg, color-mix(in oklch, var(--leaf-2) 8%, transparent), transparent 70%);
+}
+.rt-app-editor .til-prose .ProseMirror hr {
+  border-top: 2px dotted var(--line-strong);
+}
+
+/* 체크박스(task list) */
+.rt-app-editor .til-prose .ProseMirror ul[data-type='taskList'] input[type='checkbox'] {
+  border-color: var(--line-strong);
+  background: var(--paper-card);
+}
+.rt-app-editor .til-prose .ProseMirror ul[data-type='taskList'] input[type='checkbox']:hover {
+  border-color: var(--leaf-2);
+}
+.rt-app-editor .til-prose .ProseMirror ul[data-type='taskList'] input[type='checkbox']:checked {
+  background: var(--leaf-2);
+  border-color: var(--leaf-2);
+}
+.rt-app-editor .til-prose .ProseMirror ul[data-type='taskList'] input[type='checkbox']:checked::after {
+  border-color: var(--paper-card);
+}
+
+/* 이미지 핸들 / 선택 외곽선 */
+.rt-app-editor .til-prose .ProseMirror .til-image-handle {
+  background: var(--leaf);
+  border-color: var(--paper-card);
+}
+.rt-app-editor .til-prose .ProseMirror .til-image-wrapper[data-selected='true'] .til-image,
+.rt-app-editor .til-prose .ProseMirror img.ProseMirror-selectednode {
+  outline-color: var(--peach);
+}
+
+/* 표 — 헤더/테두리/선택셀/리사이즈 */
+.rt-app-editor .til-prose .ProseMirror td,
+.rt-app-editor .til-prose .ProseMirror th {
+  border-color: var(--line-strong);
+}
+.rt-app-editor .til-prose .ProseMirror th {
+  background: var(--paper-warm);
+  color: var(--leaf);
+}
+.rt-app-editor .til-prose .ProseMirror .selectedCell::after {
+  background: color-mix(in oklch, var(--leaf) 14%, transparent);
+}
+.rt-app-editor .til-prose .ProseMirror .column-resize-handle {
+  background: var(--leaf);
+}
+
+/* KaTeX 인라인 편집기 / 호버 */
+.rt-app-editor .til-prose .ProseMirror .Tiptap-mathematics-editor {
+  background: var(--paper-2);
+  color: var(--leaf);
+  border-color: var(--line-strong);
+}
+.rt-app-editor .til-prose .ProseMirror .Tiptap-mathematics-render--editable:hover {
+  background: var(--paper-2);
+}
+
+/* 콜아웃 — 정보(leaf)/팁(leaf-3)/경고(amber) sprout 팔레트 */
+.rt-app-editor .til-prose .ProseMirror .til-callout {
+  border-width: 2px;
+}
+.rt-app-editor .til-prose .ProseMirror .til-callout[data-callout='info'] {
+  background: color-mix(in oklch, var(--leaf-2) 10%, var(--paper-card));
+  border-color: color-mix(in oklch, var(--leaf-2) 45%, transparent);
+}
+.rt-app-editor .til-prose .ProseMirror .til-callout[data-callout='info'] .til-callout-icon {
+  color: var(--leaf-2);
+}
+.rt-app-editor .til-prose .ProseMirror .til-callout[data-callout='tip'] {
+  background: color-mix(in oklch, var(--leaf-3) 14%, var(--paper-card));
+  border-color: color-mix(in oklch, var(--leaf-3) 52%, transparent);
+}
+.rt-app-editor .til-prose .ProseMirror .til-callout[data-callout='tip'] .til-callout-icon {
+  color: var(--leaf-3);
+}
+.rt-app-editor .til-prose .ProseMirror .til-callout[data-callout='warning'] {
+  background: var(--amber-soft);
+  border-color: color-mix(in oklch, var(--amber) 55%, transparent);
+}
+.rt-app-editor .til-prose .ProseMirror .til-callout[data-callout='warning'] .til-callout-icon {
+  color: #9a7322;
+}
+
+/* 코드블럭 — 다크 본문은 가독성 위해 유지, 프레임만 픽셀로 */
+.rt-app-editor .til-prose .ProseMirror .til-code-block {
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-card);
+  box-shadow: 4px 4px 0 0 var(--leaf);
+}
+
+/* ---------------------------------------------------------------- */
+/* 3) 포털 팝업 — body로 빠지므로 토큰을 로컬 재선언 후 픽셀 톤 적용  */
+/*    (대시보드/정원 팝업엔 .rt-pop 을 안 붙이므로 누수 없음)         */
+/* ---------------------------------------------------------------- */
+.rt-pop,
+.til-bubble-menu {
+  /* shadcn 시맨틱 토큰을 sprout 픽셀 값으로 매핑 → 내부 유틸리티 자동 리테마 */
+  --background: #f3ead4;
+  --foreground: #33402a;
+  --card: #f8f2e3;
+  --card-foreground: #33402a;
+  --popover: #f8f2e3;
+  --popover-foreground: #33402a;
+  --secondary: #e6dabf;
+  --secondary-foreground: #33402a;
+  --muted: #e6dabf;
+  --muted-foreground: #6b5f47;
+  --accent: #e6dabf;
+  --accent-foreground: #33402a;
+  --border: #c0ac7e;
+  --input: #c0ac7e;
+  --ring: #5f7048;
+  --primary: #33402a;
+  --primary-foreground: #f8f2e3;
+  --destructive: #b4452e;
+  /* sprout 토큰 (rt-* / toolbarItemClass 임의값에서 사용) */
+  --leaf: #33402a;
+  --leaf-2: #5f7048;
+  --leaf-3: #8a9a5a;
+  --paper-card: #f8f2e3;
+  --paper-2: #e6dabf;
+  --paper-warm: #f3ead4;
+  --line: #d6c6a2;
+  --line-strong: #c0ac7e;
+  --muted-2: #6b5f47;
+  --peach: #e8a06a;
+  --r-chip: 4px;
+  --r-card: 8px;
+  --dur-fast: .12s;
+  --ease-soft: cubic-bezier(.2, .8, .2, 1);
+  --font-pixel: "Galmuri11", "DungGeunMo", monospace;
+  font-family: var(--font-pixel);
+  color: var(--foreground);
+}
+
+/* 팝오버 / 셀렉트 / 드롭다운 / 다이얼로그 표면 — 픽셀 프레임 */
+[data-slot="popover-content"].rt-pop,
+[data-slot="select-content"].rt-pop,
+[data-slot="dropdown-menu-content"].rt-pop {
+  background: var(--paper-card);
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-card);
+  box-shadow: 4px 4px 0 0 var(--leaf);
+}
+[data-slot="dialog-content"].rt-pop {
+  background: var(--paper-card);
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-card);
+  box-shadow: 6px 6px 0 0 var(--leaf);
+}
+
+/* 임시저장 안내 다이얼로그("작성 중인 글이 있습니다") — 게임보이 픽셀 버전 */
+.til-draft-dialog .til-draft-icon {
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-chip);
+  background: var(--paper-2);
+  box-shadow: 3px 3px 0 0 var(--leaf);
+  color: var(--leaf);
+}
+.til-draft-dialog .til-draft-btn {
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-chip);
+  box-shadow: 2px 2px 0 0 var(--leaf);
+  font-family: var(--font-pixel);
+  transition: transform var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast);
+}
+.til-draft-dialog .til-draft-btn:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 0 var(--leaf);
+}
+.til-draft-dialog .til-draft-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--leaf);
+}
+/* 솔리드 버튼(이어쓰기·삭제)은 본문과 대비되도록 leaf-2 그림자 */
+.til-draft-dialog .til-draft-btn-primary,
+.til-draft-dialog .til-draft-btn-danger {
+  box-shadow: 2px 2px 0 0 var(--leaf-2);
+}
+.til-draft-dialog .til-draft-btn-primary:hover:not(:disabled),
+.til-draft-dialog .til-draft-btn-danger:hover:not(:disabled) {
+  box-shadow: 3px 3px 0 0 var(--leaf-2);
+}
+.til-draft-dialog .til-draft-btn-primary:active:not(:disabled),
+.til-draft-dialog .til-draft-btn-danger:active:not(:disabled) {
+  box-shadow: 0 0 0 0 var(--leaf-2);
+}
+.til-draft-dialog .til-draft-btn-danger {
+  background: var(--destructive);
+  color: var(--paper-card);
+}
+
+/* 버블 메뉴 셸 — 픽셀 바 */
+.til-bubble-menu {
+  background: var(--paper-card);
+  border: 2px solid var(--leaf);
+  border-radius: var(--r-card);
+  box-shadow: 4px 4px 0 0 var(--leaf);
+}
+
+/* ---------------------------------------------------------------- */
+/* 4) 좌측 사이드바 토글 시 인셋 폭 고정 → 본문 떨림(jitter) 방지     */
+/*    기본 .gbsb-slot.hidden 은 margin-left 를 음수로 0.55s 애니메이션해 */
+/*    인셋(본문 영역) 폭을 매 프레임 바꾼다. 그러면 본문 중앙 보정이      */
+/*    한 프레임씩 뒤늦게 따라가 움찔거린다. 에디터에서는 슬롯의 레이아웃   */
+/*    폭을 유지(margin 0)해 인셋 폭을 불변으로 만든다 → 보정값 고정 →      */
+/*    떨림 없음. 콘솔 자체는 transform/opacity 로만 슬라이드·페이드된다.   */
+/* ---------------------------------------------------------------- */
+[data-screen-label="editor"] .gbsb-slot.hidden {
+  margin-left: 0;
+  /* 에디터 진입 시 margin-left 가 이전 화면의 -slot-w 값에서 0 으로 0.55s 트랜지션되며
+     본문이 오른쪽으로 밀려 들어오는 현상 방지 → margin 은 즉시 적용(opacity 만 페이드). */
+  transition: opacity 0.4s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rt-app-editor .til-pulltab,
+  .rt-app-editor .til-publish-btn {
+    transition: none;
+  }
+  .rt-app-editor .til-pulltab:hover,
+  .rt-app-editor .til-publish-btn:hover:not(:disabled) {
+    transform: none;
+  }
+}

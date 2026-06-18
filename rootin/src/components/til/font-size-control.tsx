@@ -39,7 +39,7 @@ export function FontSizeControl({ editor }: { editor: Editor }) {
           <ChevronDown className="size-3 opacity-60" />
         </DropdownMenuTrigger>
       </ToolbarTooltip>
-      <DropdownMenuContent className="min-w-32">
+      <DropdownMenuContent className="rt-pop min-w-32">
         {SIZES.map((s) => (
           <DropdownMenuItem
             key={s.label}

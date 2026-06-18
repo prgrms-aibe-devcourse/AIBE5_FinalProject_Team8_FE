@@ -10,14 +10,14 @@ import { cn } from '@/lib/utils'
  * 활성 상태는 라이브러리에 따라 data-active / data-popup-open / data-state=open 으로 들어온다.
  */
 export const toolbarItemClass = cn(
-  'inline-flex h-9 min-w-8 shrink-0 items-center justify-center gap-1 rounded-lg px-1.5',
-  'text-sm text-muted-foreground transition-colors duration-200 ease-out',
-  'hover:bg-primary/10 hover:text-foreground active:scale-[0.97]',
+  'inline-flex h-9 min-w-8 shrink-0 items-center justify-center gap-1 rounded-[var(--r-chip)] px-1.5',
+  'text-sm text-[color:var(--muted-2)] transition-colors duration-200 ease-out',
+  'hover:bg-[var(--paper-2)] hover:text-[color:var(--leaf)] active:scale-[0.97]',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
   'disabled:pointer-events-none disabled:opacity-40',
-  'data-[active]:bg-primary/10 data-[active]:text-primary',
-  'data-[popup-open]:bg-primary/10 data-[popup-open]:text-primary',
-  'data-[state=open]:bg-primary/10 data-[state=open]:text-primary',
+  'data-[active]:bg-[var(--paper-2)] data-[active]:text-[color:var(--leaf)]',
+  'data-[popup-open]:bg-[var(--paper-2)] data-[popup-open]:text-[color:var(--leaf)]',
+  'data-[state=open]:bg-[var(--paper-2)] data-[state=open]:text-[color:var(--leaf)]',
 )
 
 /**
@@ -59,8 +59,8 @@ export function ToolbarTooltip({
             transition={{ duration: 0.15, ease: 'easeOut' }}
             className={cn(
               'pointer-events-none absolute left-1/2 z-50 flex -translate-x-1/2 items-center gap-1.5',
-              'whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs font-medium text-background',
-              'shadow-[var(--shadow-md)]',
+              'whitespace-nowrap rounded-[var(--r-chip)] bg-[var(--leaf)] px-2 py-1 text-xs font-medium text-[color:var(--paper-card)]',
+              'shadow-[2px_2px_0_0_var(--leaf-2)]',
               side === 'bottom'
                 ? 'top-[calc(100%+0.5rem)]'
                 : 'bottom-[calc(100%+0.5rem)]',
@@ -68,7 +68,7 @@ export function ToolbarTooltip({
           >
             {label}
             {shortcut ? (
-              <kbd className="rounded bg-background/20 px-1 py-0.5 font-sans text-[10px] tracking-tight text-background/80">
+              <kbd className="rounded bg-white/20 px-1 py-0.5 font-sans text-[10px] tracking-tight text-[color:var(--paper-card)]">
                 {shortcut}
               </kbd>
             ) : null}

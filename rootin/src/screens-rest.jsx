@@ -1,151 +1,266 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, Fragment } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, User, Check, ArrowLeft } from 'lucide-react';
 import { getPlants } from './api/collection.js';
 import { generateSummary, generateQuiz, saveResult, fetchResults, deleteResult } from './api/ai.js';
 import { getPots } from './api/pot.js';
 import { getMyTils } from './api/til.js';
-import { Icon, Pill, Btn, Card, SectionHeader, Spinner } from './ui.jsx';
-import { PixelPlant } from './pixel-plants.jsx';
+import { Pill, Btn } from './ui.jsx';
+import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
+import { RtIcon } from './pixel-icons.jsx';
 import { RootinWordmark } from './landing/RootinWordmark.jsx';
 import { PixelPals } from './auth-pixel-pals.jsx';
+import { playSfx } from './lib/sfx.js';
 import { useUser } from './context/UserContext.jsx';
+import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
+import './dex.css';
+import './ai.css';
+import './profile.css';
+import { SPECIES_TO_PIXEL, STAGE_KEYS, GROWTH_STAGE_TO_STAGE, TIL_MODAL_PAGE_SIZE, TIL_IDS_MAX_SIZE } from './screens-rest.logic.js';
 
 // Collection (식물도감), AI, Profile, Auth screens
 
 // BE speciesKey → PixelPlant species 키 매핑
-const SPECIES_TO_PIXEL = {
-  seed:   'seed',
-  shroom: 'mushroom',
-  cactus: 'cactus',
-  fire:   'fire',
-  ice:    'ice',
-  moon:   'moonlight',
-  bolt:   'bolt',
-  rose:   'rose',
+
+
+// 단계별 강조색 — 올리브 LCD 팔레트 위에 단계마다 다른 게임 뱃지 톤(sprout 토큰 재사용)
+const STAGE_ACCENT = {
+  seed:   { bg: 'var(--amber-soft)', fg: '#9a7322',      dot: 'var(--amber)' },
+  sprout: { bg: '#dbe6bb',           fg: 'var(--leaf-2)', dot: 'var(--leaf-3)' },
+  leaf:   { bg: '#cfe0a8',           fg: 'var(--leaf)',   dot: 'var(--leaf-2)' },
+  bloom:  { bg: 'var(--berry-soft)', fg: 'var(--berry)',  dot: 'var(--berry)' },
+  full:   { bg: 'var(--sky-soft)',   fg: '#3e6580',       dot: 'var(--sky)' },
 };
 
-const STAGE_KEYS = ['seed', 'sprout', 'leaf', 'bloom', 'full'];
+// 달빛 계열 밤하늘 별 좌표
+const DEX_STAR_POS = [
+  { l: '14%', t: '20%' }, { l: '28%', t: '14%' }, { l: '42%', t: '24%' },
+  { l: '60%', t: '16%' }, { l: '74%', t: '30%' }, { l: '86%', t: '18%' },
+  { l: '20%', t: '40%' }, { l: '52%', t: '38%' }, { l: '90%', t: '44%' },
+];
 
-const STAGE_BADGE_STYLE = {
-  seed:   { background: '#fff4e0', color: '#8b6340', border: '#f0dcb5' },
-  sprout: { background: '#ebf5ef', color: '#2e6b48', border: '#d4ebdc' },
-  leaf:   { background: '#e3f2e8', color: '#1d5e38', border: '#c4e0cc' },
-  bloom:  { background: '#ffeef2', color: '#b8536a', border: '#ffd4dc' },
-  full:   { background: '#eef2f8', color: '#1a3a5c', border: '#d8e2ee' },
-};
+// 흑장미 계열 떨어지는 꽃잎 (left%, 시작 지연, 낙하 시간)
+const DEX_PETALS = [
+  { l: '12%', d: 0,   dur: 3.6 }, { l: '24%', d: 1.1, dur: 4.4 },
+  { l: '38%', d: 0.5, dur: 3.2 }, { l: '52%', d: 1.9, dur: 4.7 },
+  { l: '66%', d: 0.9, dur: 3.9 }, { l: '79%', d: 2.3, dur: 4.1 },
+  { l: '90%', d: 1.4, dur: 3.4 },
+];
+
+function pixelFor(speciesKey) {
+  return SPECIES_TO_PIXEL[speciesKey] ?? speciesKey;
+}
 
 // ============================
-// 도감 단일 카드 (5열 그리드용)
+// 통계 타일 (달성도)
 // ============================
-function DexCard({ entry, speciesKey, rare }) {
-  const pixelSpecies = SPECIES_TO_PIXEL[speciesKey] ?? speciesKey;
+function DexStatTile({ icon, label, value, total, suffix = '', accent = false }) {
+  const pct = total ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className={`rt-card rt-stat${accent ? ' rt-stat--accent' : ''}`}>
+      <p className="rt-stat-k"><RtIcon name={icon} /> {label}</p>
+      <p className="rt-stat-v">{value}<span className="unit">/ {total}{suffix}</span></p>
+      <div className="gb-dex-meter"><i style={{ width: `${pct}%` }} /></div>
+    </div>
+  );
+}
+
+// ============================
+// 희귀종 전용 배경 — 계열별 무대 연출
+//   moon: 달빛 밤하늘 · bolt: 번개 폭풍 · rose: 흑장미 고딕
+// ============================
+function DexMoonSky() {
+  return (
+    <div className="gb-dex-sky gb-dex-sky--moon" aria-hidden="true">
+      <span className="gb-dex-moon" />
+      {DEX_STAR_POS.map((s, i) => (
+        <span key={i} className="gb-dex-star" style={{ left: s.l, top: s.t, animationDelay: `${(i % 4) * 0.4}s` }} />
+      ))}
+    </div>
+  );
+}
+
+function DexBoltSky() {
+  return (
+    <div className="gb-dex-sky gb-dex-sky--bolt" aria-hidden="true">
+      <span className="gb-dex-flash" />
+      <span className="gb-dex-cloud gb-dex-cloud--1" />
+      <span className="gb-dex-cloud gb-dex-cloud--2" />
+      <span className="gb-dex-zap gb-dex-zap--1" />
+      <span className="gb-dex-zap gb-dex-zap--2" />
+    </div>
+  );
+}
+
+function DexRoseSky() {
+  return (
+    <div className="gb-dex-sky gb-dex-sky--rose" aria-hidden="true">
+      <span className="gb-dex-rose-glow" />
+      {DEX_PETALS.map((p, i) => (
+        <span key={i} className="gb-dex-petal" style={{ left: p.l, animationDelay: `${p.d}s`, animationDuration: `${p.dur}s` }} />
+      ))}
+    </div>
+  );
+}
+
+const DEX_RARE_SKY = { moon: DexMoonSky, bolt: DexBoltSky, rose: DexRoseSky };
+
+function DexRareBackdrop({ speciesKey }) {
+  const Sky = DEX_RARE_SKY[speciesKey] ?? DexMoonSky;
+  return <Sky />;
+}
+
+// ============================
+// 진화 계보 스트립 (선택 종의 5단계)
+// ============================
+function DexEvoStrip({ section, selectedNum, onSelect }) {
+  return (
+    <div className="gb-dex-evo">
+      {section.entries.map((e, i) => {
+        const stageKey = STAGE_KEYS[e.stageIndex] ?? 'seed';
+        const active = e.dexNumber === selectedNum;
+        return (
+          <Fragment key={e.dexNumber}>
+            <div className="gb-dex-evo-step">
+              <button
+                type="button"
+                className={`gb-dex-evo-cell${active ? ' is-active' : ''}${e.collected ? '' : ' is-locked'}`}
+                onClick={() => onSelect(e.dexNumber)}
+                title={e.collected ? `${e.monName} · ${e.stageName}` : `미발견 · ${e.stageName}`}
+              >
+                <PixelPlant species={pixelFor(section.speciesKey)} stage={stageKey} size={32} locked={!e.collected} />
+              </button>
+              <span className="gb-dex-evo-label">{e.stageName}</span>
+            </div>
+            {i < section.entries.length - 1 && <span className="gb-dex-evo-arrow" aria-hidden="true">›</span>}
+          </Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function DexInfoRow({ label, value, muted = false }) {
+  return (
+    <div className="gb-dex-info-row">
+      <span className="gb-dex-info-k">{label}</span>
+      <span className={`gb-dex-info-v${muted ? ' is-muted' : ''}`}>{value}</span>
+    </div>
+  );
+}
+
+// ============================
+// 좌측 뷰어 — 선택한 도감 항목 상세
+// ============================
+function DexViewer({ data, onSelect }) {
+  if (!data) return null;
+  const { entry, section } = data;
   const stageKey = STAGE_KEYS[entry.stageIndex] ?? 'seed';
-  const badge = STAGE_BADGE_STYLE[stageKey];
-
-  const collectedBorder = rare
-    ? '0.5px solid #d8e2ee'
-    : '0.5px solid var(--sprout, #9dd0b0)';
+  const accent = STAGE_ACCENT[stageKey];
+  const rare = section.rare;
+  const collected = entry.collected;
+  const rareClass = rare ? ` gb-dex-screen--rare gb-dex-screen--${section.speciesKey}` : '';
 
   return (
-    <div
-      style={{
-        background: entry.collected ? 'var(--card)' : 'var(--paper-2)',
-        border: entry.collected ? collectedBorder : '0.5px solid var(--rule)',
-        borderRadius: 'var(--r-lg, 14px)',
-        padding: '12px 8px',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5,
-        cursor: 'pointer', position: 'relative',
-        minHeight: 160,
-        transition: 'transform 0.12s, box-shadow 0.12s',
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.transform = 'translateY(-2px)';
-        e.currentTarget.style.boxShadow = 'var(--shadow-md)';
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = '';
-        e.currentTarget.style.boxShadow = '';
-      }}
-    >
-      {/* 도감 번호 */}
-      <div style={{
-        fontSize: 9, color: 'var(--ink-3)',
-        alignSelf: 'flex-start',
-        marginTop: 2,
-        fontFamily: 'var(--font-mono)',
-        letterSpacing: '0.04em',
-      }}>
-        No.{entry.dexNumber}
-      </div>
-
-      {/* 픽셀 아트 */}
-      <div style={{ width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <PixelPlant species={pixelSpecies} stage={stageKey} size={62} locked={!entry.collected} />
-      </div>
-
-      {/* 이름 */}
-      <div style={{
-        fontSize: 11, fontWeight: 600,
-        color: entry.collected ? 'var(--ink)' : 'var(--ink-3)',
-        textAlign: 'center', lineHeight: 1.3,
-        fontFamily: 'var(--font-display)',
-      }}>
-        {entry.collected ? entry.monName : '???'}
-      </div>
-
-      {/* 단계 뱃지 */}
-      {entry.collected ? (
-        <div style={{
-          fontSize: 9, fontWeight: 600,
-          padding: '2px 8px', borderRadius: 999,
-          whiteSpace: 'nowrap',
-          background: badge.background, color: badge.color,
-          border: `0.5px solid ${badge.border}`,
-          fontFamily: 'var(--font-display)',
-        }}>
-          {entry.stageName} 수확
+    <div className="gb-dex-viewer">
+      {/* 뷰어 LCD */}
+      <div className={`gb-dex-screen${rareClass}`}>
+        <div className="gb-dex-screen-bezel">
+          <div className="gb-dex-screen-top">
+            <span className="gb-garden-led" aria-hidden="true" />
+            <span className="gb-dex-screen-cap">DOT&nbsp;MATRIX&nbsp;·&nbsp;DEX&nbsp;VIEWER</span>
+          </div>
+          <div className="gb-dex-screen-frame">
+            <div className="gb-dex-lcd">
+              {rare && <DexRareBackdrop speciesKey={section.speciesKey} />}
+              <span className="gb-dex-noplate">No.{entry.dexNumber}</span>
+              <div className="gb-dex-hero">
+                <PixelPlant
+                  species={pixelFor(section.speciesKey)}
+                  stage={stageKey}
+                  size={168}
+                  locked={!collected}
+                  glow={rare && collected}
+                />
+              </div>
+              {!collected && <span className="gb-dex-qmark">?</span>}
+              <div className="gb-fx gb-fx-scan" aria-hidden="true" />
+              <div className="gb-fx gb-fx-vignette" aria-hidden="true" />
+              <div className="gb-fx gb-fx-glass" aria-hidden="true" />
+            </div>
+          </div>
         </div>
-      ) : (
-        <div style={{ height: 18 }} />
-      )}
+      </div>
+
+      {/* 이름판 */}
+      <div className="gb-dex-plate">
+        <div className="gb-dex-plate-l">
+          <span className="gb-dex-plate-no">No.{entry.dexNumber} · {section.speciesLabel}</span>
+          <h3 className="gb-dex-plate-name">{collected ? entry.monName : '??? ??? ???'}</h3>
+        </div>
+        <div className="gb-dex-plate-r">
+          {collected ? (
+            <span className="gb-dex-stage-badge" style={{ background: accent.bg, color: accent.fg }}>
+              <i style={{ background: accent.dot }} />{entry.stageName} 단계
+            </span>
+          ) : (
+            <span className="gb-dex-stage-badge gb-dex-stage-badge--lock"><RtIcon name="lock" /> 미발견</span>
+          )}
+          <span className={`rt-badge ${rare ? 'rt-badge--sky' : 'rt-badge--leaf'}`}>{rare ? '✦ 희귀종' : '일반종'}</span>
+        </div>
+      </div>
+
+      {/* 진화 계보 */}
+      <DexEvoStrip section={section} selectedNum={entry.dexNumber} onSelect={onSelect} />
+
+      {/* 정보 테이블 */}
+      <div className="gb-dex-info">
+        <DexInfoRow label="도감 번호" value={`No.${entry.dexNumber}`} />
+        <DexInfoRow label="계열 범위" value={section.numRange} />
+        <DexInfoRow label="등급" value={rare ? '희귀종' : '일반종'} />
+        <DexInfoRow label="수확일" value={collected ? entry.harvestedAt : '미발견'} muted={!collected} />
+      </div>
     </div>
   );
 }
 
 // ============================
-// 계열 구분선
+// 우측 색인 — 도감 단일 행
 // ============================
-function DexSectionDivider({ section }) {
+function DexListRow({ entry, speciesKey, selected, onSelect }) {
+  const stageKey = STAGE_KEYS[entry.stageIndex] ?? 'seed';
+  const accent = STAGE_ACCENT[stageKey];
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '28px 0 14px' }}>
-      <span style={{
-        fontSize: 10, fontWeight: 700,
-        color: 'var(--ink-3)',
-        textTransform: 'uppercase', letterSpacing: '0.1em',
-        whiteSpace: 'nowrap',
-        fontFamily: 'var(--font-display)',
-      }}>
-        {section.speciesLabel}
+    <button
+      type="button"
+      className={`gb-dex-row${selected ? ' is-active' : ''}${entry.collected ? '' : ' is-locked'}`}
+      onClick={() => onSelect(entry.dexNumber)}
+    >
+      <span className="gb-dex-row-no">{entry.dexNumber}</span>
+      <span className="gb-dex-row-sprite">
+        <PixelPlant species={pixelFor(speciesKey)} stage={stageKey} size={28} locked={!entry.collected} />
       </span>
-      <Pill tone={section.rare ? 'navy' : 'green'}>
-        {section.rare ? '✦ 희귀종' : '일반종'}
-      </Pill>
-      <div style={{ flex: 1, height: '0.5px', background: 'var(--rule)' }} />
-      <span style={{
-        fontSize: 10, color: 'var(--ink-3)',
-        fontFamily: 'var(--font-mono)',
-        whiteSpace: 'nowrap',
-      }}>{section.numRange}</span>
-    </div>
+      <span className="gb-dex-row-name">{entry.collected ? entry.monName : '??????'}</span>
+      {entry.collected ? (
+        <span className="gb-dex-row-stage" style={{ background: accent.bg, color: accent.fg }}>{entry.stageName}</span>
+      ) : (
+        <span className="gb-dex-row-stage gb-dex-row-stage--lock"><RtIcon name="lock" /></span>
+      )}
+      <span className="gb-dex-row-check">{entry.collected && <RtIcon name="check" />}</span>
+    </button>
   );
 }
 
+// ============================
+// 도감 화면 — 포켓 도감 디바이스 (좌: 뷰어 / 우: 색인)
+// ============================
 function CollectionScreen() {
+  const { user } = useUser();
   const [dex, setDex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [selectedNum, setSelectedNum] = useState(null);
 
   useEffect(() => {
     getPlants()
@@ -154,120 +269,180 @@ function CollectionScreen() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filteredSections = useMemo(() => {
-    if (!dex?.sections) return [];
-    return dex.sections
-      .map(section => ({
-        ...section,
-        entries: filter === 'all' ? section.entries
-          : filter === 'collected' ? section.entries.filter(e => e.collected)
-          : section.entries.filter(e => !e.collected),
-      }))
-      .filter(section => section.entries.length > 0);
-  }, [dex, filter]);
-
+  const sections = dex?.sections ?? [];
   const stats = dex?.stats;
 
+  // 기본 선택: 첫 수집 항목 → 없으면 001
+  useEffect(() => {
+    if (!dex) return;
+    setSelectedNum(prev => {
+      if (prev) return prev;
+      const all = sections.flatMap(s => s.entries);
+      const firstCollected = all.find(e => e.collected);
+      return firstCollected?.dexNumber ?? all[0]?.dexNumber ?? null;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dex]);
+
+  // 필터링된 섹션 (원본 수집 개수는 보존)
+  const filteredSections = useMemo(() => {
+    return sections.map(s => {
+      const entries = filter === 'all' ? s.entries
+        : filter === 'collected' ? s.entries.filter(e => e.collected)
+        : s.entries.filter(e => !e.collected);
+      return {
+        ...s,
+        entries,
+        collectedCount: s.entries.filter(e => e.collected).length,
+        totalCount: s.entries.length,
+      };
+    }).filter(s => s.entries.length > 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dex, filter]);
+
+  // 필터로 현재 선택이 가려지면 첫 보이는 항목으로 이동
+  useEffect(() => {
+    const visible = filteredSections.flatMap(s => s.entries);
+    if (visible.length && !visible.some(e => e.dexNumber === selectedNum)) {
+      setSelectedNum(visible[0].dexNumber);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
+
+  const selected = useMemo(() => {
+    for (const s of sections) {
+      const e = s.entries.find(en => en.dexNumber === selectedNum);
+      if (e) return { entry: e, section: s };
+    }
+    return sections[0]?.entries?.[0] ? { entry: sections[0].entries[0], section: sections[0] } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dex, selectedNum]);
+
+  // 등급별 / 완성 계열 집계
+  const summary = useMemo(() => {
+    let commonC = 0, rareC = 0, done = 0;
+    sections.forEach(s => {
+      const c = s.entries.filter(e => e.collected).length;
+      if (s.rare) rareC += c; else commonC += c;
+      if (s.entries.length && c === s.entries.length) done++;
+    });
+    return { commonC, rareC, done, speciesTotal: sections.length };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dex]);
+
+  const collected = stats?.collected ?? 0;
+  const total = stats?.total ?? 40;
+  const commonTotal = stats?.common ?? 25;
+  const rareTotal = stats?.rare ?? 15;
+  const pct = total ? Math.round((collected / total) * 100) : 0;
+  const visibleCount = filteredSections.reduce((n, s) => n + s.entries.length, 0);
+
+  const selectNum = (n) => { playSfx('nav'); setSelectedNum(n); };
+
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto' }}>
+    <div className="rt-app gb-dex-page" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', minHeight: '100%' }}>
 
-      {/* 헤더 */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, gap: 14, flexWrap: 'wrap' }}>
-        <div>
-          <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>식물 도감</div>
-          <div style={{
-            fontFamily: 'var(--font-display)',
-            fontSize: 24, fontWeight: 700,
-            color: 'var(--ink)',
-            marginTop: 4, letterSpacing: '-0.02em',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <svg width="24" height="24" viewBox="0 0 80 80" fill="none">
-              <path d="M22 50 L18 68 L62 68 L58 50 Z" fill="#c8a882"/>
-              <rect x="20" y="44" width="40" height="8" rx="4" fill="#b8946a"/>
-              <rect x="38" y="22" width="4" height="28" rx="2" fill="#a8d5b5"/>
-              <ellipse cx="28" cy="32" rx="12" ry="8" fill="#a8d5b5" transform="rotate(-20 28 32)"/>
-              <ellipse cx="52" cy="26" rx="11" ry="7.5" fill="#3d8b5e" transform="rotate(15 52 26)"/>
-              <circle cx="40" cy="14" r="8" fill="#3d8b5e" opacity="0.9"/>
-              <circle cx="33" cy="9" r="6" fill="#3d8b5e" opacity="0.65"/>
-              <circle cx="47" cy="9" r="6" fill="#4a9066" opacity="0.65"/>
-              <circle cx="40" cy="14" r="2.5" fill="#e8f5ec"/>
-            </svg>
-            키워낸 식물의 수집 도감
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>
-            화분에서 수확할 때마다 도감 칸이 채워져요.
-          </div>
-          {stats && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-              <Pill tone="default">총 {stats.total}칸</Pill>
-              <Pill tone="green">일반 {stats.common}칸</Pill>
-              <Pill tone="navy">희귀 {stats.rare}칸</Pill>
-              <Pill tone="warn">{stats.collected} / {stats.total} 수집</Pill>
-            </div>
-          )}
+      {/* 게임 HUD 플레이어 바 */}
+      <div className="rt-hud">
+        <div className="rt-hud-l">
+          <RtIcon name="person" /> PLAYER : {user?.name ?? '학습자'} · <span className="rt-hud-lv">도감 {pct}%</span>
         </div>
-
-        {/* 필터 버튼 */}
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {[
-            { key: 'all',       label: '전체' },
-            { key: 'collected', label: '수집 완료' },
-            { key: 'locked',    label: '미수집' },
-          ].map(({ key, label }) => (
-            <Btn
-              key={key}
-              variant={filter === key ? 'green' : 'secondary'}
-              size="sm"
-              onClick={() => setFilter(key)}
-            >
-              {label}
-            </Btn>
-          ))}
+        <div className="rt-hud-r">
+          <span className="rt-hud-grp"><RtIcon name="book" /> 수집 {collected}/{total}</span>
+          <span className="rt-hud-sep" />
+          <span className="rt-hud-grp"><RtIcon name="star" /> 희귀 {summary.rareC}/{rareTotal}</span>
+          <span className="rt-hud-sep" />
+          <span className="rt-hud-grp"><RtIcon name="trophy" /> 완성 {summary.done}/{summary.speciesTotal}</span>
         </div>
       </div>
 
-      {loading && (
-        <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-          도감을 불러오는 중…
-        </div>
-      )}
+      {/* 달성도 통계 타일 */}
+      <div className="rt-grid rt-grid--4">
+        <DexStatTile icon="book"   label="도감 수집" value={collected}      total={total}      accent />
+        <DexStatTile icon="leaf"   label="일반종"   value={summary.commonC} total={commonTotal} />
+        <DexStatTile icon="star"   label="희귀종"   value={summary.rareC}   total={rareTotal} />
+        <DexStatTile icon="trophy" label="완성 계열" value={summary.done}    total={summary.speciesTotal} suffix="계열" />
+      </div>
 
-      {!loading && filteredSections.length === 0 && (
-        <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-          해당 조건의 식물이 없어요.
-        </div>
-      )}
-
-      {/* 계열별 섹션 */}
-      {!loading && filteredSections.map(section => (
-        <div key={section.speciesKey}>
-          <DexSectionDivider section={section} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 8 }}>
-            {section.entries.map(entry => (
-              <DexCard key={entry.dexNumber} entry={entry} speciesKey={section.speciesKey} rare={section.rare} />
+      {/* 게임보이 DMG 콘솔 — 포켓 도감 디바이스 */}
+      <div className="gb-console gb-dex-console">
+        <div className="gb-console-head">
+          <div>
+            <span className="rt-tag"><RtIcon name="search" /> NATIONAL DEX</span>
+            <h2 className="rt-h3" style={{ margin: '10px 0 0' }}>식물 도감 · No.001–040</h2>
+          </div>
+          <div className="gb-dex-filters">
+            {[
+              { key: 'all',       label: '전체',   icon: null },
+              { key: 'collected', label: '수집',   icon: 'check' },
+              { key: 'locked',    label: '미수집', icon: 'lock' },
+            ].map(({ key, label, icon }) => (
+              <button
+                key={key}
+                className={`gb-key ${filter === key ? 'gb-key--lcd' : 'gb-key--dark'}`}
+                onClick={() => { playSfx('toggle'); setFilter(key); }}
+              >
+                {icon && <RtIcon name={icon} />} {label}
+              </button>
             ))}
           </div>
         </div>
-      ))}
+
+        {loading ? (
+          <div className="gb-dex-loading">도감을 불러오는 중…</div>
+        ) : (
+          <div className="gb-dex-main">
+            {/* 좌측 뷰어 */}
+            <DexViewer data={selected} onSelect={selectNum} />
+
+            {/* 우측 색인 */}
+            <div className="gb-dex-index">
+              <div className="gb-dex-index-head">
+                <span className="rt-tag"><RtIcon name="book" /> 도감 색인</span>
+                <span className="gb-dex-index-count">{visibleCount}종 표시</span>
+              </div>
+              <div className="gb-dex-list scrollbar">
+                {filteredSections.length === 0 ? (
+                  <div className="gb-dex-empty">해당 조건의 식물이 없어요.</div>
+                ) : filteredSections.map(s => (
+                  <div key={s.speciesKey} className="gb-dex-group">
+                    <div className="gb-dex-group-head">
+                      <span className="gb-dex-group-name">{s.speciesLabel}</span>
+                      <span className={`rt-badge ${s.rare ? 'rt-badge--sky' : 'rt-badge--leaf'}`}>{s.rare ? '희귀' : '일반'}</span>
+                      <span className="gb-dex-group-range">{s.numRange}</span>
+                      <span className="gb-dex-group-count">{s.collectedCount}/{s.totalCount}</span>
+                    </div>
+                    {s.entries.map(e => (
+                      <DexListRow
+                        key={e.dexNumber}
+                        entry={e}
+                        speciesKey={s.speciesKey}
+                        selected={e.dexNumber === selectedNum}
+                        onSelect={selectNum}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 콘솔 하단 — 브랜드 각인 + 스피커 그릴 */}
+        <div className="gb-console-foot">
+          <div className="gb-brand">
+            <span className="gb-brand-word">Rootin</span>
+            <span className="gb-brand-sub">DOT-MATRIX&nbsp;DEX&nbsp;SYSTEM<span className="tm">TM</span></span>
+          </div>
+          <div className="gb-speaker" aria-hidden="true" />
+        </div>
+      </div>
     </div>
   );
 }
 
 // === AI Screen ===
 
-const TIL_MODAL_PAGE_SIZE = 10;
-const TIL_IDS_MAX_SIZE = 200; // BE AiPolicy.TIL_IDS_MAX_SIZE 와 동기화 — AI에 전달 가능한 선택 최대 개수
-
-const createGuideAiTils = () => {
-  const guideDate = new Date().toISOString();
-
-  return [
-    { id: -1, title: 'React 상태 관리 복습', date: guideDate, tags: ['React', '상태관리'] },
-    { id: -2, title: 'Spring API 설계 정리', date: guideDate, tags: ['Spring', 'API'] },
-    { id: -3, title: '오늘 배운 알고리즘 메모', date: guideDate, tags: ['Algorithm'] },
-  ];
-};
 
 const formatDate = (iso) => {
   if (!iso) return '';
@@ -283,7 +458,7 @@ const formatDate = (iso) => {
  *   onConfirm  — (tilIds: number[]) => void
  *   onClose    — () => void
  */
-function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpenGuide }) {
+function AiTilSelectModal({ potId, onConfirm, onClose }) {
   const [tils, setTils]               = useState([]);
   const [totalElements, setTotalElements] = useState(0);
   const [loading, setLoading]         = useState(true);
@@ -305,31 +480,10 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
+
   // 진입 시 화분 TIL 전체 로딩 — 전체 페이지 순회
   useEffect(() => {
-    if (guideMode) {
-      const guideTils = createGuideAiTils();
-      setLoading(false);
-      setError(null);
-      setPartialError(false);
-      setKeyword('');
-      setSelectedTag(null);
-      setPage(0);
-      setTotalElements(guideTils.length);
-      setTils(guideTils);
-      setSelectedIds(new Set(guideTils.slice(0, 1).map(til => til.id)));
-      return;
-    }
-
-    if (!potId) {
-      setLoading(false);
-      setError(null);
-      setPartialError(false);
-      setTotalElements(0);
-      setTils([]);
-      setSelectedIds(new Set());
-      return;
-    }
+    if (!potId) return;
     let active = true;
     const controller = new AbortController();
     setLoading(true);
@@ -390,7 +544,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
       });
 
     return () => { active = false; controller.abort(); };
-  }, [potId, guideMode]);
+  }, [potId]);
 
   // 태그 목록 (빈도순)
   const tagCounts = useMemo(() => {
@@ -406,7 +560,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
   const filtered = useMemo(() => {
     const kw = keyword.trim().toLowerCase();
     return tils.filter(t => {
-      const matchesTag = !selectedTag || t.tags.map(String).includes(selectedTag);
+      const matchesTag = !selectedTag || t.tags.includes(selectedTag);
       const matchesKw  = !kw || t.title.toLowerCase().includes(kw);
       return matchesTag && matchesKw;
     });
@@ -434,7 +588,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
       isAllSelected:   total > 0 && selectedCount === total,
       isIndeterminate: selectedCount > 0 && selectedCount < total,
       canSelectAll:    outsideSelected + total <= TIL_IDS_MAX_SIZE,
-      addableCount:    TIL_IDS_MAX_SIZE - outsideSelected - selectedCount,
+      addableCount:    TIL_IDS_MAX_SIZE - outsideSelected,
     };
   }, [allFilteredIds, selectedIds]);
 
@@ -465,175 +619,119 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
   }, []);
 
   const handleConfirm = () => {
-    if (guideMode || selectedIds.size === 0) return;
     onConfirm(Array.from(selectedIds));
   };
 
   return (
     <div
+      className="rt-app gb-ai-modal-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="ai-til-modal-title"
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0,0,0,0.45)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={e => { if (e.target === e.currentTarget) { playSfx('cancel'); onClose(); } }}
     >
-      <div
-        ref={dialogRef}
-        tabIndex={-1}
-        style={{
-          background: '#fff', borderRadius: 16, padding: 24,
-          width: 560, maxHeight: '80vh',
-          display: 'flex', flexDirection: 'column', gap: 16,
-          boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
-          outline: 'none',
-        }}
-      >
+      <div ref={dialogRef} tabIndex={-1} className="gb-ai-modal">
+
         {/* 헤더 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <h2 id="ai-til-modal-title" style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--ink)', margin: 0 }}>
-              학습할 TIL 선택
-            </h2>
-            <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
-              AI가 분석할 TIL을 골라주세요
+        <div className="gb-ai-modal-head">
+          <div className="gb-ai-modal-titlewrap">
+            <span className="gb-ai-modal-ic" aria-hidden="true"><RtIcon name="book" /></span>
+            <div>
+              <h2 id="ai-til-modal-title" className="gb-ai-modal-title">기록 불러오기</h2>
+              <p className="gb-ai-modal-sub">퀴즈·요약에 사용할 기록을 골라주세요</p>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {/* 도움말(?) 버튼 추가 - 모달용 가이드 투어를 트리거합니다 */}
-            <button
-              onClick={() => onOpenGuide?.()}
-              title="이 모달의 이용 가이드 보기"
-              style={{
-                width: 28, height: 28, borderRadius: 7,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
-                fontSize: 13, fontWeight: 'bold', color: 'var(--ink-2)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >?</button>
-            <button
-              aria-label="닫기"
-              onClick={onClose}
-              style={{
-                width: 28, height: 28, borderRadius: 7,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
-                fontSize: 14, color: 'var(--ink-2)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >✕</button>
-          </div>
+          <button type="button" className="gb-ai-modal-close" aria-label="닫기" onClick={() => { playSfx('cancel'); onClose(); }}><RtIcon name="xmark" /></button>
         </div>
 
         {/* 검색 */}
-        <input
-          type="text"
-          placeholder="제목으로 검색..."
-          value={keyword}
-          onChange={e => setKeyword(e.target.value)}
-          style={{
-            width: '100%', padding: '9px 12px', borderRadius: 8, boxSizing: 'border-box',
-            border: '0.5px solid var(--rule-2)', fontSize: 13, color: 'var(--ink)',
-            outline: 'none', fontFamily: 'var(--font-body)',
-          }}
-        />
+        <div className="gb-ai-modal-search">
+          <span aria-hidden="true"><RtIcon name="search" /></span>
+          <input
+            className="gb-ai-modal-search-input"
+            type="text"
+            placeholder="제목으로 검색..."
+            value={keyword}
+            onChange={e => setKeyword(e.target.value)}
+          />
+        </div>
 
         {/* 태그 필터 */}
         {tagCounts.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <div className="gb-ai-modal-tags scrollbar">
             {tagCounts.map(([tag]) => (
               <button
                 key={tag}
-                onClick={() => setSelectedTag(prev => prev === tag ? null : tag)}
-                style={{
-                  padding: '4px 10px', borderRadius: 20, fontSize: 11.5,
-                  background: selectedTag === tag ? 'var(--moss)' : '#f3f7f3',
-                  color: selectedTag === tag ? '#fff' : 'var(--ink-2)',
-                  border: selectedTag === tag ? '1px solid var(--moss)' : '0.5px solid var(--rule)',
-                  cursor: 'pointer', fontFamily: 'var(--font-body)',
-                }}
+                type="button"
+                className={`gb-ai-modal-tag${selectedTag === tag ? ' is-active' : ''}`}
+                onClick={() => { playSfx('toggle'); setSelectedTag(prev => prev === tag ? null : tag); }}
               >#{tag}</button>
             ))}
           </div>
         )}
 
         {/* 전체 선택 + 카운트 */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid var(--rule)', paddingBottom: 8 }}>
+        <div className="gb-ai-modal-selbar">
           {((partialError ? tils.length : totalElements) <= TIL_IDS_MAX_SIZE || (!!(keyword.trim() || selectedTag) && filtered.length <= TIL_IDS_MAX_SIZE)) ? (
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canSelectAll ? 'pointer' : 'default', fontSize: 12.5, color: 'var(--ink-2)' }}>
+            <label className="gb-ai-modal-selall" style={{ cursor: canSelectAll ? 'pointer' : 'default' }}>
               <input
                 type="checkbox"
                 checked={isAllSelected}
                 ref={el => { if (el) el.indeterminate = isIndeterminate; }}
-                onChange={toggleAll}
+                onChange={() => { playSfx('toggle'); toggleAll(); }}
                 disabled={filtered.length === 0}
               />
-              {canSelectAll ? `전체 선택 (${filtered.length}개)` : `추가 가능한 ${addableCount}개만 선택됩니다`}
+              <span>{canSelectAll ? `전체 선택 (${filtered.length})` : `추가 가능한 ${addableCount}개만 선택`}</span>
             </label>
           ) : (
-            <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+            <span className="gb-ai-modal-selhint">
               검색·태그로 {TIL_IDS_MAX_SIZE}개 이하로 좁히면 전체 선택할 수 있어요
             </span>
           )}
-          <span style={{ fontSize: 12, fontWeight: 600, color: selectedIds.size >= TIL_IDS_MAX_SIZE ? '#b8536a' : 'var(--moss-2)' }}>
-            {selectedIds.size} / {TIL_IDS_MAX_SIZE}개 선택
-            {selectedIds.size >= TIL_IDS_MAX_SIZE && ' (최대)'}
+          <span className={`gb-ai-modal-count${selectedIds.size >= TIL_IDS_MAX_SIZE ? ' is-max' : ''}`}>
+            {selectedIds.size} / {TIL_IDS_MAX_SIZE} 선택
           </span>
         </div>
 
         {/* 부분 로드 실패 안내 */}
         {partialError && (
-          <div style={{ padding: '6px 10px', borderRadius: 7, background: '#fff8e1', border: '0.5px solid #ffe082', fontSize: 11.5, color: '#b8860b' }}>
-            일부 TIL을 불러오지 못했어요. 목록이 불완전할 수 있습니다.
+          <div className="gb-ai-modal-warn">
+            일부 기록을 불러오지 못했어요. 목록이 불완전할 수 있습니다.
           </div>
         )}
 
-        {/* TIL 목록 - 가이드 타겟팅을 위해 guide-ai-modal-list 클래스를 설정합니다 */}
-        <div className="guide-ai-modal-list scrollbar" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {/* 기록 목록 */}
+        <div className="gb-ai-modal-list scrollbar guide-ai-modal-list">
           {loading ? (
-            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-              TIL 목록을 불러오는 중...
-            </div>
+            <div className="gb-ai-modal-msg">기록을 불러오는 중...</div>
           ) : error ? (
-            <div style={{ padding: '24px 0', textAlign: 'center', color: '#b8536a', fontSize: 13 }}>{error}</div>
+            <div className="gb-ai-modal-msg is-error">{error}</div>
           ) : pageTils.length === 0 ? (
-            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
-              {tils.length === 0 ? '이 화분에 TIL이 없어요.' : '검색 결과가 없어요.'}
+            <div className="gb-ai-modal-msg">
+              {tils.length === 0 ? '이 화분에 기록이 없어요.' : '검색 결과가 없어요.'}
             </div>
           ) : (
             pageTils.map(til => (
               <label
                 key={til.id}
-                style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 10,
-                  padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                  background: selectedIds.has(til.id) ? 'var(--paper-2)' : '#fcfdfb',
-                  border: selectedIds.has(til.id) ? '1px solid var(--moss)' : '0.5px solid var(--rule)',
-                  transition: 'background 0.1s, border-color 0.1s',
-                }}
+                className={`gb-ai-til${selectedIds.has(til.id) ? ' is-selected' : ''}`}
               >
                 <input
                   type="checkbox"
                   checked={selectedIds.has(til.id)}
-                  onChange={() => toggleOne(til.id)}
+                  onChange={() => { playSfx('coindrop'); toggleOne(til.id); }}
                   disabled={!selectedIds.has(til.id) && selectedIds.size >= TIL_IDS_MAX_SIZE}
-                  style={{ marginTop: 2, flexShrink: 0 }}
                 />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {til.title}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{formatDate(til.date)}</span>
+                <span className="gb-ai-til-box" aria-hidden="true"><RtIcon name="check" /></span>
+                <span className="gb-ai-til-body">
+                  <span className="gb-ai-til-title">{til.title}</span>
+                  <span className="gb-ai-til-meta">
+                    <span className="gb-ai-til-date">{formatDate(til.date)}</span>
                     {til.tags.slice(0, 3).map(tag => (
-                      <span key={tag} style={{ fontSize: 10.5, color: 'var(--moss-2)', background: '#f0f7f0', borderRadius: 4, padding: '1px 6px' }}>
-                        #{tag}
-                      </span>
+                      <span key={tag} className="gb-ai-til-tag">#{tag}</span>
                     ))}
-                  </div>
-                </div>
+                  </span>
+                </span>
               </label>
             ))
           )}
@@ -641,112 +739,71 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
 
         {/* 페이지네이션 */}
         {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <div className="gb-ai-modal-pager">
             <button
+              type="button"
+              className="gb-ai-pager-btn"
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={currentPage === 0}
               aria-label="이전 페이지"
-              style={{
-                padding: '5px 12px', borderRadius: 7, fontSize: 12,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
-                color: currentPage === 0 ? 'var(--ink-3)' : 'var(--ink)',
-                cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
-              }}
-            >이전</button>
-            <span style={{ fontSize: 12, color: 'var(--ink-2)' }}>{currentPage + 1} / {totalPages}</span>
+            >◀ 이전</button>
+            <span className="gb-ai-pager-now">{currentPage + 1} / {totalPages}</span>
             <button
+              type="button"
+              className="gb-ai-pager-btn"
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
               disabled={currentPage === totalPages - 1}
               aria-label="다음 페이지"
-              style={{
-                padding: '5px 12px', borderRadius: 7, fontSize: 12,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
-                color: currentPage === totalPages - 1 ? 'var(--ink-3)' : 'var(--ink)',
-                cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
-              }}
-            >다음</button>
+            >다음 ▶</button>
           </div>
         )}
 
         {/* 확인 / 취소 */}
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Btn variant="secondary" size="md" style={{ flex: 1 }} onClick={onClose}>취소</Btn>
-          <Btn
-            className="guide-ai-modal-submit"
-            variant="green" size="md"
-            style={{
-              flex: 2,
-              opacity: selectedIds.size === 0 || guideMode ? 0.55 : 1,
-              cursor: selectedIds.size === 0 || guideMode ? 'not-allowed' : 'pointer'
-            }}
-            disabled={selectedIds.size === 0 || guideMode}
+        <div className="gb-ai-modal-foot">
+          <button type="button" className="gb-ai-mbtn gb-ai-mbtn--ghost" onClick={() => { playSfx('cancel'); onClose(); }}>취소</button>
+          <button
+            type="button"
+            className="gb-ai-mbtn gb-ai-mbtn--go guide-ai-modal-submit"
+            disabled={selectedIds.size === 0}
             onClick={handleConfirm}
           >
-            {selectedIds.size === 0 ? 'TIL을 선택해 주세요' : `${selectedIds.size}개 TIL로 생성`}
-          </Btn>
+            {selectedIds.size === 0 ? '기록을 선택해 주세요' : `${selectedIds.size}개로 만들기`}
+          </button>
         </div>
       </div>
     </div>
   );
 }
+
 // growthStage → PixelPlant stage 매핑
-const GROWTH_STAGE_TO_STAGE = {
-  SEED: 'seed', SPROUT: 'sprout', MATURE: 'leaf', BLOOM: 'bloom', FULL_BLOOM: 'full',
-};
 
 function PotCard({ pot, selected, onClick }) {
   const species = inferSpecies(pot.plantName);
   const stage = GROWTH_STAGE_TO_STAGE[pot.growthStage] ?? 'seed';
-
-  // TIL 개수: BE 응답의 tilCount 필드 사용, 없으면 미표시
+  // TIL 개수: BE 응답의 tilCount 필드 사용, 없으면 0
   const tilCount = pot.tilCount ?? 0;
 
+  // 정원(스테이지) 타일 — 클릭하면 분석 대상으로 선택된다
   return (
-    <button
-      onClick={onClick}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        padding: '12px 14px', borderRadius: 10, textAlign: 'left', width: '100%',
-        background: selected ? 'var(--paper-2)' : '#fff',
-        border: selected ? '1.5px solid var(--moss)' : '0.5px solid var(--rule)',
-        position: 'relative',
-        transition: 'border-color 0.12s, background 0.12s',
-      }}
-    >
-      {/* 식물 이미지 */}
-      <div style={{
-        width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-        background: selected ? 'var(--paper)' : '#f7f9f7',
-        border: '0.5px solid var(--rule)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
-        <PixelPlant species={species} stage={stage} size={36} />
-      </div>
-
-      {/* 텍스트 */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', fontFamily: 'var(--font-display)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pot.title}</span>
-        <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>Lv.{pot.level} · TIL {tilCount}개</span>
-      </div>
-
-      {/* 선택 체크 배지 */}
-      {selected && (
-        <div style={{
-          width: 20, height: 20, borderRadius: '50%',
-          background: 'var(--moss)', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff',
-        }}>
-          {Icon.check}
-        </div>
-      )}
+    <button type="button" onClick={onClick} className={`gb-ai-stage${selected ? ' is-active' : ''}`}>
+      <span className="gb-ai-stage-pedestal" aria-hidden="true">
+        <PixelPlant species={species} stage={stage} size={34} />
+      </span>
+      <span className="gb-ai-stage-info">
+        <span className="gb-ai-stage-name">{pot.title}</span>
+        <span className="gb-ai-stage-meta">
+          <span className="gb-ai-stage-lv">Lv.{pot.level}</span>
+          <span>기록 {tilCount}장</span>
+        </span>
+      </span>
+      <span className="gb-ai-stage-pick" aria-hidden="true"><RtIcon name="check" /></span>
     </button>
   );
 }
 
 function AIScreen({ onOpenGuide }) {
   const { user } = useUser();
-  const [mode, setMode] = useState('quiz'); // quiz | summary — 입력 UI 탭 선택
+  const [mode, setMode] = useState(null); // null | quiz | summary — 선택 전엔 null (① 퀘스트 종류부터 순차 해금)
   const [resultMode, setResultMode] = useState('quiz'); // quiz | summary — 현재 표시 중인 결과 타입
   const [potId, setPotId] = useState(null);
   const [quizCount, setQuizCount] = useState(5);
@@ -773,45 +830,6 @@ function AIScreen({ onOpenGuide }) {
 
   // TIL 선택 모달
   const [modalOpen, setModalOpen] = useState(false);
-  const [guideTilModalActive, setGuideTilModalActive] = useState(false);
-
-  // 📝 가이드 투어 도중 설명용 AI 예시 결과지 데이터를 렌더링하기 위한 가짜 상태(Mock State)입니다.
-  const [guideMockActive, setGuideMockActive] = useState(false);
-
-  // 📝 가이드 투어 순차 진행 시 특정 단계에 맞춰 자동으로 TIL 선택 모달(modalOpen)을 열고 닫는 로직을 구현합니다.
-  useEffect(() => {
-    const handleGuideStep = (e) => {
-      const { action, isEnd, selector } = e.detail;
-      if (isEnd) {
-        setModalOpen(false);
-        setGuideTilModalActive(false);
-        setGuideMockActive(false);
-        return;
-      }
-      
-      // AI 학습 가이드가 실행 중일 때 각 단계별로 화면의 모드나 팝업을 자동 제어합니다.
-      if (selector && selector.startsWith('.guide-ai-')) {
-        if (action === 'ensureQuizMode') {
-          setMode('quiz');
-        }
-
-        // TIL 선택 모달을 설명하는 단계에서는 모달을 자동으로 오픈합니다.
-        if (action === 'openAiTilModal') {
-          setGuideTilModalActive(true);
-          setModalOpen(true);
-        } else {
-          setGuideTilModalActive(false);
-          setModalOpen(false);
-        }
-
-        // 결과 화면을 설명하는 단계에서는 실제 생성 결과가 없어도 가이드용 예시 데이터를 노출합니다.
-        setGuideMockActive(action === 'showAiGuideResult');
-      }
-    };
-
-    window.addEventListener('rootin-guide-step', handleGuideStep);
-    return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
-  }, []);
   // 마지막으로 선택한 tilIds (다시 생성 시 재사용)
   const [lastTilIds, setLastTilIds] = useState([]);
 
@@ -823,16 +841,79 @@ function AIScreen({ onOpenGuide }) {
     }
   }, []);
 
+  // 이용 가이드 투어가 AI 화면 단계(.guide-ai-*)를 지날 때 화면 상태를 자동 제어한다.
+  // (classic AI 화면과 동일한 rootin-guide-step 프로토콜 공유)
+  // 게임보이 AI는 단계가 순차 해금되므로, 난이도·만들기 단계를 보여주려면 종류·화분이 선택돼 있어야 한다.
+  useEffect(() => {
+    const handleGuideStep = (e) => {
+      const { action, isEnd, selector } = e.detail;
+      if (isEnd) {
+        setModalOpen(false);
+        setAiResult(prev => {
+          if (prev?.isGuideMock) {
+            setGenerated(false);
+            return null;
+          }
+          return prev;
+        });
+        return;
+      }
+      if (selector && selector.startsWith('.guide-ai-')) {
+        if (action === 'ensureQuizMode') {
+          setMode('quiz');
+          setResultMode('quiz');
+          // 화분 미선택 시 첫 화분을 채워 난이도·만들기 단계를 해금(기존 선택은 보존).
+          setPotId(prev => prev ?? pots[0]?.id ?? null);
+        }
+        
+        if (action === 'showAiGuideResult') {
+          setResultMode('quiz');
+          setQuizCount(2); // 예시 결과는 2문항 — 배지·안내 문구와 실제 렌더 문항 수를 일치시킴
+          setGenerated(true);
+          // QuizResult가 읽는 실제 응답 형태(choices·answer 문자열·hint)로 구성해야 선택지가 렌더된다.
+          setAiResult({
+            isGuideMock: true,
+            quizzes: [
+              {
+                question: "🌱 Rootin에서 매일 TIL을 꾸준히 작성하면 정원에서 어떤 변화가 일어날까요?",
+                choices: ["아무 일도 일어나지 않는다", "포인트가 줄어든다", "화분의 식물이 한 단계 성장한다", "새로운 화분이 무한히 생성된다"],
+                answer: "화분의 식물이 한 단계 성장한다",
+                hint: "TIL을 발행해 물주기를 완료하면 성장 경험치가 쌓여요.",
+              },
+              {
+                question: "📚 AI 복습 퀴즈를 만들기 위해 필요한 것은 무엇인가요?",
+                choices: ["키보드와 마우스", "충분한 보유 포인트와 작성된 TIL", "새로운 화분", "친구의 초대 링크"],
+                answer: "충분한 보유 포인트와 작성된 TIL",
+                hint: "활동으로 모은 포인트와 학습할 화분의 기록이 필요해요.",
+              }
+            ]
+          });
+        } else if (action !== 'showAiGuideResult') {
+          // 다른 단계에서는 mock 결과 숨기기
+          setAiResult(prev => {
+            if (prev?.isGuideMock) {
+              setGenerated(false);
+              return null;
+            }
+            return prev;
+          });
+        }
+        
+        // TIL 선택 모달 단계에서만 모달을 열고, 그 외 단계에서는 닫는다.
+        setModalOpen(action === 'openAiTilModal');
+      }
+    };
+    window.addEventListener('rootin-guide-step', handleGuideStep);
+    return () => window.removeEventListener('rootin-guide-step', handleGuideStep);
+  }, [pots]);
+
   // 페이지 진입 시 화분 목록 + 사용자 포인트 로딩
   useEffect(() => {
-    // 화분 목록 로딩 — 첫 번째 화분 자동 선택
+    // 화분 목록 로딩 — 자동 선택하지 않음(① 퀘스트 종류 선택 후 ② 정원 단계가 해금되면 사용자가 직접 선택)
     getPots()
       .then(data => {
         const list = Array.isArray(data) ? data : [];
         setPots(list);
-        if (list.length > 0) {
-          setPotId(list[0].id);
-        }
       })
       .catch(() => {
         // 화분 목록 로딩 실패 시 빈 목록 유지
@@ -853,13 +934,14 @@ function AIScreen({ onOpenGuide }) {
           const content = typeof r.content === 'string'
             ? (() => { try { return JSON.parse(r.content); } catch { return null; } })()
             : r.content;
+          const d = new Date(r.createdAt);
           return {
             id: r.resultId,
             type: r.type.toLowerCase(),   // 'QUIZ' → 'quiz'
             potId: r.potId,
             content,
             tilIds: r.tilIds ?? [],
-            date: formatDate(r.createdAt),
+            date: `${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`,
             quizCount: r.type === 'QUIZ' ? content?.quizzes?.length : undefined,
           };
         });
@@ -901,7 +983,9 @@ function AIScreen({ onOpenGuide }) {
       setRemainPoint(data.remainPoint);
       setResultMode(mode);
       setGenerated(true);
+      playSfx('powerup');   // 결과 도착 — 파워업 부팅음
     } catch (err) {
+      playSfx('error');     // 오류 — 경고음
       if (err.status === 402) {
         setError('포인트가 부족해요. 활동으로 포인트를 적립해 보세요.');
       } else {
@@ -912,17 +996,15 @@ function AIScreen({ onOpenGuide }) {
     }
   };
 
-  // 모달 확인 — tilIds 받아서 생성 실행
+  // 모달 확인 — tilIds 받아서 생성 실행. 결제 순간 코인 분출 + 까-칭 효과음.
   const handleModalConfirm = (tilIds) => {
     setModalOpen(false);
     setLastTilIds(tilIds);
+    playSfx('coin');
     handleGenerate(tilIds);
   };
 
-  const handleModalClose = useCallback(() => {
-    setModalOpen(false);
-    setGuideTilModalActive(false);
-  }, []);
+  const handleModalClose = useCallback(() => setModalOpen(false), []);
 
   const handlePotChange = (id) => {
     setPotId(id);
@@ -952,6 +1034,7 @@ function AIScreen({ onOpenGuide }) {
           date,
           quizCount: resultMode === 'quiz' ? quizCount : undefined,
           tilIds: lastTilIds,
+          pot: selectedPot,
           content: aiResult,
         },
         ...prev,
@@ -980,263 +1063,289 @@ function AIScreen({ onOpenGuide }) {
     }
   };
 
-  const guideMockQuizzes = guideMockActive ? [
-    {
-      id: 1,
-      question: 'React에서 useEffect의 의존성 배열을 빈 배열([])로 설정하면 어떤 시점에 실행되나요?',
-      choices: ['컴포넌트가 처음 화면에 나타날 때(마운트)', '상태가 바뀔 때마다', '화면에서 사라질 때만', '렌더링되기 직전'],
-      answer: '컴포넌트가 처음 화면에 나타날 때(마운트)',
-      explanation: '의존성 배열이 빈 배열인 경우 컴포넌트가 마운트될 때 최초 1회만 동작합니다.',
-    },
-    {
-      id: 2,
-      question: '마크다운 문법에서 가장 큰 제목을 표현할 때 쓰는 기호는 무엇인가요?',
-      choices: ['#', '##', '###', '####'],
-      answer: '#',
-      explanation: '# 기호를 사용하면 HTML의 h1 태그와 같은 가장 큰 제목이 생성됩니다.',
-    },
-  ] : [];
-  const guideMockSummary = guideMockActive
-    ? '오늘 학습한 React 핵심 개념과 마크다운 작성 팁에 관한 요약입니다. 컴포넌트 생명주기와 훅의 올바른 사용법이 분석되었습니다.'
-    : '';
-  const guideMockKeyPoints = guideMockActive ? [
-    'useEffect의 의존성 관리 및 메모리 누수 방지 기법 학습',
-    'Shadcn UI와 Tailwind CSS를 활용한 반응형 웹 인터페이스 배치',
-    'AI 학습지 생성 시의 포인트 소모 규칙 확인',
-  ] : [];
+  const generateCost = mode === 'quiz' ? quizCount * 10 : mode === 'summary' ? 50 : 0;
+  const canGenerate = !!potId && !generating;
+  const balanceAfter = remainPoint - generateCost;
+  const enough = remainPoint >= generateCost;
+
+  // ── 퀘스트 진행(표시용) — 기존 상태에서 파생, 비즈니스 로직 아님 ──
+  // 순차 해금: ① 퀘스트 종류 선택 → ② 정원 해금 → 정원 선택 → ③ 난이도·④ 출격 해금
+  const modeChosen = mode !== null;
+  const potChosen = !!potId;
+  const quizDiff = quizCount <= 3 ? { key: 'easy', label: '쉬움' }
+    : quizCount <= 6 ? { key: 'normal', label: '보통' }
+    : { key: 'hard', label: '어려움' };
+  const questNodes = mode === 'quiz'
+    ? [
+        { key: 'mode', label: '종류', icon: 'spark', done: modeChosen, unlocked: true },
+        { key: 'pot',  label: '화분',   icon: 'leaf',  done: potChosen, unlocked: modeChosen },
+        { key: 'diff', label: '문항 수', icon: 'gear',  done: potChosen, unlocked: potChosen },
+        { key: 'go',   label: '만들기',   icon: 'flame', done: generated, unlocked: potChosen },
+      ]
+    : [
+        { key: 'mode', label: '종류', icon: 'spark', done: modeChosen, unlocked: true },
+        { key: 'pot',  label: '화분',   icon: 'leaf',  done: potChosen, unlocked: modeChosen },
+        { key: 'go',   label: '만들기',   icon: 'flame', done: generated, unlocked: potChosen },
+      ];
+  const doneCount = questNodes.filter(n => n.done).length;
+  const currentNodeIdx = (() => {
+    const i = questNodes.findIndex(n => !n.done);
+    return i === -1 ? questNodes.length - 1 : i;
+  })();
+  const heroSpecies = inferSpecies(selectedPot?.plantName);
+  const objective = generating
+    ? 'AI가 기록을 분석하는 중...'
+    : generated
+      ? '완성됐어요! 결과를 확인하세요'
+      : !modeChosen
+        ? '먼저 만들 종류를 선택하세요'
+        : !potChosen
+          ? '화분을 선택하세요'
+          : !enough
+            ? '포인트가 부족해요 — 활동으로 모아보세요'
+            : '만들기 버튼을 눌러 시작하세요!';
 
   return (
     <>
-    <div style={{ padding: 32, width: '100%', display: 'grid', gridTemplateColumns: '360px 1fr', gap: 24, maxWidth: 1600, margin: '0 auto', fontFamily: 'var(--font-body)' }}>
+    <div className="rt-app gb-ai-page">
+      <div className="gb-console">
 
-      {/* Left — source picker */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div>
-        <SectionHeader eyebrow="입력" title="학습 소스 선택" />
-        <Card padding={18} style={{ marginBottom: 16 }}>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>목적</div>
-          {/* 가이드 하이라이트 매칭을 위해 guide-ai-mode 클래스를 추가합니다 */}
-          <div className="guide-ai-mode" style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setMode('quiz')} style={{
-              flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'quiz' ? 'var(--coral)' : '#fff',
-              color: mode === 'quiz' ? '#fff' : 'var(--ink-2)',
-              border: '0.5px solid ' + (mode === 'quiz' ? 'var(--coral)' : 'var(--rule-2)'),
-              fontSize: 12.5, fontWeight: 500, textAlign: 'left',
-            }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 4 }}>📝 복습 문제 생성</div>
-              <div style={{ fontSize: 10.5, opacity: 0.7, lineHeight: 1.5 }}>TIL에서 {quizCount}문제 자동 생성</div>
-            </button>
-            <button onClick={() => setMode('summary')} style={{
-              flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'summary' ? 'var(--coral)' : '#fff',
-              color: mode === 'summary' ? '#fff' : 'var(--ink-2)',
-              border: '0.5px solid ' + (mode === 'summary' ? 'var(--coral)' : 'var(--rule-2)'),
-              fontSize: 12.5, fontWeight: 500, textAlign: 'left',
-            }}>
-              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 4 }}>✨ TIL 요약</div>
-              <div style={{ fontSize: 10.5, opacity: 0.7, lineHeight: 1.5 }}>핵심 개념을 한 문서로</div>
-            </button>
-          </div>
-          {mode === 'quiz' && (
-            <div style={{
-              marginTop: 12, paddingTop: 12,
-              borderTop: '0.5px solid var(--rule)',
-            }}>
-              <div className="guide-ai-quiz-count" style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                borderRadius: 10,
-              }}>
-                <span style={{ fontSize: 12.5, color: 'var(--ink-2)' }}>문제 수량</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button
-                    onClick={() => setQuizCount(c => Math.max(1, c - 1))}
-                    style={{
-                      width: 28, height: 28, borderRadius: 7,
-                      border: '0.5px solid var(--rule-2)', background: '#fff',
-                      fontSize: 15, color: 'var(--ink-2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >−</button>
-                  <span style={{
-                    width: 28, textAlign: 'center',
-                    fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)',
-                  }}>{quizCount}</span>
-                  <button
-                    onClick={() => setQuizCount(c => Math.min(10, c + 1))}
-                    style={{
-                      width: 28, height: 28, borderRadius: 7,
-                      border: '0.5px solid var(--rule-2)', background: '#fff',
-                      fontSize: 15, color: 'var(--ink-2)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >+</button>
-                  <span style={{ fontSize: 11, color: 'var(--ink-3)' }}>최대 10문제</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        <Card padding={18}>
-          <div style={{ marginBottom: 12 }}>
-            <div className="eyebrow">화분 선택</div>
-            <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>
-              학습할 화분을 하나 선택하세요
+        {/* ===== 콘솔 헤드: 카트리지 라벨 · 타이틀 · 코인 HUD ===== */}
+        <div className="gb-ai-head">
+          <div className="gb-ai-id">
+            <span className="gb-ai-cart" aria-hidden="true"><RtIcon name="spark" /></span>
+            <div className="gb-ai-titles">
+              <span className="gb-ai-kicker"><RtIcon name="book" /> 기록으로 만드는 복습 자료</span>
+              <h1 className="gb-ai-title">AI 복습 도우미</h1>
             </div>
           </div>
-
-          <div className="guide-ai-pots scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 420, overflow: 'auto', paddingRight: 4 }}>
-            {potsLoading ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                화분 목록을 불러오는 중...
-              </div>
-            ) : pots.length === 0 ? (
-              <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 12.5 }}>
-                화분이 없어요. 화분을 먼저 만들어 보세요.
-              </div>
-            ) : (
-              pots.map(p => (
-                <PotCard
-                  key={p.id}
-                  pot={p}
-                  selected={potId === p.id}
-                  onClick={() => handlePotChange(p.id)}
-                />
-              ))
-            )}
+          <div className={`gb-ai-credit${enough ? '' : ' is-low'}`}>
+            <span className="gb-ai-coin" aria-hidden="true">P</span>
+            <span className="gb-ai-credit-meta">
+              <span className="gb-ai-credit-k">보유 포인트</span>
+              <span className="gb-ai-credit-v">{remainPoint}P</span>
+            </span>
           </div>
-
-          <Btn
-            className="guide-ai-select-til"
-            variant="green" size="lg"
-            style={{ width: '100%', marginTop: 14, opacity: potId ? 1 : 0.45, cursor: potId ? 'pointer' : 'not-allowed' }}
-            onClick={() => potId && !generating && setModalOpen(true)}
-          >
-            {generating
-              ? '생성 중...'
-              : `${mode === 'quiz' ? `🌱 복습 문제 ${quizCount}개 만들기` : '✨ 요약 생성하기'} · ${mode === 'quiz' ? quizCount * 10 : 50} 포인트 사용`
-            }
-          </Btn>
-          <div style={{ marginTop: 8, fontSize: 11, color: 'var(--ink-3)', textAlign: 'center' }}>
-            현재 보유: <b style={{ color: 'var(--ink)' }}>{remainPoint}P</b> · 포인트는 활동으로 적립돼요
-          </div>
-          {error && (
-            <div style={{
-              marginTop: 8, padding: '10px 14px', borderRadius: 8,
-              background: '#fff3f5', border: '0.5px solid #f7c1c1',
-              fontSize: 12, color: '#b8536a', textAlign: 'center',
-            }}>
-              {error}
-            </div>
-          )}
-        </Card>
-      </div>
-
-        {/* ➕ 추가: 저장된 AI 결과 목록(보관함) UI 신규 배치 */}
-        <div className="guide-ai-saved-results">
-          <SectionHeader eyebrow="보관함" title="저장된 AI 결과" />
-          <Card padding={14} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {savedResults.length === 0 ? (
-                <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 12, color: 'var(--ink-3)' }}>
-                  저장된 결과지가 없습니다.
-                </div>
-            ) : (
-                savedResults.map(item => {
-                  const itemPot = pots.find(p => p.id === item.potId);
-                  const itemTitle = item.title ?? (item.type === 'quiz'
-                    ? `${itemPot?.title ?? item.potId} 화분 복습 문제`
-                    : `${itemPot?.title ?? item.potId} 화분 요약본`);
-                  return (
-                    <div
-                        key={item.id}
-                        onClick={() => handleSelectSavedItem(item)}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '10px 12px', borderRadius: 8, background: '#fcfdfb',
-                          border: '0.5px solid var(--rule)', cursor: 'pointer'
-                        }}
-                    >
-                  <span style={{ fontSize: 12.5, color: 'var(--ink)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 200 }}>
-                    {item.type === 'quiz' ? '📝 ' : '✨ '} {itemTitle}
-                  </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                        <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{item.date}</span>
-                        <button
-                          onClick={(e) => handleDelete(e, item.id)}
-                          aria-label="삭제"
-                          style={{
-                            width: 20, height: 20, borderRadius: 5,
-                            border: '0.5px solid var(--rule-2)', background: '#fff',
-                            fontSize: 11, color: 'var(--ink-3)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            cursor: 'pointer',
-                          }}
-                        >✕</button>
-                      </div>
-                    </div>
-                  );
-                })
-            )}
-          </Card>
         </div>
 
-      </div>
+        {/* ===== HUD 목표 바 — 현재 퀘스트 목표 + 진행도 ===== */}
+        <div className="gb-ai-objbar">
+          <span className="gb-ai-obj-flag" aria-hidden="true"><RtIcon name="flame" /></span>
+          <span className="gb-ai-obj-text">목표 ▸ <span className="cur">{objective}</span></span>
+          <span className="gb-ai-progress" aria-hidden="true">
+            {questNodes.map((n, i) => (<i key={n.key} className={i < doneCount ? 'on' : ''} />))}
+          </span>
+        </div>
 
-      {/* Right — output */}
-      <div>
-        <SectionHeader
-          eyebrow="AI 결과지"
-          title={resultMode === 'quiz' ? `복습 문제 (${quizCount}문항)` : 'TIL 요약 결과지'}
-          action={generated ? (
-            <div style={{ display: 'flex', gap: 8 }}>
-              {lastTilIds.length > 0 && (
-                <Btn variant="secondary" size="sm" onClick={() => handleGenerate(lastTilIds)}>다시 생성</Btn>
-              )}
-              <Btn variant="primary" size="sm" onClick={handleSave}>
-                {saved ? '✓ 저장됨' : '결과 저장'}
-              </Btn>
-            </div>
-          ) : null}
-        />
+        {/* ===== 본문: 좌 퀘스트 타임라인 / 우 플레이 스크린 ===== */}
+        <div className="gb-ai-main">
 
-        <Card className="guide-ai-result" padding={28}>
-          {generating ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '60px 0', color: 'var(--ink-3)' }}>
-              <Spinner size={48} color="var(--moss)" ariaHidden={true} />
-              <div style={{ fontSize: 13.5, color: 'var(--ink-2)', fontFamily: 'var(--font-display)' }}>AI가 TIL을 분석하고 있어요...</div>
-            </div>
-          ) : (!generated && !guideMockActive) ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, padding: '60px 0' }}>
-              <div style={{ fontSize: 40, opacity: 0.35 }}>{mode === 'quiz' ? '📝' : '✨'}</div>
-              <div style={{ fontSize: 13.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)' }}>
-                화분을 선택하고 생성 버튼을 눌러주세요
+          {/* ── 좌: 퀘스트 타임라인 (진행 흐름) ── */}
+          <ol className="gb-ai-quest">
+            {questNodes.map((n, i) => (
+              <li key={n.key} className={`gb-ai-node${n.done ? ' is-done' : ''}${i === currentNodeIdx ? ' is-current' : ''}${!n.unlocked ? ' is-locked' : ''}`}>
+                <div className="gb-ai-rail">
+                  <span className="gb-ai-mark" aria-hidden="true">
+                    {!n.unlocked ? <RtIcon name="lock" /> : n.done ? <RtIcon name="check" /> : i === currentNodeIdx ? <RtIcon name={n.icon} /> : (i + 1)}
+                  </span>
+                </div>
+                <div className="gb-ai-node-body rt-card">
+                  {!n.unlocked ? (
+                    <div className="gb-ai-locked">
+                      <span className="gb-ai-locked-ic" aria-hidden="true"><RtIcon name="lock" /></span>
+                      <span className="gb-ai-locked-t">{n.label} 단계 · 잠김</span>
+                      <span className="gb-ai-locked-d">{n.key === 'pot' ? '먼저 종류를 선택하세요' : '먼저 화분을 선택하세요'}</span>
+                    </div>
+                  ) : (<div className="gb-ai-node-content" key={`${n.key}-open`}>
+
+                  {n.key === 'mode' && (
+                    <>
+                      <div className="gb-ai-node-head"><span className="gb-ai-node-title">종류 선택</span><span className="gb-ai-node-sub">무엇을 만들까요?</span></div>
+                      <div className="gb-ai-intent guide-ai-mode">
+                        <button type="button" className={`gb-ai-quest-opt${mode === 'quiz' ? ' is-active' : ''}`} onClick={() => { playSfx('toggle'); setMode('quiz'); }}>
+                          <span className="gb-ai-quest-ic" aria-hidden="true"><RtIcon name="check" /></span>
+                          <span className="gb-ai-quest-t">복습 퀴즈</span>
+                          <span className="gb-ai-quest-d">4지선다로 이해도 점검</span>
+                        </button>
+                        <button type="button" className={`gb-ai-quest-opt${mode === 'summary' ? ' is-active' : ''}`} onClick={() => { playSfx('toggle'); setMode('summary'); }}>
+                          <span className="gb-ai-quest-ic" aria-hidden="true"><RtIcon name="star" /></span>
+                          <span className="gb-ai-quest-t">핵심 요약</span>
+                          <span className="gb-ai-quest-d">한 편의 정리 노트로</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {n.key === 'pot' && (
+                    <>
+                      <div className="gb-ai-node-head"><span className="gb-ai-node-title">화분 선택</span><span className="gb-ai-node-sub">{selectedPot ? selectedPot.title : '선택 필요'}</span></div>
+                      <div className="gb-ai-stages scrollbar guide-ai-pots">
+                        {potsLoading ? (
+                          <div className="gb-ai-msg">화분 목록을 불러오는 중...</div>
+                        ) : pots.length === 0 ? (
+                          <div className="gb-ai-msg">화분이 없어요. 먼저 화분을 만들어 보세요.</div>
+                        ) : (
+                          pots.map(p => (
+                            <PotCard
+                              key={p.id}
+                              pot={p}
+                              selected={potId === p.id}
+                              onClick={() => { playSfx('nav'); handlePotChange(p.id); }}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {n.key === 'diff' && (
+                    <>
+                      <div className="gb-ai-node-head"><span className="gb-ai-node-title">문항 수</span><span className="gb-ai-node-sub">최대 10문제</span></div>
+                      <div className="gb-ai-dial guide-ai-quiz-count">
+                        <button type="button" className="gb-ai-dial-btn" onClick={() => setQuizCount(n2 => Math.max(1, n2 - 1))} disabled={quizCount <= 1} aria-label="문항 줄이기">−</button>
+                        <div className="gb-ai-dial-screen">
+                          <span className="gb-ai-dial-val">{quizCount}<span className="unit">문항</span></span>
+                          <span className="gb-ai-diff" data-diff={quizDiff.key}>{quizDiff.label}</span>
+                        </div>
+                        <button type="button" className="gb-ai-dial-btn" onClick={() => setQuizCount(n2 => Math.min(10, n2 + 1))} disabled={quizCount >= 10} aria-label="문항 늘리기">+</button>
+                      </div>
+                    </>
+                  )}
+
+                  {n.key === 'go' && (
+                    <>
+                      <div className="gb-ai-node-head"><span className="gb-ai-node-title">만들기</span><span className="gb-ai-node-sub">필요 포인트 {generateCost}P</span></div>
+                      <div className="gb-ai-ledger">
+                        <span className="gb-ai-ledger-row"><span>보유 포인트</span><b>{remainPoint}P</b></span>
+                        <span className="gb-ai-ledger-row is-cost"><span>이번 사용</span><b>− {generateCost}P</b></span>
+                        <span className="gb-ai-ledger-row is-total"><span>사용 후 잔여</span><b>{balanceAfter}P</b></span>
+                      </div>
+                      {!enough && <div className="gb-ai-warn"><RtIcon name="lock" /> 포인트가 부족해요. 활동으로 포인트를 모아보세요.</div>}
+                      <button
+                        type="button"
+                        className={`gb-ai-start guide-ai-select-til${canGenerate && enough ? ' is-ready' : ''}`}
+                        onClick={() => { if (canGenerate) { playSfx('confirm'); setModalOpen(true); } }}
+                        disabled={!canGenerate}
+                      >
+                        <span className="gb-ai-start-ic" aria-hidden="true">A</span>
+                        <span>{generating ? '만드는 중…' : '만들기'}</span>
+                        <span className="gb-ai-start-cost">{generateCost}P</span>
+                      </button>
+                    </>
+                  )}
+                  </div>)}
+                </div>
+              </li>
+            ))}
+          </ol>
+
+          {/* ── 우: 플레이 스크린 (LCD) ── */}
+          <section className="gb-ai-screen guide-ai-result">
+            <div className="gb-ai-bezel">
+              <div className="gb-ai-bez-top">
+                <span className={`gb-ai-led${generated && !generating ? ' is-on' : ''}`} aria-hidden="true" />
+                <span className="gb-ai-bez-cap">{mode === 'quiz' ? '복습 퀴즈' : mode === 'summary' ? '핵심 요약' : '대기 중'}</span>
+                <span className="gb-ai-bez-cap r">ROOTIN-AI</span>
+              </div>
+              <div className="gb-ai-frame">
+                <div className="gb-ai-lcd">
+                  {generating ? (
+                    <div className="gb-ai-explore">
+                      <span className="gb-ai-explore-hero" aria-hidden="true"><PixelPlant species={heroSpecies} stage="sprout" size={56} /></span>
+                      <div className="gb-ai-explore-t">{mode === 'quiz' ? '복습 퀴즈 만드는 중' : '핵심 요약 만드는 중'}</div>
+                      <div className="gb-ai-loadbar" aria-hidden="true"><i /></div>
+                      <div className="gb-ai-explore-sub">AI가 기록을 분석하고 있어요...</div>
+                    </div>
+                  ) : generated ? (
+                    <div className="gb-ai-result">
+                      <div className="gb-ai-clear">
+                        <span className="gb-ai-clear-badge">{resultMode === 'quiz' ? `${quizCount}문항` : '요약'}</span>
+                        <span className="gb-ai-clear-title">{resultMode === 'quiz' ? '복습 퀴즈가 완성됐어요' : '핵심 요약이 완성됐어요'}</span>
+                        <div className="gb-ai-clear-acts">
+                          {lastTilIds.length > 0 && (
+                            <button type="button" className="gb-ai-act" onClick={() => handleGenerate(lastTilIds)}>다시 만들기</button>
+                          )}
+                          <button type="button" className="gb-ai-act gb-ai-act--save" onClick={handleSave}>{saved ? '✓ 저장됨' : '저장하기'}</button>
+                        </div>
+                      </div>
+                      <div className="gb-ai-result-body scrollbar">
+                        {error && <div className="gb-ai-strip"><RtIcon name="lock" />{error}</div>}
+                        {resultMode === 'quiz' ? (
+                          <QuizResult pot={selectedPot} quizCount={quizCount} quizzes={aiResult?.quizzes ?? null} />
+                        ) : (
+                          <SummaryResult pot={selectedPot} summary={aiResult?.summary ?? null} keyPoints={aiResult?.keyPoints ?? null} />
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="gb-ai-standby">
+                      <div className="gb-ai-gate" aria-hidden="true">
+                        <span className="gb-ai-gate-hero"><PixelPlant species={heroSpecies} stage="sprout" size={56} /></span>
+                      </div>
+                      <div className="gb-ai-standby-t">시작 대기 중</div>
+                      <div className="gb-ai-standby-sub">화분과 종류를 선택하고 만들기를 누르면, 기록을 분석해 복습 퀴즈나 핵심 요약을 만들어 드려요.</div>
+                      <div className="gb-ai-press">▶ 만들기 버튼을 눌러 시작</div>
+                      {error && <div className="gb-ai-strip" style={{ marginTop: 4 }}><RtIcon name="lock" />{error}</div>}
+                    </div>
+                  )}
+                  <span className="gb-fx gb-fx-scan" aria-hidden="true" />
+                  <span className="gb-fx gb-fx-vignette" aria-hidden="true" />
+                  <span className="gb-fx gb-fx-glass" aria-hidden="true" />
+                </div>
               </div>
             </div>
-          ) : (resultMode === 'quiz' || (guideMockActive && mode === 'quiz')) ? (
-            <QuizResult
-              pot={selectedPot ?? { name: '예시 화분(JavaScript 입문)' }}
-              quizCount={2}
-              quizzes={guideMockActive ? guideMockQuizzes : (aiResult?.quizzes ?? [])}
-            />
+          </section>
+        </div>
+
+        {/* ===== 전리품 보관함 ===== */}
+        <section className="gb-ai-vault guide-ai-saved-results">
+          <div className="gb-ai-vault-head">
+            <RtIcon name="trophy" />
+            <span className="gb-ai-vault-title">저장한 학습 자료</span>
+            <span className="gb-ai-vault-count">{savedResults.length}개</span>
+          </div>
+          {savedResults.length === 0 ? (
+            <div className="gb-ai-vault-empty">아직 저장한 자료가 없어요. 결과를 만들고 저장해 보세요.</div>
           ) : (
-            <SummaryResult
-              pot={selectedPot ?? { name: '예시 화분(JavaScript 입문)' }}
-              summary={guideMockActive ? guideMockSummary : (aiResult?.summary ?? '')}
-              keyPoints={guideMockActive ? guideMockKeyPoints : (aiResult?.keyPoints ?? [])}
-            />
+            <div className="gb-ai-vault-grid">
+              {savedResults.map(item => {
+                const itemPot = pots.find(p => p.id === item.potId);
+                const itemTitle = item.title ?? (item.type === 'quiz'
+                  ? `${itemPot?.title ?? item.potId} 화분 복습 문제`
+                  : `${itemPot?.title ?? item.potId} 화분 요약본`);
+                return (
+                  <article key={item.id} className="gb-ai-loot" onClick={() => { playSfx('nav'); handleSelectSavedItem(item); }}>
+                    <span className={`gb-ai-loot-ic ${item.type === 'quiz' ? 'is-quiz' : 'is-summary'}`} aria-hidden="true">
+                      <RtIcon name={item.type === 'quiz' ? 'check' : 'star'} />
+                    </span>
+                    <span className="gb-ai-loot-body">
+                      <span className="gb-ai-loot-title">{itemTitle}</span>
+                      <span className="gb-ai-loot-meta">{item.type === 'quiz' ? '복습 퀴즈' : '핵심 요약'} · {item.date}</span>
+                    </span>
+                    <button type="button" className="gb-ai-loot-del" aria-label="삭제" onClick={(e) => handleDelete(e, item.id)}><RtIcon name="xmark" /></button>
+                  </article>
+                );
+              })}
+            </div>
           )}
-        </Card>
+        </section>
+
+        {/* ===== 콘솔 발 — 브랜드 + 스피커 ===== */}
+        <div className="gb-console-foot">
+          <div className="gb-brand">
+            <span className="gb-brand-word">Rootin</span>
+            <span className="gb-brand-sub">AI 복습 도우미</span>
+          </div>
+          <span className="gb-speaker" aria-hidden="true" />
+        </div>
       </div>
     </div>
 
     {modalOpen && (
       <AiTilSelectModal
         potId={potId}
-        guideMode={guideTilModalActive}
         onConfirm={handleModalConfirm}
         onClose={handleModalClose}
-        onOpenGuide={onOpenGuide}
       />
     )}
     </>
@@ -1263,62 +1372,42 @@ function QuizResult({ pot, quizCount, quizzes }) {
     setGraded(true);
   }
 
-  function getChoiceStyle(q, i, choice) {
-    const base = {
-      width: '100%', textAlign: 'left',
-      padding: '10px 14px', borderRadius: 9,
-      fontSize: 13, cursor: graded ? 'default' : 'pointer',
-      transition: 'background 0.15s',
-    };
-    if (!graded) {
-      const isSelected = selected[i] === choice;
-      return {
-        ...base,
-        background: isSelected ? 'var(--moss)' : 'var(--paper-2)',
-        color: isSelected ? '#fff' : 'var(--ink)',
-        border: isSelected ? '0.5px solid var(--moss)' : '0.5px solid var(--rule)',
-        fontWeight: isSelected ? 600 : 400,
-      };
-    }
-    // 채점 후
-    const isCorrect = choice === q.answer;
-    const isSelected = selected[i] === choice;
-    if (isCorrect) return { ...base, background: '#e8f5e9', color: '#2e7d32', border: '0.5px solid #81c784', fontWeight: 600 };
-    if (isSelected) return { ...base, background: '#ffebee', color: '#c62828', border: '0.5px solid #e57373' };
-    return { ...base, background: 'var(--paper-2)', color: 'var(--ink-3)', border: '0.5px solid var(--rule)' };
+  // 채점 전/후 보기 상태 클래스
+  function choiceClass(q, i, choice) {
+    if (!graded) return selected[i] === choice ? ' is-selected' : '';
+    if (choice === q.answer) return ' is-correct';
+    if (selected[i] === choice) return ' is-wrong';
+    return ' is-dim';
   }
 
+  // 채점 결과 별점(표시용) — 정답률을 5칸으로 환산
+  const starCount = list.length ? Math.round((correctCount / list.length) * 5) : 0;
+  const stars = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-      <div style={{
-        padding: 16, background: 'var(--paper-2)', borderRadius: 10,
-        fontSize: 12.5, color: 'var(--ink-2)', borderLeft: '2px solid var(--moss)',
-      }}>
-        💡 {pot?.emoji} {pot?.name} 화분의 TIL에서 핵심 개념 {quizCount}문항을 추출했어요. 보기를 선택하고 채점해보세요.
-      </div>
+    <div className="gb-ai-quiz">
+      <p className="gb-ai-quiz-intro">
+        {pot?.title ? `'${pot.title}' 화분의 ` : ''}기록에서 {quizCount}개의 문제를 만들었어요. 정답을 고른 뒤 채점해 보세요.
+      </p>
 
       {list.map((q, i) => (
-        <div key={i}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-            <span style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--moss-2)' }}>
-              {String(i + 1).padStart(2, '0')}
-            </span>
-            <span style={{ fontSize: 15, fontWeight: 500, color: 'var(--ink)', lineHeight: 1.6, flex: 1 }}>{q.question}</span>
+        <div key={i} className="gb-ai-q">
+          <div className="gb-ai-q-head">
+            <span className="gb-ai-q-no">Q{i + 1}</span>
+            <span className="gb-ai-q-text">{q.question}</span>
           </div>
-          {q.hint && (
-            <div style={{ paddingLeft: 28, marginTop: 6, fontSize: 11.5, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-              힌트: {q.hint}
-            </div>
-          )}
-          <div style={{ paddingLeft: 28, marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {q.hint && <div className="gb-ai-q-hint"><RtIcon name="drop" />힌트 · {q.hint}</div>}
+          <div className="gb-ai-choices">
             {(q.choices ?? []).map((choice, ci) => (
               <button
                 key={ci}
+                type="button"
+                className={`gb-ai-choice${choiceClass(q, i, choice)}`}
                 onClick={() => handleSelect(i, choice)}
-                style={getChoiceStyle(q, i, choice)}
+                disabled={graded}
               >
-                <span style={{ marginRight: 8, opacity: 0.5 }}>{['①', '②', '③', '④'][ci]}</span>
-                {choice}
+                <span className="gb-ai-choice-mk" aria-hidden="true">{['A', 'B', 'C', 'D'][ci] ?? '·'}</span>
+                <span className="gb-ai-choice-text">{choice}</span>
               </button>
             ))}
           </div>
@@ -1326,31 +1415,20 @@ function QuizResult({ pot, quizCount, quizzes }) {
       ))}
 
       {list.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, marginTop: 8 }}>
+        <div className="gb-ai-quiz-foot">
           {graded && (
-            <div style={{
-              padding: '14px 24px', borderRadius: 12, textAlign: 'center',
-              background: correctCount === list.length ? '#e8f5e9' : '#fff8e1',
-              border: `1px solid ${correctCount === list.length ? '#81c784' : '#ffd54f'}`,
-              fontSize: 14, fontWeight: 600,
-              color: correctCount === list.length ? '#2e7d32' : '#f57f17',
-            }}>
-              {correctCount === list.length
-                ? `🎉 전체 정답! ${list.length}문제 모두 맞혔어요.`
-                : `${list.length}문제 중 ${correctCount}개 정답이에요.`}
+            <div className={`gb-ai-score${correctCount === list.length ? ' is-perfect' : ''}`}>
+              <span className="gb-ai-score-stars" aria-hidden="true">{stars}</span>
+              <span>{correctCount === list.length
+                ? `${list.length}문제 모두 정답이에요! 완벽해요.`
+                : `${list.length}문제 중 ${correctCount}개 정답!`}</span>
             </div>
           )}
           <button
+            type="button"
+            className="gb-ai-btn"
             onClick={handleGrade}
             disabled={!allAnswered || graded}
-            style={{
-              padding: '12px 32px', borderRadius: 10,
-              background: allAnswered && !graded ? 'var(--moss)' : 'var(--rule)',
-              color: allAnswered && !graded ? '#fff' : 'var(--ink-3)',
-              border: 'none', fontSize: 14, fontWeight: 600,
-              cursor: allAnswered && !graded ? 'pointer' : 'not-allowed',
-              transition: 'background 0.15s',
-            }}
           >
             {graded ? '채점 완료' : '채점하기'}
           </button>
@@ -1362,31 +1440,19 @@ function QuizResult({ pot, quizCount, quizzes }) {
 
 function SummaryResult({ pot, summary, keyPoints }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div style={{
-        padding: 16, background: 'var(--paper-2)', borderRadius: 10,
-        fontSize: 12.5, color: 'var(--ink-2)', borderLeft: '2px solid var(--moss)',
-      }}>
-        🌿 {pot ? `${pot.emoji} ${pot.name} 화분의 TIL 핵심을 한 문서로 묶었어요.` : 'TIL 핵심을 한 문서로 묶었어요.'}
-      </div>
+    <div className="gb-ai-summary">
+      <p className="gb-ai-summary-intro">
+        {pot?.title ? `'${pot.title}' 화분의 ` : ''}기록을 한 편으로 정리했어요.
+      </p>
 
-      {summary && (
-        <div>
-          <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.85, whiteSpace: 'pre-wrap' }}>
-            {summary}
-          </div>
-        </div>
-      )}
+      {summary && <div className="gb-ai-summary-body">{summary}</div>}
 
       {keyPoints && keyPoints.length > 0 && (
-        <div style={{ padding: 16, borderRadius: 10, background: 'var(--paper-2)' }}>
-          <div className="eyebrow" style={{ marginBottom: 8 }}>핵심 포인트</div>
-          <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="gb-ai-keypoints">
+          <div className="gb-ai-keypoints-cap"><RtIcon name="star" /> 핵심 포인트</div>
+          <ul className="gb-ai-keypoints-list">
             {keyPoints.map((point, i) => (
-              <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, color: 'var(--ink)' }}>
-                <span style={{ width: 4, height: 4, borderRadius: 2, background: 'var(--moss)', marginTop: 6, flexShrink: 0 }} />
-                {point}
-              </li>
+              <li key={i} className="gb-ai-keypoint"><span className="gb-ai-kp-mk" aria-hidden="true">{i + 1}</span>{point}</li>
             ))}
           </ul>
         </div>
@@ -1397,8 +1463,14 @@ function SummaryResult({ pot, summary, keyPoints }) {
 
 // === Profile Screen ===
 
+const THEME_OPTIONS = [
+  { id: 'classic', emoji: '🌿', name: '원본', desc: '깔끔한 식물 테마' },
+  { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔' },
+];
+
 function ProfileScreen() {
   const { user, updateUser, clearUser } = useUser();
+  const { theme, setTheme } = useTheme();
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState(user?.name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
@@ -1546,292 +1618,291 @@ function ProfileScreen() {
   const profileImageUrl = user?.profileImageUrl ?? null;
 
   return (
-    <div style={{ padding: 32, width: '100%', maxWidth: 1600, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 22, fontFamily: 'var(--font-body)' }}>
+    <div className="rt-app gb-profile-page">
 
-      <Card padding={28}>
-        {/* 뷰 모드: 가로 배치 / 편집 모드: 아바타+폼 세로 구조 */}
-        {editing ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {/* 아바타 행 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ position: 'relative', flexShrink: 0 }}>
-                <img
-                  src={profileImageUrl || ''}
-                  alt="프로필"
-                  style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', display: profileImageUrl ? 'block' : 'none' }}
-                  onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-edit').style.display = 'flex'; }}
-                />
-                <div id="avatar-initial-edit" style={{
-                  width: 72, height: 72, borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
-                  color: '#fff', display: profileImageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 28, fontFamily: 'var(--font-display)', fontWeight: 600,
-                }}>{avatarInitial}</div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleImageChange}
-                  data-testid="profile-image-input"
-                />
-                <button
-                  style={{
-                    position: 'absolute', bottom: -2, right: -2,
-                    width: 26, height: 26, borderRadius: '50%',
-                    background: '#fff', border: '1px solid var(--rule-2)',
-                    fontSize: 12, cursor: imageUploading ? 'not-allowed' : 'pointer',
-                    opacity: imageUploading ? 0.5 : 1,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                  disabled={imageUploading}
-                  onClick={() => fileInputRef.current?.click()}
-                  aria-label="프로필 이미지 변경"
-                >
-                  {imageUploading ? '…' : '📷'}
-                </button>
-              </div>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-3)' }}>이미지를 클릭해 변경하세요</span>
-            </div>
-
-            {/* 닉네임 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>닉네임</label>
-              <input
-                value={nickname}
-                onChange={e => setNickname(e.target.value)}
-                style={{
-                  fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, color: 'var(--ink)',
-                  border: '0.5px solid var(--rule-2)', borderRadius: 8, padding: '8px 12px',
-                  width: '100%', maxWidth: 400, boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            {/* 소개 */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 11.5, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>소개</label>
-              <textarea
-                value={bio}
-                onChange={e => setBio(e.target.value)}
-                style={{
-                  width: '100%', maxWidth: 600, minHeight: 64, padding: '8px 12px',
-                  border: '0.5px solid var(--rule-2)', borderRadius: 8,
-                  fontSize: 13, color: 'var(--ink-2)', outline: 'none', resize: 'vertical',
-                  fontFamily: 'var(--font-body)', boxSizing: 'border-box',
-                }}
-              />
-            </div>
-
-            {/* 버튼 행 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Btn variant="green" onClick={handleSave} disabled={saving}>
-                {saving ? '저장 중…' : '저장'}
-              </Btn>
-              <Btn variant="secondary" onClick={() => { setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
-                취소
-              </Btn>
-              {saveError && <span style={{ fontSize: 12, color: '#e05252', marginLeft: 4 }}>{saveError}</span>}
-            </div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 22 }}>
-            <div style={{ position: 'relative', flexShrink: 0 }}>
-              <img
-                src={profileImageUrl || ''}
-                alt="프로필"
-                style={{ width: 92, height: 92, borderRadius: '50%', objectFit: 'cover', display: profileImageUrl ? 'block' : 'none' }}
-                onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-view').style.display = 'flex'; }}
-              />
-              <div id="avatar-initial-view" style={{
-                width: 92, height: 92, borderRadius: '50%',
-                background: 'linear-gradient(135deg, #a8d5b5, #3d8b5e)',
-                color: '#fff', display: profileImageUrl ? 'none' : 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 36, fontFamily: 'var(--font-display)', fontWeight: 600,
-              }}>{avatarInitial}</div>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 700, color: 'var(--ink)' }}>{nickname}</h2>
-                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-3)', fontSize: 13 }}>@{user?.handle ?? ''}</span>
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 6 }}>{bio}</div>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', marginTop: 8 }}>
-                {user?.joinedAt ?? ''}부터 Rootin과 함께
-              </div>
-            </div>
-            <Btn variant="secondary" onClick={() => setEditing(true)}>
-              프로필 수정
-            </Btn>
-          </div>
-        )}
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginTop: 24, paddingTop: 22, borderTop: '0.5px solid var(--rule)' }}>
-          {[
-            { label: '누적 TIL', value: (user?.totalTil ?? 0) + '개' },
-            { label: '연속 기록', value: (user?.streak ?? 0) + '일' },
-            { label: '수확한 식물', value: harvestedCount !== null ? harvestedCount + '종' : '—' },
-            { label: '보유 포인트', value: (user?.points ?? 0) + 'P' },
-          ].map((s, i) => (
-            <div key={i} style={{
-              borderRight: i < 3 ? '0.5px solid var(--rule)' : 'none',
-              paddingLeft: i > 0 ? 22 : 0,
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-display)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>{s.label}</div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, fontWeight: 700, color: 'var(--ink)', marginTop: 4 }}>{s.value}</div>
-            </div>
-          ))}
+      {/* 게임 HUD 플레이어 바 */}
+      <div className="rt-hud">
+        <div className="rt-hud-l">
+          <RtIcon name="person" /> PLAYER : {nickname || '학습자'} · <span className="rt-hud-lv">SAVE FILE 01</span>
         </div>
-      </Card>
+        <div className="rt-hud-r">
+          <span className="rt-hud-grp"><RtIcon name="clock" /> {user?.joinedAt ? `${user.joinedAt}~` : '모험 진행 중'}</span>
+          <span className="rt-hud-sep" />
+          <span className="rt-hud-grp"><RtIcon name="star" /> {user?.points ?? 0}P</span>
+        </div>
+      </div>
 
-      {/* Account settings */}
-      <Card padding={24}>
-        <SectionHeader eyebrow="계정 관리" title="설정" />
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-
-          {/* 이메일 행 */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 20,
-            padding: '14px 0',
-            borderBottom: isLocal ? '0.5px solid var(--rule)' : 'none',
-          }}>
-            <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>이메일</div>
-            <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>{user?.email ?? ''}</div>
+      {/* ===== 플레이어 데이터 콘솔 (세이브 파일) ===== */}
+      <div className="gb-console gb-profile-console">
+        <div className="gb-console-head">
+          <div>
+            <span className="rt-tag"><RtIcon name="person" /> SAVE FILE · PLAYER DATA</span>
+            <h2 className="rt-h3" style={{ margin: '10px 0 0' }}>플레이어 프로필</h2>
           </div>
-
-          {/* 비밀번호 행 — local 유저만 */}
-          {isLocal && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 20, padding: '14px 0' }}>
-              <div style={{ width: 140, fontSize: 12.5, color: 'var(--ink-3)' }}>비밀번호</div>
-              <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)' }}>••••••••</div>
-              <Btn variant="secondary" size="sm" onClick={() => setShowPasswordForm(true)}>변경</Btn>
-            </div>
+          {!editing && (
+            <button className="rt-btn rt-btn--sm" onClick={() => { playSfx('nav'); setEditing(true); }}>
+              <RtIcon name="gear" /> 프로필 수정
+            </button>
           )}
         </div>
-      </Card>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '0 4px' }}>
-        <button
-          onClick={handleWithdraw}
-          disabled={withdrawing}
-          style={{
-            fontSize: 12.5,
-            color: '#b8536a',
-            background: 'transparent',
-            border: '1px solid #b8536a',
-            borderRadius: 6,
-            padding: '4px 12px',
-            cursor: withdrawing ? 'not-allowed' : 'pointer',
-            opacity: withdrawing ? 0.6 : 1,
-          }}
-        >
-          {withdrawing ? '처리 중…' : '회원 탈퇴'}
+        <div className="gb-prof-main">
+
+          {/* ── 좌: 캐릭터 LCD (보기) / 프로필 폼 (편집) ── */}
+          <div className="gb-prof-screen">
+            <div className="gb-prof-bezel">
+              <div className="gb-prof-beztop">
+                <span className="gb-garden-led" aria-hidden="true" />
+                <span className="gb-prof-cap">{editing ? 'EDIT MODE · 프로필 편집' : 'DOT MATRIX · CHARACTER'}</span>
+              </div>
+              <div className="gb-prof-frame">
+                <div className="gb-prof-lcd">
+
+                  {editing ? (
+                    /* ----- 편집 폼 ----- */
+                    <div className="gb-prof-form">
+                      <div className="gb-prof-avatar-row">
+                        <div className="gb-prof-avatar">
+                          <img
+                            src={profileImageUrl || ''}
+                            alt="프로필"
+                            className="gb-prof-avatar-img"
+                            style={{ display: profileImageUrl ? 'block' : 'none' }}
+                            onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-edit').style.display = 'flex'; }}
+                          />
+                          <div id="avatar-initial-edit" className="gb-prof-avatar-fallback" style={{ display: profileImageUrl ? 'none' : 'flex' }}>{avatarInitial}</div>
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={handleImageChange}
+                            data-testid="profile-image-input"
+                          />
+                          <button
+                            className="gb-prof-cam"
+                            disabled={imageUploading}
+                            onClick={() => fileInputRef.current?.click()}
+                            aria-label="프로필 이미지 변경"
+                          >
+                            {imageUploading ? '…' : <RtIcon name="plus" />}
+                          </button>
+                        </div>
+                        <span className="gb-prof-avatar-hint">이미지를 클릭해 변경하세요</span>
+                      </div>
+
+                      <label className="gb-prof-field">
+                        <span className="gb-prof-field-k">닉네임</span>
+                        <input
+                          className="gb-prof-input"
+                          value={nickname}
+                          onChange={e => setNickname(e.target.value)}
+                        />
+                      </label>
+
+                      <label className="gb-prof-field">
+                        <span className="gb-prof-field-k">소개</span>
+                        <textarea
+                          className="gb-prof-textarea"
+                          value={bio}
+                          onChange={e => setBio(e.target.value)}
+                        />
+                      </label>
+
+                      <div className="gb-prof-form-actions">
+                        <button className="rt-btn rt-btn--primary" onClick={() => { playSfx('confirm'); handleSave(); }} disabled={saving}>
+                          {saving ? '저장 중…' : '저장'}
+                        </button>
+                        <button className="rt-btn rt-btn--ghost" onClick={() => { playSfx('cancel'); setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
+                          취소
+                        </button>
+                        {saveError && <span className="gb-prof-err">{saveError}</span>}
+                      </div>
+                    </div>
+                  ) : (
+                    /* ----- 캐릭터 카드 ----- */
+                    <div className="gb-prof-card">
+                      <div className="gb-prof-portrait">
+                        <img
+                          src={profileImageUrl || ''}
+                          alt="프로필"
+                          className="gb-prof-portrait-img"
+                          style={{ display: profileImageUrl ? 'block' : 'none' }}
+                          onError={e => { e.currentTarget.style.display = 'none'; document.getElementById('avatar-initial-view').style.display = 'flex'; }}
+                        />
+                        <div id="avatar-initial-view" className="gb-prof-portrait-fallback" style={{ display: profileImageUrl ? 'none' : 'flex' }}>{avatarInitial}</div>
+                      </div>
+                      <div className="gb-prof-id">
+                        <h3 className="gb-prof-name">{nickname}</h3>
+                        <span className="gb-prof-handle">@{user?.handle ?? ''}</span>
+                        <p className="gb-prof-bio">{bio || '아직 소개가 없어요.'}</p>
+                        <span className="gb-prof-since">
+                          <RtIcon name="clock" /> {user?.joinedAt ? `${user.joinedAt}부터 ` : ''}Rootin과 함께
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="gb-fx gb-fx-scan" aria-hidden="true" />
+                  <div className="gb-fx gb-fx-vignette" aria-hidden="true" />
+                  <div className="gb-fx gb-fx-glass" aria-hidden="true" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── 우: STATUS 스탯 패널 ── */}
+          <div className="gb-prof-status">
+            <div className="gb-prof-status-head">
+              <span className="rt-tag"><RtIcon name="trophy" /> STATUS</span>
+            </div>
+            <ul className="gb-prof-stats">
+              {[
+                { icon: 'book',  k: '누적 TIL',    v: (user?.totalTil ?? 0) + '개', tone: 'leaf' },
+                { icon: 'flame', k: '연속 기록',   v: (user?.streak ?? 0) + '일', tone: 'peach' },
+                { icon: 'leaf',  k: '수확한 식물', v: harvestedCount !== null ? harvestedCount + '종' : '—', tone: 'sky' },
+                { icon: 'star',  k: '보유 포인트', v: (user?.points ?? 0) + 'P', tone: 'amber' },
+              ].map((s) => (
+                <li key={s.k} className={`gb-prof-stat gb-prof-stat--${s.tone}`}>
+                  <span className="gb-prof-stat-ic"><RtIcon name={s.icon} /></span>
+                  <span className="gb-prof-stat-k">{s.k}</span>
+                  <span className="gb-prof-stat-v">{s.v}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* 콘솔 하단 — 브랜드 각인 + 스피커 그릴 */}
+        <div className="gb-console-foot">
+          <div className="gb-brand">
+            <span className="gb-brand-word">Rootin</span>
+            <span className="gb-brand-sub">DOT-MATRIX&nbsp;SAVE&nbsp;SYSTEM<span className="tm">TM</span></span>
+          </div>
+          <div className="gb-speaker" aria-hidden="true" />
+        </div>
+      </div>
+
+      {/* ===== 계정 관리 ===== */}
+      <div className="rt-card gb-prof-acct">
+        <div className="gb-prof-acct-head">
+          <span className="rt-tag"><RtIcon name="gear" /> 계정 관리</span>
+          <h3 className="rt-h3" style={{ margin: '8px 0 0' }}>설정</h3>
+        </div>
+
+        {/* 이메일 행 */}
+        <div className="gb-acct-row">
+          <span className="gb-acct-k">이메일</span>
+          <span className="gb-acct-v">{user?.email ?? ''}</span>
+        </div>
+
+        {/* 비밀번호 행 — local 유저만 */}
+        {isLocal && (
+          <div className="gb-acct-row">
+            <span className="gb-acct-k">비밀번호</span>
+            <span className="gb-acct-v">••••••••</span>
+            <button className="rt-btn rt-btn--sm" onClick={() => { playSfx('nav'); setShowPasswordForm(true); }}>변경</button>
+          </div>
+        )}
+      </div>
+
+      {/* 테마 보관함 — 카트리지 컬렉션 */}
+      <div className="rt-card gb-prof-theme">
+        <div className="gb-prof-acct-head">
+          <span className="rt-tag"><RtIcon name="star" /> 화면 테마</span>
+          <h3 className="rt-h3" style={{ margin: '8px 0 0' }}>테마 보관함</h3>
+        </div>
+        <div className="gb-theme-grid">
+          {THEME_OPTIONS.map((opt) => {
+            const active = theme === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className={`gb-theme-cart${active ? ' is-active' : ''}`}
+                onClick={() => { playSfx('nav'); setTheme(opt.id); }}
+                aria-pressed={active}
+              >
+                <span className="gb-theme-cart-emoji">{opt.emoji}</span>
+                <span className="gb-theme-cart-name">{opt.name}</span>
+                <span className="gb-theme-cart-desc">{opt.desc}</span>
+                <span className="gb-theme-cart-badge">{active ? '● 장착됨' : '○ 선택'}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 회원 탈퇴 */}
+      <div className="gb-prof-danger-row">
+        <button className="gb-prof-danger" onClick={handleWithdraw} disabled={withdrawing}>
+          <RtIcon name="xmark" /> {withdrawing ? '처리 중…' : '회원 탈퇴'}
         </button>
       </div>
 
       {/* 비밀번호 변경 모달 */}
       {showPasswordForm && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(15, 42, 71, 0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={handlePasswordFormCancel}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              width: 420, background: '#fff', borderRadius: 18,
-              padding: '32px 28px', boxShadow: 'var(--shadow-lg)',
-            }}
-          >
-            <div className="eyebrow" style={{ color: 'var(--moss-2)', marginBottom: 4 }}>계정 관리</div>
-            <h3 style={{
-              fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 700,
-              color: 'var(--ink)', marginBottom: 22,
-            }}>
-              비밀번호 변경
-            </h3>
+        <div className="gb-pw-overlay" onClick={handlePasswordFormCancel}>
+          <div className="gb-pw-modal" onClick={e => e.stopPropagation()}>
+            <div className="gb-pw-bar">
+              <span className="gb-garden-led" aria-hidden="true" />
+              <span className="gb-pw-cap">ACCOUNT&nbsp;·&nbsp;SECURITY</span>
+            </div>
+            <div className="gb-pw-body">
+              <span className="rt-tag"><RtIcon name="lock" /> 계정 관리</span>
+              <h3 className="gb-pw-title">비밀번호 변경</h3>
 
-            {pwStep === 'form' ? (
-              <>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {[
-                    { label: '현재 비밀번호', value: pwCurrent, setter: setPwCurrent },
-                    { label: '새 비밀번호', value: pwNew, setter: setPwNew },
-                    { label: '새 비밀번호 확인', value: pwConfirm, setter: setPwConfirm },
-                  ].map(({ label, value, setter }) => (
-                    <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <label style={{
-                        fontSize: 11.5, color: 'var(--ink-3)',
-                        fontFamily: 'var(--font-display)', letterSpacing: '0.06em', textTransform: 'uppercase',
-                      }}>
-                        {label}
+              {pwStep === 'form' ? (
+                <>
+                  <div className="gb-pw-fields">
+                    {[
+                      { label: '현재 비밀번호', value: pwCurrent, setter: setPwCurrent },
+                      { label: '새 비밀번호', value: pwNew, setter: setPwNew },
+                      { label: '새 비밀번호 확인', value: pwConfirm, setter: setPwConfirm },
+                    ].map(({ label, value, setter }) => (
+                      <label key={label} className="gb-pw-field">
+                        <span className="gb-pw-label">{label}</span>
+                        <input
+                          type="password"
+                          className="gb-pw-input"
+                          value={value}
+                          onChange={e => setter(e.target.value)}
+                        />
                       </label>
-                      <input
-                        type="password"
-                        value={value}
-                        onChange={e => setter(e.target.value)}
-                        style={{
-                          padding: '9px 12px', border: '0.5px solid var(--rule-2)', borderRadius: 8,
-                          fontSize: 13.5, color: 'var(--ink)', fontFamily: 'var(--font-body)',
-                          outline: 'none', width: '100%', boxSizing: 'border-box',
-                        }}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                {pwError && (
-                  <div style={{
-                    marginTop: 12, padding: '9px 13px', borderRadius: 8,
-                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
-                    fontSize: 12.5, color: '#b8536a',
-                  }}>
-                    {pwError}
+                    ))}
                   </div>
-                )}
 
-                <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-                  <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={handlePasswordFormCancel}>
-                    취소
-                  </Btn>
-                  <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={handlePasswordNext}>
-                    비밀번호 변경
-                  </Btn>
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{
-                  padding: '18px 16px', borderRadius: 10, background: 'var(--paper-2)',
-                  fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 22,
-                }}>
-                  정말 비밀번호를 변경하시겠습니까?<br />
-                  <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>변경 후에는 새 비밀번호로 다시 로그인해야 합니다.</span>
-                </div>
+                  {pwError && <div className="gb-pw-error">{pwError}</div>}
 
-                {pwError && (
-                  <div style={{
-                    marginBottom: 14, padding: '9px 13px', borderRadius: 8,
-                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
-                    fontSize: 12.5, color: '#b8536a',
-                  }}>
-                    {pwError}
+                  <div className="gb-pw-actions">
+                    <button className="rt-btn rt-btn--ghost" onClick={() => { playSfx('cancel'); handlePasswordFormCancel(); }}>
+                      취소
+                    </button>
+                    <button className="rt-btn rt-btn--primary" onClick={() => { playSfx('nav'); handlePasswordNext(); }}>
+                      비밀번호 변경
+                    </button>
                   </div>
-                )}
+                </>
+              ) : (
+                <>
+                  <div className="gb-pw-confirm">
+                    정말 비밀번호를 변경하시겠습니까?<br />
+                    <span className="gb-pw-confirm-sub">변경 후에는 새 비밀번호로 다시 로그인해야 합니다.</span>
+                  </div>
 
-                <div style={{ display: 'flex', gap: 10 }}>
-                  <Btn variant="secondary" size="lg" style={{ flex: 1 }} onClick={() => { setPwStep('form'); setPwError(null); }} disabled={pwSaving}>
-                    아니요
-                  </Btn>
-                  <Btn variant="green" size="lg" style={{ flex: 1 }} onClick={handlePasswordConfirm} disabled={pwSaving}>
-                    {pwSaving ? '변경 중…' : '변경합니다'}
-                  </Btn>
-                </div>
-              </>
-            )}
+                  {pwError && <div className="gb-pw-error">{pwError}</div>}
+
+                  <div className="gb-pw-actions">
+                    <button className="rt-btn rt-btn--ghost" onClick={() => { setPwStep('form'); setPwError(null); }} disabled={pwSaving}>
+                      아니요
+                    </button>
+                    <button className="rt-btn rt-btn--primary" onClick={() => { playSfx('confirm'); handlePasswordConfirm(); }} disabled={pwSaving}>
+                      {pwSaving ? '변경 중…' : '변경합니다'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}

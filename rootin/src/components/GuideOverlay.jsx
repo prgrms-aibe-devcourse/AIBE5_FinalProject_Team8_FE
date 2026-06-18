@@ -4,6 +4,50 @@ import React, { useEffect, useState, useCallback } from 'react';
  * 손그림 감성의 곡선 화살표를 그리는 컴포넌트입니다.
  * 시작점(from)과 끝점(to)을 기준으로 2차 베지에 곡선(Quadratic Bezier Curve)을 생성하여 부드럽게 꺾이는 화살표를 렌더링합니다.
  */
+// 테마별 가이드 카드/스포트라이트 팔레트.
+// classic은 기존 화이트 카드+레드 화살표, gameboy는 픽셀 종이 카드(아이보리+올리브 잉크+하드 픽셀 그림자).
+// GuideOverlay가 .rt-app 토큰 스코프 밖에서 렌더될 수 있어 gameboy 값은 리터럴 hex로 둔다.
+const GUIDE_PALETTE = {
+  classic: {
+    font: 'var(--font-body)',
+    fontMono: 'var(--font-mono)',
+    arrow: '#ff4d4d',
+    cardBg: 'rgba(255, 255, 255, 0.98)',
+    cardBorder: 'none',
+    cardAccent: '4px solid #ff4d4d',
+    cardRadius: '12px',
+    cardShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+    text: 'var(--ink)',
+    progress: 'var(--ink-3)',
+    spotShadow: '0 0 0 9999px rgba(12, 17, 24, 0.82), 0 0 0 2.5px #ff4d4d, 0 0 15px rgba(255, 77, 77, 0.8)',
+    spotRadius: '12px',
+    hintBg: 'var(--ink)',
+    hintColor: '#ffffff',
+    prev: { bg: '#fff', border: '0.5px solid var(--rule-2)', color: 'var(--ink-2)', shadow: 'none' },
+    next: { bg: 'var(--moss)', border: 'none', color: '#fff', shadow: 'none' },
+    done: { bg: 'var(--ink)', border: 'none', color: '#fff', shadow: 'none' },
+  },
+  gameboy: {
+    font: '"Galmuri11", "DungGeunMo", monospace',
+    fontMono: '"Galmuri11", "DungGeunMo", monospace',
+    arrow: '#c85d83',
+    cardBg: '#f8f2e3',
+    cardBorder: '2px solid #33402a',
+    cardAccent: '2px solid #33402a',
+    cardRadius: '8px',
+    cardShadow: 'inset 0 0 0 1px rgba(255, 255, 255, .55), 5px 5px 0 0 #33402a',
+    text: '#33402a',
+    progress: '#9a8a66',
+    spotShadow: '0 0 0 9999px rgba(20, 28, 16, 0.82), 0 0 0 2.5px #c85d83, 0 0 0 5px rgba(200, 93, 131, .4)',
+    spotRadius: '6px',
+    hintBg: '#33402a',
+    hintColor: '#f8f2e3',
+    prev: { bg: '#f8f2e3', border: '2px solid #33402a', color: '#33402a', shadow: '2px 2px 0 0 #5f7048' },
+    next: { bg: '#33402a', border: '2px solid #33402a', color: '#f8f2e3', shadow: '2px 2px 0 0 #5f7048' },
+    done: { bg: '#c85d83', border: '2px solid #33402a', color: '#fff', shadow: '2px 2px 0 0 #33402a' },
+  },
+};
+
 function CurvedArrow({ fromX, fromY, toX, toY, color = '#ff4d4d' }) {
   // 제어점(Control Point)을 계산하여 곡선의 꺾임 정도를 결정합니다.
   const midX = (fromX + toX) / 2;
@@ -56,8 +100,10 @@ function CurvedArrow({ fromX, fromY, toX, toY, color = '#ff4d4d' }) {
  * @param {function} onClose - 가이드를 닫을 때 호출되는 함수
  * @param {Array} steps - 가이드할 항목들의 배열
  *   각 step 예시: { selector: '.className', text: '설명', arrowOffset: { x: -50, y: -30 } }
+ * @param {'classic'|'gameboy'} theme - 가이드 카드/스포트라이트 룩(테마별 분기). 로직은 공통.
  */
-export function GuideOverlay({ isOpen, onClose, steps = [] }) {
+export function GuideOverlay({ isOpen, onClose, steps = [], theme = 'classic' }) {
+  const pal = GUIDE_PALETTE[theme] ?? GUIDE_PALETTE.classic;
   const [currentStep, setCurrentStep] = useState(0);
   const [coords, setCoords] = useState([]);
   const [windowSize, setWindowSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -308,11 +354,11 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
             bottom: '24px',
             left: '50%',
             transform: 'translateX(-50%)',
-            backgroundColor: 'var(--ink)',
-            color: '#ffffff',
+            backgroundColor: pal.hintBg,
+            color: pal.hintColor,
             padding: '8px 18px',
             borderRadius: '20px',
-            fontFamily: 'var(--font-body)',
+            fontFamily: pal.font,
             fontSize: '13px',
             fontWeight: 600,
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
@@ -343,11 +389,11 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
                   left: step.targetRect.left - 6,
                   width: step.targetRect.width + 12,
                   height: step.targetRect.height + 12,
-                  borderRadius: '12px',
-                  // 9999px 거대한 그림자 장막으로 어둡게 처리하면서, 
-                  // 타겟 박스 둘레에 2.5px 붉은색 테두리 및 15px의 부드러운 네온 레드 글로우 효과를 주어 
-                  // "어느 영역에서 선택이 가능한지" 시각적으로 100% 명확히 드러나도록 표시합니다.
-                  boxShadow: '0 0 0 9999px rgba(12, 17, 24, 0.82), 0 0 0 2.5px #ff4d4d, 0 0 15px rgba(255, 77, 77, 0.8)',
+                  borderRadius: pal.spotRadius,
+                  // 9999px 거대한 그림자 장막으로 어둡게 처리하면서,
+                  // 타겟 박스 둘레에 강조색 테두리/글로우를 주어
+                  // "어느 영역에서 선택이 가능한지" 시각적으로 100% 명확히 드러나도록 표시합니다. (테마별 색)
+                  boxShadow: pal.spotShadow,
                   pointerEvents: 'none',
                   zIndex: 10000,
                 }}
@@ -374,7 +420,7 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
                 fromY={step.arrow.fromY}
                 toX={step.arrow.toX}
                 toY={step.arrow.toY}
-                color="#ff4d4d"
+                color={pal.arrow}
               />
             )}
 
@@ -385,16 +431,17 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
                 top: step.textPos.y,
                 left: step.textPos.x,
                 transform: 'translate(-50%, -50%)',
-                backgroundColor: 'rgba(255, 255, 255, 0.98)',
-                color: '#1a1a1a',
+                backgroundColor: pal.cardBg,
+                color: pal.text,
                 padding: '16px 18px',
-                borderRadius: '12px',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
-                borderLeft: '4px solid #ff4d4d',
+                borderRadius: pal.cardRadius,
+                boxShadow: pal.cardShadow,
+                border: pal.cardBorder,
+                borderLeft: pal.cardAccent,
                 zIndex: 10001,
                 maxWidth: '240px',
                 textAlign: 'center',
-                fontFamily: 'var(--font-body)',
+                fontFamily: pal.font,
                 display: 'flex',
                 flexDirection: 'column',
                 gap: '12px',
@@ -402,14 +449,14 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
               onClick={(e) => e.stopPropagation()} // 설명 박스 내부 클릭 시 가이드가 종료되지 않도록 방지
             >
               {/* 설명 텍스트 */}
-              <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: '1.5', whiteSpace: 'pre-line', color: 'var(--ink)' }}>
+              <div style={{ fontSize: '13px', fontWeight: 600, lineHeight: '1.5', whiteSpace: 'pre-line', color: pal.text }}>
                 {step.text}
               </div>
 
               {/* 하단 제어 및 페이지네이션 영역 */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px', gap: '8px' }}>
                 {/* 진행도 표시 (예: 1 / 3) */}
-                <span style={{ fontSize: '11px', color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                <span style={{ fontSize: '11px', color: pal.progress, fontFamily: pal.fontMono }}>
                   {currentStep + 1} / {steps.length}
                 </span>
 
@@ -420,11 +467,13 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
                       style={{
                         padding: '4px 8px',
                         borderRadius: '6px',
-                        border: '0.5px solid var(--rule-2)',
-                        backgroundColor: '#fff',
+                        border: pal.prev.border,
+                        backgroundColor: pal.prev.bg,
+                        boxShadow: pal.prev.shadow,
+                        fontFamily: pal.font,
                         fontSize: '11px',
                         fontWeight: 600,
-                        color: 'var(--ink-2)',
+                        color: pal.prev.color,
                         cursor: 'pointer',
                       }}
                     >
@@ -437,11 +486,13 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
                       style={{
                         padding: '4px 10px',
                         borderRadius: '6px',
-                        border: 'none',
-                        backgroundColor: 'var(--moss)',
+                        border: pal.next.border,
+                        backgroundColor: pal.next.bg,
+                        boxShadow: pal.next.shadow,
+                        fontFamily: pal.font,
                         fontSize: '11px',
                         fontWeight: 700,
-                        color: '#fff',
+                        color: pal.next.color,
                         cursor: 'pointer',
                       }}
                     >
@@ -453,11 +504,13 @@ export function GuideOverlay({ isOpen, onClose, steps = [] }) {
                       style={{
                         padding: '4px 10px',
                         borderRadius: '6px',
-                        border: 'none',
-                        backgroundColor: 'var(--ink)',
+                        border: pal.done.border,
+                        backgroundColor: pal.done.bg,
+                        boxShadow: pal.done.shadow,
+                        fontFamily: pal.font,
                         fontSize: '11px',
                         fontWeight: 700,
-                        color: '#fff',
+                        color: pal.done.color,
                         cursor: 'pointer',
                       }}
                     >

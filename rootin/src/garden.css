@@ -1,0 +1,261 @@
+/* =========================================================================
+   ROOTIN — 정원(/garden) 화면 스킨
+   대시보드(sprout.css, .rt-app)의 게임보이/CRT 디자인 시스템을 따른다.
+   상단 "정원 씬"만 게임보이 DMG LCD 패널(.gb-garden-*)로 감싼다.
+   전역 부작용을 피하기 위해 .gb-garden-page 하위로만 카드 픽셀 음영을 적용.
+   ========================================================================= */
+
+/* 풀스크린 레이아웃 — 대시보드와 동일하게 양쪽 여백 없이 풀폭 사용.
+   비전-디스플레이 베젤(.rt-vision-frame)은 app.jsx에서 framed 화면에 입혀진다.
+   사이드바 접힘(도크) 시 좌측을 도크 폭만큼 비켜준다. */
+[data-screen-label="garden"] .gb-garden-page {
+  padding: 28px 56px 44px;
+  transition: padding-left .55s cubic-bezier(.7, 0, .2, 1);
+}
+[data-screen-label="garden"] .gbsb-slot.hidden ~ [data-slot="sidebar-inset"] .gb-garden-page {
+  padding-left: 132px;
+}
+
+/* 대시보드와 동일한 픽셀 카드(또렷한 잉크 테두리 + 하드 픽셀 그림자) */
+.gb-garden-page .rt-card {
+  border: 2px solid var(--leaf);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 5px 5px 0 0 var(--leaf);
+}
+.gb-garden-page .rt-page-title,
+.gb-garden-page .rt-section-head .rt-h3,
+.gb-garden-page .rt-h3 {
+  font-weight: 700;
+  text-shadow: 1px 0 0 currentColor;
+}
+
+/* ---------------- 화분 카드 (그리드) ---------------- */
+.gb-garden-page .gb-pot-card {
+  display: flex; flex-direction: column; gap: 12px;
+  text-align: left; cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast);
+}
+.gb-garden-page .gb-pot-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 7px 7px 0 0 var(--leaf);
+}
+.gb-garden-page .gb-pot-card:active {
+  transform: translate(1px, 1px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 3px 3px 0 0 var(--leaf);
+}
+
+/* 식물 받침(스테이지) — 카드 안의 미니 LCD 무대 */
+.gb-garden-page .gb-pot-stage {
+  height: 160px; border-radius: var(--r-chip);
+  display: flex; align-items: flex-end; justify-content: center;
+  position: relative; overflow: hidden;
+  background: linear-gradient(180deg, var(--paper-warm), var(--paper-2));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.gb-garden-page .gb-pot-stage::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(20, 32, 14, .05) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply; opacity: .6;
+}
+.gb-garden-page .gb-pot-stage--rare {
+  background: linear-gradient(180deg, #16294a 0%, #0c1830 100%);
+}
+
+/* 픽셀 진행바 */
+.gb-garden-page .gb-prog {
+  height: 10px; border-radius: 3px; background: var(--paper-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong); overflow: hidden;
+}
+.gb-garden-page .gb-prog > i {
+  display: block; height: 100%;
+  background: var(--leaf-2);
+  box-shadow: inset 0 0 0 1px rgba(20, 40, 12, .18);
+}
+
+/* 새 화분 만들기(점선) 카드 */
+.gb-garden-page .gb-add-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 14px; min-height: 300px; cursor: pointer;
+  border: 2px dashed var(--leaf-2) !important;
+  box-shadow: none !important;
+  background:
+    repeating-linear-gradient(45deg, transparent 0 8px, rgba(95, 112, 72, .07) 8px 16px),
+    var(--paper-card);
+  transition: background var(--dur-fast), transform var(--dur-fast);
+}
+.gb-garden-page .gb-add-card:hover { transform: translateY(-2px); background: var(--paper-warm); }
+.gb-garden-page .gb-add-bubble {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--paper-card); border: 2px dashed var(--leaf-2);
+  display: flex; align-items: center; justify-content: center; color: var(--leaf-2);
+  font-size: 22px;
+}
+
+/* ---------------- 꾸미기 패널 ---------------- */
+.gb-garden-page .gb-panel {
+  border: 2px solid var(--line-strong); border-radius: var(--r-card);
+  background: var(--paper-2); padding: var(--sp-4) var(--sp-5);
+  display: flex; flex-direction: column; gap: var(--sp-4);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+.gb-garden-page .gb-panel-sep { height: 0; border-top: 2px dotted var(--line-strong); opacity: .7; }
+
+/* 패널 섹션 제목 — 흐릿한 올리브 캡션 대신 또렷한 잉크 + 좌측 액센트 바로 구획을 명확히 */
+.gb-garden-page .gb-panel .rt-eyebrow {
+  position: relative; padding-left: 11px;
+  color: var(--leaf); font-size: 12px; letter-spacing: .5px;
+}
+.gb-garden-page .gb-panel .rt-eyebrow::before {
+  content: ""; position: absolute; left: 0; top: 1px; bottom: 1px;
+  width: 4px; border-radius: 1px; background: var(--peach);
+}
+
+/* 칩 안의 액션 라벨(+ 적용 / + 배치) — 작은 알약 배지로 클릭 가능함을 분명히 */
+.gb-garden-page .gb-chip-act {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-family: var(--font-pixel); font-size: 10px; font-weight: 700; line-height: 1;
+  padding: 3px 8px; border-radius: var(--r-pill);
+  background: var(--peach-soft); color: var(--peach-deep);
+}
+.gb-garden-page .gb-chip {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 7px; border-radius: var(--r-chip); cursor: pointer;
+  background: var(--paper-card); border: 2px solid var(--line-strong);
+  color: var(--text-body); font-family: var(--font-pixel); font-size: 11px;
+  transition: transform var(--dur-fast);
+}
+.gb-garden-page .gb-chip:hover { transform: translateY(-2px); }
+.gb-garden-page .gb-chip.is-active { background: var(--leaf); color: var(--paper-card); border-color: var(--leaf); }
+
+/* ---------------- 게임보이 DMG 콘솔 셸 (정원 씬 바깥 박스) ---------------- */
+.gb-garden-page .gb-console {
+  position: relative;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 18px 20px 20px;
+  border-radius: 18px 18px 60px 18px;
+  background: linear-gradient(150deg, #d8d2c6 0%, #c4bdb0 46%, #ada695 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .55),
+    inset 0 -8px 18px rgba(0, 0, 0, .22),
+    inset 6px 0 14px rgba(255, 255, 255, .18),
+    inset -8px 0 16px rgba(0, 0, 0, .16),
+    0 30px 60px -20px rgba(0, 0, 0, .5),
+    0 8px 18px rgba(0, 0, 0, .32);
+}
+.gb-garden-page .gb-console::after {
+  content: ""; position: absolute; inset: 7px 7px 9px 7px;
+  border-radius: 12px 12px 52px 12px;
+  border: 1px solid rgba(0, 0, 0, .10);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  pointer-events: none;
+}
+.gb-garden-page .gb-console > * { position: relative; z-index: 1; }
+
+/* 셸 상단 헤더 — 플라스틱 위에 올라간 타이틀/버튼 */
+.gb-garden-page .gb-console-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 2px 4px 0; }
+
+/* 콘솔 헤더의 물리 버튼(DMG 키) — 눌리는 입체감 */
+.gb-garden-page .gb-key {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-pixel); font-size: 12px; letter-spacing: .5px; line-height: 1;
+  padding: 11px 17px; border: 0; border-radius: 999px; cursor: pointer;
+  color: #f3ede0; white-space: nowrap; user-select: none;
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, .28),
+    inset 0 -3px 6px rgba(0, 0, 0, .5),
+    0 4px 6px rgba(0, 0, 0, .4);
+  transition: transform .07s ease, box-shadow .07s ease, filter .12s ease;
+}
+.gb-garden-page .gb-key::before {
+  content: ""; width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%;
+  background: rgba(255, 255, 255, .35);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .6), inset 0 -1px 1px rgba(0, 0, 0, .35);
+}
+.gb-garden-page .gb-key:hover { filter: brightness(1.08); }
+.gb-garden-page .gb-key:active {
+  transform: translateY(3px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, .55), 0 1px 2px rgba(0, 0, 0, .4);
+}
+.gb-garden-page .gb-key:disabled { opacity: .6; cursor: default; transform: none; filter: none; }
+.gb-garden-page .gb-key .rt-ico { font-size: 1.1em; }
+
+/* A버튼(마젠타) = 주요 액션, 다크 플라스틱 = 보조, 그린 LCD = 완료 */
+.gb-garden-page .gb-key--ab { background: radial-gradient(circle at 38% 28%, #b34a73, #8a1d44 62%, #6a1334); }
+.gb-garden-page .gb-key--dark { background: linear-gradient(150deg, #3f3f45, #202024); }
+.gb-garden-page .gb-key--lcd { background: linear-gradient(#3c5c22, #233a13); color: #cdd79a; }
+.gb-garden-page .gb-key--lcd::before { background: #9bbc0f; box-shadow: 0 0 6px rgba(155, 188, 15, .6), inset 0 1px 1px rgba(255, 255, 255, .4); }
+
+/* 셸 하단 — 브랜드 각인 + 스피커 그릴 */
+.gb-garden-page .gb-console-foot {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  padding: 2px 6px 2px 8px;
+}
+.gb-garden-page .gb-brand { display: flex; align-items: baseline; gap: 9px; }
+.gb-garden-page .gb-brand-word {
+  font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 800;
+  font-size: 23px; letter-spacing: -.5px; color: #4f4b3f; text-shadow: 0 1px 0 rgba(255, 255, 255, .5);
+}
+.gb-garden-page .gb-brand-sub {
+  font-family: "Galmuri9", "Galmuri11", monospace; font-size: 8px; letter-spacing: 1.5px; color: #6a6557;
+}
+.gb-garden-page .gb-brand-sub .tm { font-size: 6px; vertical-align: super; margin-left: 1px; }
+.gb-garden-page .gb-speaker {
+  width: 96px; height: 22px; flex: 0 0 auto; border-radius: 2px; opacity: .5;
+  background: radial-gradient(circle, rgba(0, 0, 0, .34) 1.4px, transparent 1.6px) 0 0 / 9px 9px;
+}
+
+/* ---------------- 게임보이 DMG LCD 패널 (정원 씬) ---------------- */
+.gb-garden { position: relative; }
+.gb-garden-bezel {
+  background: linear-gradient(160deg, #6a6a70, #44444b 40%, #2c2c31);
+  border-radius: 14px 14px 30px 14px;
+  padding: 13px 15px 17px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .10),
+    inset 0 -4px 10px rgba(0, 0, 0, .5),
+    0 2px 5px rgba(0, 0, 0, .35);
+}
+.gb-garden-beztop { display: flex; align-items: center; gap: 10px; padding: 0 2px 9px; }
+.gb-garden-led {
+  width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+  background: radial-gradient(circle at 35% 30%, #ff9a8f, #d11d1d 60%, #7a0d0d);
+  box-shadow: 0 0 7px 1px rgba(235, 40, 40, .85), inset 0 0 2px rgba(0, 0, 0, .4);
+  animation: gb-led 3.4s ease-in-out infinite;
+}
+@keyframes gb-led { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+.gb-garden-cap {
+  font-family: "Galmuri9", "Galmuri11", monospace;
+  font-size: 8px; letter-spacing: .5px; color: #c9c9d0; opacity: .78; margin-left: auto;
+}
+.gb-garden-frame {
+  position: relative; display: flex; background: #0c0c0e; border-radius: 8px;
+  padding: 11px 11px 11px 18px;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .6), inset 0 3px 9px rgba(0, 0, 0, .8);
+}
+.gb-garden-stripe { position: absolute; left: 6px; top: 12px; bottom: 12px; width: 8px; display: flex; gap: 3px; }
+.gb-garden-stripe i { width: 2px; height: 100%; border-radius: 2px; }
+.gb-garden-stripe .red { background: linear-gradient(#b23a6b, #7e1d44); }
+.gb-garden-stripe .blue { background: linear-gradient(#3b4aa0, #27357e); }
+.gb-garden-lcd {
+  position: relative; flex: 1; border-radius: 8px; overflow: hidden;
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .25);
+}
+
+/* 화면 위 CRT 오버레이 — 입력은 통과(pointer-events:none) */
+.gb-fx { position: absolute; inset: 0; pointer-events: none; }
+.gb-fx-scan {
+  z-index: 7;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .16) 0 1px, rgba(0, 0, 0, 0) 2px 3px);
+  mix-blend-mode: multiply; opacity: .4;
+}
+.gb-fx-vignette {
+  z-index: 9;
+  box-shadow: inset 0 0 26px 6px rgba(0, 0, 0, .3);
+  background: radial-gradient(120% 120% at 50% 50%, transparent 62%, rgba(0, 0, 0, .16) 100%);
+}
+.gb-fx-glass {
+  z-index: 10;
+  background: linear-gradient(125deg, rgba(255, 255, 255, .16) 0%, rgba(255, 255, 255, .04) 18%, rgba(255, 255, 255, 0) 36%);
+}
+
+@media (prefers-reduced-motion: reduce) { .gb-garden-led { animation: none; } }

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ProfileScreen } from '../screens-rest.jsx';
 import { UserProvider } from '../context/UserContext.jsx';
+import { ThemeProvider } from '../context/ThemeContext.jsx';
 
 // API 전체 mock
 vi.mock('../api/user.js', () => ({
@@ -34,9 +35,11 @@ const mockApiUserLocal = {
 
 function renderProfile(apiUser = mockApiUser) {
   return render(
-    <UserProvider initialUser={apiUser}>
-      <ProfileScreen />
-    </UserProvider>
+    <ThemeProvider>
+      <UserProvider initialUser={apiUser}>
+        <ProfileScreen />
+      </UserProvider>
+    </ThemeProvider>
   );
 }
 
@@ -140,14 +143,14 @@ describe('ProfileScreen — provider 조건부 렌더', () => {
 describe('ProfileScreen — 가입일 표시', () => {
   it('createdAt이 있으면 한국어 날짜(년 월 일)로 표시된다', () => {
     renderProfile(mockApiUser); // createdAt: '2024-03-15T10:00:00Z'
-    expect(screen.getByText(/2024년 3월 15일/)).toBeInTheDocument();
+    expect(screen.getAllByText(/2024년 3월 15일/)[0]).toBeInTheDocument();
   });
 
   it('createdAt이 없으면 가입일 텍스트가 비어있다', () => {
     const userWithoutDate = { ...mockApiUser, createdAt: undefined };
     renderProfile(userWithoutDate);
-    expect(screen.getByText(/부터 Rootin과 함께/)).toBeInTheDocument();
-    // 날짜 없이 '부터 Rootin과 함께'만 표시
+    expect(screen.getAllByText(/Rootin과 함께/)[0]).toBeInTheDocument();
+    // 날짜 없이 'Rootin과 함께'만 표시
     expect(screen.queryByText(/\d{4}년/)).not.toBeInTheDocument();
   });
 });

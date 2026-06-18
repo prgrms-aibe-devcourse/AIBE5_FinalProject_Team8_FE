@@ -1,0 +1,81 @@
+/* =========================================================================
+   ROOTIN — 로그아웃 확인 모달 스킨 "SYSTEM · POWER OFF"
+   대시보드(sprout.css, .rt-app)·정원(garden.css)의 게임보이/CRT 시스템을 따른다.
+   앱 셸 레벨에서 렌더되어 .rt-app 바깥이므로, 오버레이에 .rt-app 을 직접 부여해
+   게임보이 토큰(--leaf 등)과 픽셀 폰트를 상속받는다. 미니 게임보이 카트리지 카드.
+   (전역 헬퍼 .gb-garden-led, @keyframes gb-led 는 garden.css 의 것을 재사용)
+   ========================================================================= */
+
+.rt-app.gb-logout-overlay {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: rgba(12, 14, 8, .55); backdrop-filter: blur(3px);
+}
+
+.gb-logout-overlay .gb-logout-modal {
+  width: 400px; max-width: 100%;
+  border-radius: 16px 16px 30px 16px;
+  background: linear-gradient(150deg, #d8d2c6 0%, #c4bdb0 46%, #ada695 100%);
+  padding: 14px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .55),
+    inset 0 -8px 18px rgba(0, 0, 0, .22),
+    0 30px 60px -20px rgba(0, 0, 0, .6);
+}
+
+/* 카트리지 상단 바 — LED + 라벨 + 닫기 */
+.gb-logout-overlay .gb-logout-bar { display: flex; align-items: center; gap: 10px; padding: 2px 4px 10px; }
+.gb-logout-overlay .gb-logout-cap {
+  font-family: "Galmuri9", "Galmuri11", monospace; font-size: 8px; letter-spacing: .5px;
+  color: #4f4b3f; opacity: .8;
+}
+.gb-logout-overlay .gb-logout-x {
+  margin-left: auto; width: 24px; height: 24px; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #4f4b3f; background: rgba(0, 0, 0, .08); border-radius: 6px; cursor: pointer;
+  transition: background var(--dur-fast, .12s), transform var(--dur-fast, .12s);
+}
+.gb-logout-overlay .gb-logout-x:hover { background: rgba(0, 0, 0, .16); }
+.gb-logout-overlay .gb-logout-x:active { transform: scale(.92); }
+.gb-logout-overlay .gb-logout-x:disabled { opacity: .4; cursor: default; }
+.gb-logout-overlay .gb-logout-x .rt-ico { font-size: 12px; }
+
+/* LCD 본문 */
+.gb-logout-overlay .gb-logout-body {
+  position: relative;
+  background: var(--paper-card); border-radius: 10px;
+  border: 2px solid var(--leaf); padding: 24px 22px 22px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+  text-align: center;
+}
+
+/* 전원 아이콘 배지 */
+.gb-logout-overlay .gb-logout-icon {
+  width: 56px; height: 56px; margin: 0 auto 14px;
+  display: grid; place-items: center;
+  color: var(--leaf); font-size: 28px;
+  background: var(--paper-warm);
+  border: 2px solid var(--leaf); border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 3px 3px 0 0 var(--leaf);
+}
+
+.gb-logout-overlay .gb-logout-eyebrow {
+  font-family: var(--font-pixel-sm, monospace); font-size: 10px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--leaf-2);
+}
+.gb-logout-overlay .gb-logout-title {
+  margin: 6px 0 8px; font-family: var(--font-pixel); font-size: 21px; line-height: 1.2;
+  color: var(--leaf); text-shadow: 1px 0 0 currentColor;
+}
+.gb-logout-overlay .gb-logout-desc {
+  font-size: 12.5px; line-height: 1.6; color: var(--muted-2);
+}
+
+.gb-logout-overlay .gb-logout-error {
+  margin-top: 14px; padding: 9px 13px; border-radius: var(--r-chip);
+  background: var(--berry-soft); border: 1px solid var(--berry);
+  font-size: 12.5px; color: var(--berry); line-height: 1.5;
+}
+
+.gb-logout-overlay .gb-logout-actions { display: flex; gap: 10px; margin-top: 22px; }
+.gb-logout-overlay .gb-logout-actions .rt-btn { flex: 1; }

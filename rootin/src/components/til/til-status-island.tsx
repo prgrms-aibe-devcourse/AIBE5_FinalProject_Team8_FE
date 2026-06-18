@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useTilEditor } from './til-editor-context'
+import { playSfx } from '@/lib/sfx.js'
 
 type Stats = { words: number; chars: number; minutes: number }
 
@@ -46,6 +47,7 @@ function TemplateMenu() {
     setSaving(true)
     try {
       await saveCustomTemplate(name)
+      playSfx('confirm')
       setNewName('')
       setDialogOpen(false)
     } catch {
@@ -58,6 +60,7 @@ function TemplateMenu() {
   // 템플릿 삭제 (서버 연동) — 기본 제공 템플릿은 삭제 불가
   const handleDeleteTemplate = (id: number) => {
     if (!window.confirm('이 템플릿을 삭제할까요?')) return
+    playSfx('delete')
     deleteCustomTemplate(id).catch(() => {
       window.alert('템플릿 삭제에 실패했습니다.')
     })
@@ -65,7 +68,7 @@ function TemplateMenu() {
 
   return (
     <>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open} onOpenChange={(o) => { if (o) playSfx('toggle'); setOpen(o) }}>
         <PopoverTrigger
           render={
             <Button
@@ -78,7 +81,7 @@ function TemplateMenu() {
           <LayoutTemplate className="size-3.5" />
           템플릿
         </PopoverTrigger>
-        <PopoverContent side="top" align="start" sideOffset={10} className="w-64">
+        <PopoverContent side="top" align="start" sideOffset={10} className="rt-pop w-64">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-medium text-foreground">빠른 시작</span>
             <button
@@ -130,7 +133,7 @@ function TemplateMenu() {
 
       {/* BM-07 새 템플릿 저장 다이얼로그 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="rt-pop">
           <DialogHeader>
             <DialogTitle>새 템플릿 저장</DialogTitle>
             <DialogDescription>
@@ -150,7 +153,7 @@ function TemplateMenu() {
             placeholder="템플릿 이름"
           />
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>
+            <Button variant="ghost" onClick={() => { playSfx('cancel'); setDialogOpen(false) }}>
               취소
             </Button>
             <Button onClick={handleSaveTemplate} disabled={!newName.trim() || saving}>
@@ -211,10 +214,11 @@ export function TilStatusIsland({
         hidden ? 'translate-y-6 opacity-0' : 'translate-y-0 opacity-100',
       )}
     >
-      <div className="guide-editor-status pointer-events-auto flex items-center gap-3 rounded-full border border-border/60 bg-background/80 px-4 py-2.5 shadow-[var(--shadow-lg)] backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="til-status-bar guide-editor-status pointer-events-auto flex items-center gap-3 px-4 py-2.5">
+
         <TemplateMenu />
 
-        <span className="h-4 w-px bg-border/70" />
+        <span className="h-4 w-px bg-[var(--line-strong)]" />
 
         {/* 작성 모드 표시 — 옆의 저장 버튼이 '임시저장'인지 '변경 저장'인지 명확히 */}
         <span
@@ -229,15 +233,15 @@ export function TilStatusIsland({
           {isEditMode ? '수정 중' : '새 글'}
         </span>
 
-        <span className="h-4 w-px bg-border/70" />
+        <span className="h-4 w-px bg-[var(--line-strong)]" />
 
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>{stats.words.toLocaleString()} 단어</span>
-          <span className="size-1 rounded-full bg-border" />
+          <span className="size-1 rounded-full bg-[var(--line-strong)]" />
           <span>약 {stats.minutes}분 읽기</span>
         </span>
 
-        <span className="h-4 w-px bg-border/70" />
+        <span className="h-4 w-px bg-[var(--line-strong)]" />
 
         <span
           className={cn(
@@ -261,16 +265,16 @@ export function TilStatusIsland({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onSave}
+          onClick={() => { playSfx('confirm'); onSave() }}
           title={isEditMode ? '발행된 글에 변경 내용을 바로 반영합니다' : '발행 전 임시 보관본을 저장합니다 (자동 저장돼요)'}
-          className="h-7 rounded-full text-xs text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground"
+          className="h-7 rounded-[var(--r-chip)] text-xs text-[color:var(--leaf-2)] transition-colors hover:bg-[var(--paper-2)] hover:text-[color:var(--leaf)]"
         >
           {saveLabel}
         </Button>
         <Button
           size="sm"
           className="til-publish-btn h-7 gap-1.5 text-xs font-medium text-primary-foreground"
-          onClick={onPublish}
+          onClick={() => { playSfx('confirm'); onPublish() }}
           disabled={!canPublish || publishing}
           title={isEditMode ? '수정한 내용을 최종 반영하고 목록으로 이동합니다' : '글을 발행해 화분에 심습니다'}
         >

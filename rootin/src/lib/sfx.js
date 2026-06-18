@@ -19,7 +19,10 @@ function tone(freq, dur, o = {}) {
   const { type = 'square', vol = 0.06, when = 0, glide = null } = o;
   try {
     const c = ctx();
-    if (c.state === 'suspended') c.resume(); // 첫 사용자 제스처에서 재개
+    // 잠긴(suspended) 동안 소리를 예약하면, 첫 사용자 제스처로 resume 되는 순간
+    // 예약분이 한꺼번에 터져 부팅음·클릭음과 겹친다. 첫 제스처에선 resume 만 하고,
+    // running 이 된 다음 클릭부터 예약한다. (GameBoySidebar.tone 과 동일한 가드)
+    if (c.state !== 'running') { c.resume(); return; }
     const t = c.currentTime + when;
     const osc = c.createOscillator(), g = c.createGain();
     osc.type = type; osc.frequency.setValueAtTime(freq, t);

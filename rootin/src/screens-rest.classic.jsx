@@ -1868,7 +1868,7 @@ function validate({ mode, email, password, nickname }) {
 
 // API 에러 → 사용자 메시지 변환
 function parseApiError(err) {
-  if (err?.status === 401) return '비밀번호가 올바르지 않습니다.';
+  if (err?.status === 401) return '이메일 또는 비밀번호가 올바르지 않습니다.';
   if (err?.status === 409) return '이미 사용 중인 이메일입니다.';
   if (err?.status === 404) return '등록되지 않은 이메일입니다.';
   return err?.body?.message ?? '오류가 발생했습니다. 잠시 후 다시 시도해주세요.';

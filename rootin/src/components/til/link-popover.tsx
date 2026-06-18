@@ -8,13 +8,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { ToolbarTooltip, toolbarItemClass } from './toolbar-button'
 import { cn } from '@/lib/utils'
 
 export function LinkPopover({ editor }: { editor: Editor }) {
@@ -46,28 +42,16 @@ export function LinkPopover({ editor }: { editor: Editor }) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="링크"
-              data-active={isActive ? '' : undefined}
-              className={cn(
-                'inline-flex h-8 min-w-8 items-center justify-center rounded-md px-1.5',
-                'text-muted-foreground transition-all duration-200',
-                'hover:bg-accent hover:text-accent-foreground',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
-                'data-[active]:bg-primary/15 data-[active]:text-primary',
-              )}
-            >
-              <Link2 className="size-4" />
-            </button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>링크</TooltipContent>
-      </Tooltip>
-      <PopoverContent align="start" className="w-80 p-2">
+      <ToolbarTooltip label="링크">
+        <PopoverTrigger
+          aria-label="링크"
+          data-active={isActive ? '' : undefined}
+          className={cn(toolbarItemClass)}
+        >
+          <Link2 className="size-4" />
+        </PopoverTrigger>
+      </ToolbarTooltip>
+      <PopoverContent align="start" className="rt-pop w-80 p-2">
         <div className="flex items-center gap-1.5">
           <Input
             autoFocus

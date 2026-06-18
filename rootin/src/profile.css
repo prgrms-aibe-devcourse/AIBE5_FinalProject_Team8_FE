@@ -1,0 +1,370 @@
+/* =========================================================================
+   ROOTIN — 프로필(/profile) 화면 스킨 "SAVE FILE · PLAYER DATA"
+   대시보드(sprout.css, .rt-app)·정원(garden.css)·도감(dex.css)·AI(ai.css)의
+   게임보이/CRT 시스템을 따른다. 게임보이 DMG 콘솔 셸 안에 좌측 "캐릭터 LCD"
+   (초상화·신원 / 편집 모드에선 프로필 폼) + 우측 "STATUS 스탯 패널"을 담은
+   RPG 세이브 파일 레이아웃. 전역 부작용을 피하려 .gb-profile-page 하위로만 스코프.
+   (전역 헬퍼 .gb-fx*, .gb-garden-led, @keyframes gb-led 는 garden.css 의 것을 재사용)
+   ========================================================================= */
+
+/* 풀스크린 레이아웃 — 대시보드/정원/도감/AI와 동일하게 풀폭. 도크 접힘 시 좌측 비켜줌. */
+[data-screen-label="profile"] .gb-profile-page {
+  display: flex; flex-direction: column; gap: 16px;
+  width: 100%; min-height: 100%;
+  padding: 28px 56px 44px;
+  transition: padding-left .55s cubic-bezier(.7, 0, .2, 1);
+}
+[data-screen-label="profile"] .gbsb-slot.hidden ~ [data-slot="sidebar-inset"] .gb-profile-page {
+  padding-left: 132px;
+}
+
+/* 픽셀 카드(또렷한 잉크 테두리 + 하드 픽셀 그림자) — 다른 화면과 통일 */
+.gb-profile-page .rt-card {
+  border: 2px solid var(--leaf);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 5px 5px 0 0 var(--leaf);
+}
+.gb-profile-page .rt-h3 { font-weight: 700; text-shadow: 1px 0 0 currentColor; }
+
+/* ============================================================
+   게임보이 DMG 콘솔 셸 (세이브 파일 본체)
+   ============================================================ */
+.gb-profile-page .gb-console {
+  position: relative;
+  display: flex; flex-direction: column; gap: 16px;
+  padding: 18px 20px 20px;
+  border-radius: 18px 18px 60px 18px;
+  background: linear-gradient(150deg, #d8d2c6 0%, #c4bdb0 46%, #ada695 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .55),
+    inset 0 -8px 18px rgba(0, 0, 0, .22),
+    inset 6px 0 14px rgba(255, 255, 255, .18),
+    inset -8px 0 16px rgba(0, 0, 0, .16),
+    0 30px 60px -20px rgba(0, 0, 0, .5),
+    0 8px 18px rgba(0, 0, 0, .32);
+}
+.gb-profile-page .gb-console::after {
+  content: ""; position: absolute; inset: 7px 7px 9px 7px;
+  border-radius: 12px 12px 52px 12px;
+  border: 1px solid rgba(0, 0, 0, .10);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  pointer-events: none;
+}
+.gb-profile-page .gb-console > * { position: relative; z-index: 1; }
+
+.gb-profile-page .gb-console-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; padding: 2px 4px 0;
+}
+
+/* 콘솔 하단 — 브랜드 각인 + 스피커 그릴 */
+.gb-profile-page .gb-console-foot {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  padding: 2px 6px 2px 8px;
+}
+.gb-profile-page .gb-brand { display: flex; align-items: baseline; gap: 9px; }
+.gb-profile-page .gb-brand-word {
+  font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 800;
+  font-size: 23px; letter-spacing: -.5px; color: #4f4b3f; text-shadow: 0 1px 0 rgba(255, 255, 255, .5);
+}
+.gb-profile-page .gb-brand-sub {
+  font-family: "Galmuri9", "Galmuri11", monospace; font-size: 8px; letter-spacing: 1.5px; color: #6a6557;
+}
+.gb-profile-page .gb-brand-sub .tm { font-size: 6px; vertical-align: super; margin-left: 1px; }
+.gb-profile-page .gb-speaker {
+  width: 96px; height: 22px; flex: 0 0 auto; border-radius: 2px; opacity: .5;
+  background: radial-gradient(circle, rgba(0, 0, 0, .34) 1.4px, transparent 1.6px) 0 0 / 9px 9px;
+}
+
+/* ============================================================
+   2분할 본문 — 좌: 캐릭터 LCD / 우: STATUS 스탯
+   ============================================================ */
+.gb-profile-page .gb-prof-main {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.15fr) minmax(300px, .85fr);
+  gap: 16px;
+  align-items: stretch;
+}
+@media (max-width: 1180px) {
+  .gb-profile-page .gb-prof-main { grid-template-columns: 1fr; }
+}
+
+/* ---------------- 좌측: 캐릭터 LCD ---------------- */
+.gb-profile-page .gb-prof-screen { display: flex; }
+.gb-profile-page .gb-prof-bezel {
+  flex: 1;
+  background: linear-gradient(160deg, #6a6a70, #44444b 40%, #2c2c31);
+  border-radius: 14px 14px 26px 14px;
+  padding: 12px 14px 16px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .10),
+    inset 0 -4px 10px rgba(0, 0, 0, .5),
+    0 2px 5px rgba(0, 0, 0, .35);
+}
+.gb-profile-page .gb-prof-beztop { display: flex; align-items: center; gap: 10px; padding: 0 2px 9px; }
+.gb-profile-page .gb-prof-cap {
+  font-family: "Galmuri9", "Galmuri11", monospace;
+  font-size: 8px; letter-spacing: .5px; color: #c9c9d0; opacity: .78; margin-left: auto;
+}
+.gb-profile-page .gb-prof-frame {
+  position: relative; background: #0c0c0e; border-radius: 8px; padding: 11px;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .6), inset 0 3px 9px rgba(0, 0, 0, .8);
+}
+.gb-profile-page .gb-prof-lcd {
+  position: relative; min-height: 290px; border-radius: 8px; overflow: hidden;
+  image-rendering: pixelated;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #e7ecc6 0%, #d4dcae 100%);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .25);
+}
+/* LCD 픽셀 격자 결 */
+.gb-profile-page .gb-prof-lcd::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 6;
+  background: repeating-linear-gradient(0deg, rgba(20, 32, 14, .05) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply; opacity: .55;
+}
+
+/* 캐릭터 카드 (보기 모드) */
+.gb-profile-page .gb-prof-card {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; gap: 20px;
+  width: 100%; padding: 18px 22px;
+}
+.gb-profile-page .gb-prof-portrait {
+  position: relative; flex: 0 0 auto;
+  width: 104px; height: 104px; border-radius: var(--r-card); overflow: hidden;
+  border: 3px solid var(--leaf);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5), 4px 4px 0 0 var(--leaf);
+}
+.gb-profile-page .gb-prof-portrait-img { width: 100%; height: 100%; object-fit: cover; }
+.gb-profile-page .gb-prof-portrait-fallback {
+  width: 100%; height: 100%; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #a8d5b5, #3d8b5e);
+  color: #fff; font-family: var(--font-pixel); font-size: 44px; line-height: 1;
+}
+.gb-profile-page .gb-prof-id { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.gb-profile-page .gb-prof-name {
+  margin: 0; font-family: var(--font-pixel); font-size: 26px; line-height: 1.1;
+  color: var(--leaf); text-shadow: 1px 0 0 currentColor;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gb-profile-page .gb-prof-handle {
+  font-family: var(--font-pixel-sm, monospace); font-size: 12px; letter-spacing: .5px; color: var(--leaf-2);
+}
+.gb-profile-page .gb-prof-bio {
+  margin: 6px 0 2px; font-size: 13px; line-height: 1.5; color: var(--muted-2);
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+.gb-profile-page .gb-prof-since {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-pixel-sm, monospace); font-size: 10px; letter-spacing: .5px; color: var(--muted);
+}
+.gb-profile-page .gb-prof-since .rt-ico { color: var(--leaf-3); }
+
+/* 편집 폼 (편집 모드) */
+.gb-profile-page .gb-prof-form {
+  position: relative; z-index: 2;
+  display: flex; flex-direction: column; gap: 14px;
+  width: 100%; padding: 16px 20px;
+}
+.gb-profile-page .gb-prof-avatar-row { display: flex; align-items: center; gap: 14px; }
+.gb-profile-page .gb-prof-avatar {
+  position: relative; flex: 0 0 auto;
+  width: 72px; height: 72px; border-radius: var(--r-card); overflow: visible;
+}
+.gb-profile-page .gb-prof-avatar-img {
+  width: 72px; height: 72px; border-radius: var(--r-card); object-fit: cover;
+  border: 3px solid var(--leaf); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+.gb-profile-page .gb-prof-avatar-fallback {
+  width: 72px; height: 72px; border-radius: var(--r-card);
+  align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #a8d5b5, #3d8b5e);
+  color: #fff; font-family: var(--font-pixel); font-size: 30px; line-height: 1;
+  border: 3px solid var(--leaf); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+.gb-profile-page .gb-prof-cam {
+  position: absolute; bottom: -6px; right: -6px;
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  background: var(--leaf); color: var(--paper-card);
+  border: 2px solid var(--paper-card); border-radius: 50%; cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .35);
+  transition: transform var(--dur-fast, .12s) var(--ease-soft);
+}
+.gb-profile-page .gb-prof-cam:hover { transform: scale(1.08); }
+.gb-profile-page .gb-prof-cam:active { transform: scale(.95); }
+.gb-profile-page .gb-prof-cam:disabled { opacity: .5; cursor: not-allowed; }
+.gb-profile-page .gb-prof-cam .rt-ico { font-size: 13px; }
+.gb-profile-page .gb-prof-avatar-hint { font-size: 11px; color: var(--muted-2); }
+
+.gb-profile-page .gb-prof-field { display: flex; flex-direction: column; gap: 6px; }
+.gb-profile-page .gb-prof-field-k {
+  font-family: var(--font-pixel-sm, monospace); font-size: 10px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--leaf-2);
+}
+.gb-profile-page .gb-prof-input,
+.gb-profile-page .gb-prof-textarea {
+  width: 100%; padding: 9px 12px;
+  font-family: var(--font-pixel); font-size: 14px; color: var(--leaf);
+  background: var(--paper-card); border: 2px solid var(--line-strong); border-radius: var(--r-chip);
+  outline: none; transition: border-color var(--dur-fast, .12s);
+}
+.gb-profile-page .gb-prof-input:focus,
+.gb-profile-page .gb-prof-textarea:focus { border-color: var(--leaf); }
+.gb-profile-page .gb-prof-textarea { min-height: 60px; resize: vertical; font-size: 13px; line-height: 1.5; }
+.gb-profile-page .gb-prof-form-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+.gb-profile-page .gb-prof-err { font-size: 12px; color: var(--danger); }
+
+/* ---------------- 우측: STATUS 스탯 패널 ---------------- */
+.gb-profile-page .gb-prof-status {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--paper-card); border: 2px solid var(--leaf); border-radius: var(--r-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 4px 4px 0 0 var(--leaf);
+  padding: 16px;
+}
+.gb-profile-page .gb-prof-status-head { display: flex; align-items: center; }
+.gb-profile-page .gb-prof-stats { list-style: none; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.gb-profile-page .gb-prof-stat {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  background: var(--paper-warm); border: 1px solid var(--line); border-radius: var(--r-chip);
+}
+.gb-profile-page .gb-prof-stat-ic {
+  display: grid; place-items: center; flex: 0 0 auto;
+  width: 30px; height: 30px; border-radius: var(--r-chip);
+  background: var(--paper-2); color: var(--leaf-2); font-size: 15px;
+}
+.gb-profile-page .gb-prof-stat-k { flex: 1; font-size: 12.5px; color: var(--leaf-2); letter-spacing: .5px; }
+.gb-profile-page .gb-prof-stat-v {
+  font-family: var(--font-pixel); font-size: 22px; line-height: 1; color: var(--leaf);
+  text-shadow: 1px 0 0 currentColor;
+}
+/* 스탯 강조 톤 */
+.gb-profile-page .gb-prof-stat--leaf  .gb-prof-stat-ic { background: #dbe6bb; color: var(--leaf-2); }
+.gb-profile-page .gb-prof-stat--peach .gb-prof-stat-ic { background: var(--peach-soft); color: var(--peach-deep); }
+.gb-profile-page .gb-prof-stat--peach .gb-prof-stat-v { color: var(--peach-deep); }
+.gb-profile-page .gb-prof-stat--sky   .gb-prof-stat-ic { background: var(--sky-soft); color: #3e6580; }
+.gb-profile-page .gb-prof-stat--amber .gb-prof-stat-ic { background: var(--amber-soft); color: #9a7322; }
+
+/* ============================================================
+   계정 관리 패널
+   ============================================================ */
+.gb-profile-page .gb-prof-acct { display: flex; flex-direction: column; }
+.gb-profile-page .gb-prof-acct-head { margin-bottom: 14px; }
+.gb-profile-page .gb-acct-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 13px 4px;
+  border-top: 2px dotted var(--line-strong);
+}
+.gb-profile-page .gb-acct-row:first-of-type { border-top: 0; }
+.gb-profile-page .gb-acct-k {
+  width: 110px; flex: 0 0 auto;
+  font-family: var(--font-pixel-sm, monospace); font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--leaf-2);
+}
+.gb-profile-page .gb-acct-v { flex: 1; min-width: 0; font-size: 13.5px; color: var(--leaf); word-break: break-all; }
+
+/* 회원 탈퇴 — 위험 액션 */
+.gb-profile-page .gb-prof-danger-row { display: flex; justify-content: flex-end; padding: 0 2px; }
+.gb-profile-page .gb-prof-danger {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-pixel); font-size: var(--fs-caption, 11px); letter-spacing: .5px; line-height: 1;
+  padding: 9px 14px; cursor: pointer;
+  color: var(--berry); background: transparent;
+  border: 2px solid var(--berry); border-radius: var(--r-chip);
+  box-shadow: 2px 2px 0 0 var(--berry);
+  transition: transform var(--dur-fast, .12s) var(--ease-soft), box-shadow var(--dur-fast, .12s), background var(--dur-fast, .12s);
+}
+.gb-profile-page .gb-prof-danger:hover { background: var(--berry-soft); transform: translate(-1px, -1px); box-shadow: 3px 3px 0 0 var(--berry); }
+.gb-profile-page .gb-prof-danger:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--berry); }
+.gb-profile-page .gb-prof-danger:disabled { opacity: .55; cursor: not-allowed; box-shadow: 2px 2px 0 0 var(--berry); transform: none; }
+
+/* ============================================================
+   비밀번호 변경 모달 — 미니 게임보이 카트리지
+   ============================================================ */
+.gb-profile-page .gb-pw-overlay {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: rgba(12, 14, 8, .55); backdrop-filter: blur(3px);
+}
+.gb-profile-page .gb-pw-modal {
+  width: 440px; max-width: 100%;
+  border-radius: 16px 16px 30px 16px;
+  background: linear-gradient(150deg, #d8d2c6 0%, #c4bdb0 46%, #ada695 100%);
+  padding: 14px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .55),
+    inset 0 -8px 18px rgba(0, 0, 0, .22),
+    0 30px 60px -20px rgba(0, 0, 0, .6);
+}
+.gb-profile-page .gb-pw-bar { display: flex; align-items: center; gap: 10px; padding: 2px 6px 10px; }
+.gb-profile-page .gb-pw-cap {
+  font-family: "Galmuri9", "Galmuri11", monospace; font-size: 8px; letter-spacing: .5px;
+  color: #4f4b3f; opacity: .8; margin-left: auto;
+}
+.gb-profile-page .gb-pw-body {
+  background: var(--paper-card); border-radius: 10px;
+  border: 2px solid var(--leaf); padding: 22px 20px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+}
+.gb-profile-page .gb-pw-title {
+  margin: 8px 0 18px; font-family: var(--font-pixel); font-size: 22px; line-height: 1.1;
+  color: var(--leaf); text-shadow: 1px 0 0 currentColor;
+}
+.gb-profile-page .gb-pw-fields { display: flex; flex-direction: column; gap: 13px; }
+.gb-profile-page .gb-pw-field { display: flex; flex-direction: column; gap: 5px; }
+.gb-profile-page .gb-pw-label {
+  font-family: var(--font-pixel-sm, monospace); font-size: 10px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--leaf-2);
+}
+.gb-profile-page .gb-pw-input {
+  width: 100%; padding: 9px 12px;
+  font-family: var(--font-pixel); font-size: 14px; color: var(--leaf);
+  background: var(--paper-warm); border: 2px solid var(--line-strong); border-radius: var(--r-chip);
+  outline: none; transition: border-color var(--dur-fast, .12s);
+}
+.gb-profile-page .gb-pw-input:focus { border-color: var(--leaf); }
+.gb-profile-page .gb-pw-error {
+  margin-top: 12px; padding: 9px 13px; border-radius: var(--r-chip);
+  background: var(--berry-soft); border: 1px solid var(--berry);
+  font-size: 12.5px; color: var(--berry);
+}
+.gb-profile-page .gb-pw-confirm {
+  padding: 16px 16px; border-radius: var(--r-chip); background: var(--paper-warm);
+  border: 1px solid var(--line); font-size: 13.5px; color: var(--leaf-2); line-height: 1.6;
+}
+.gb-profile-page .gb-pw-confirm-sub { font-size: 12px; color: var(--muted); }
+.gb-profile-page .gb-pw-actions { display: flex; gap: 10px; margin-top: 20px; }
+.gb-profile-page .gb-pw-actions .rt-btn { flex: 1; }
+
+/* ============================================================
+   테마 보관함 — 카트리지 컬렉션
+   ============================================================ */
+.gb-profile-page .gb-theme-grid {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+}
+.gb-profile-page .gb-theme-cart {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  text-align: left; cursor: pointer;
+  padding: 16px 16px 14px;
+  background: var(--paper-card);
+  border: 2px solid var(--line-strong); border-radius: var(--r-card);
+  box-shadow: 3px 3px 0 0 var(--line-strong);
+  transition: transform var(--dur-fast, .12s) var(--ease-soft), box-shadow var(--dur-fast, .12s), border-color var(--dur-fast, .12s), background var(--dur-fast, .12s);
+}
+.gb-profile-page .gb-theme-cart:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 0 var(--line-strong); }
+.gb-profile-page .gb-theme-cart:active { transform: translate(2px, 2px); box-shadow: 0 0 0 0 var(--line-strong); }
+.gb-profile-page .gb-theme-cart.is-active {
+  border-color: var(--leaf); background: var(--paper-warm);
+  box-shadow: 3px 3px 0 0 var(--leaf);
+}
+.gb-profile-page .gb-theme-cart-emoji { font-size: 26px; line-height: 1; }
+.gb-profile-page .gb-theme-cart-name {
+  font-family: var(--font-pixel); font-size: 13px; letter-spacing: .5px; color: var(--leaf);
+}
+.gb-profile-page .gb-theme-cart-desc { font-size: 12px; color: var(--muted); }
+.gb-profile-page .gb-theme-cart-badge {
+  margin-top: 2px;
+  font-family: var(--font-pixel-sm, monospace); font-size: 10px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--leaf-2);
+}
+.gb-profile-page .gb-theme-cart.is-active .gb-theme-cart-badge { color: var(--leaf); }

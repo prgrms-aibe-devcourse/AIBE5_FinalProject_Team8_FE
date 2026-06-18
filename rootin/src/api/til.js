@@ -14,6 +14,47 @@ export async function createTil({ title, content, potId, tags }) {
   return res.data;
 }
 
+// GET /api/v1/tils/me?potId=&page=&size=&sort=&keyword=&tag=
+// 내 발행 완료 TIL 목록을 조회합니다. potId를 넘기면 특정 화분의 TIL만 가져옵니다.
+// keyword, tag는 BE 구현 후 서버사이드 필터링에 연결 예정
+export async function getMyTils({ potId, page = 0, size = 10, sort = 'latest', keyword, tag, signal } = {}) {
+  const params = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort,
+  });
+
+  if (potId != null) params.set('potId', String(potId));
+  if (keyword)       params.set('keyword', keyword);
+  if (tag)           params.set('tag', tag);
+
+  const res = await request(`/api/v1/tils/me?${params.toString()}`, { signal });
+  return res.data;
+}
+
+// GET /api/v1/tils/{tilId}
+// 특정 TIL의 상세 내용을 조회합니다.
+export async function getTil(tilId) {
+  const res = await request(`/api/v1/tils/${tilId}`);
+  return res.data;
+}
+
+// DELETE /api/v1/tils/{tilId}
+// 발행된 TIL을 삭제합니다. (204 No Content)
+export async function deleteTil(tilId) {
+  await request(`/api/v1/tils/${tilId}`, { method: 'DELETE' });
+}
+
+// PUT /api/v1/tils/{tilId}
+// 발행된 TIL의 제목, 본문, 태그를 수정합니다.
+export async function updateTil(tilId, { title, content, tags }) {
+  const res = await request(`/api/v1/tils/${tilId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ title, content, tags }),
+  });
+  return res.data;
+}
+
 // =====================================================================
 // 임시저장 (화분당 1개)
 // =====================================================================
@@ -75,6 +116,6 @@ export async function createTemplate({ title, content }) {
 
 // 템플릿 삭제
 // DELETE /api/v1/til-templates/{templateId}  → 204
-export function deleteTemplate(templateId) {
-  return request(`/api/v1/til-templates/${templateId}`, { method: 'DELETE' });
+export async function deleteTemplate(templateId) {
+  await request(`/api/v1/til-templates/${templateId}`, { method: 'DELETE' });
 }

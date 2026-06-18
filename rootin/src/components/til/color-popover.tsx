@@ -8,11 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
+import { ToolbarTooltip, toolbarItemClass } from './toolbar-button'
 import { cn } from '@/lib/utils'
 
 const TEXT_COLORS: { name: string; value: string }[] = [
@@ -49,29 +45,25 @@ function Swatch({
   ariaLabel: string
 }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          aria-label={ariaLabel}
-          onClick={onClick}
-          className={cn(
-            'relative size-7 rounded-full border border-border/60 transition-transform duration-150 ease-out',
-            'hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
-            active && 'ring-2 ring-primary ring-offset-2 ring-offset-popover',
-          )}
-          style={{
-            background:
-              color === 'inherit' ? 'var(--foreground)' : color,
-          }}
-        >
-          {active ? (
-            <Check className="absolute inset-0 m-auto size-3.5 text-background" />
-          ) : null}
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{ariaLabel}</TooltipContent>
-    </Tooltip>
+    <ToolbarTooltip label={ariaLabel}>
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        onClick={onClick}
+        className={cn(
+          'relative size-7 rounded-full border border-border/60 transition-transform duration-150 ease-out',
+          'hover:scale-110 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
+          active && 'ring-2 ring-primary ring-offset-2 ring-offset-popover',
+        )}
+        style={{
+          background: color === 'inherit' ? 'var(--foreground)' : color,
+        }}
+      >
+        {active ? (
+          <Check className="absolute inset-0 m-auto size-3.5 text-background" />
+        ) : null}
+      </button>
+    </ToolbarTooltip>
   )
 }
 
@@ -81,31 +73,19 @@ export function TextColorPopover({ editor }: { editor: Editor }) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="글자색"
-              className={cn(
-                'inline-flex h-8 items-center justify-center gap-0.5 rounded-md px-1.5',
-                'text-muted-foreground transition-all duration-200',
-                'hover:bg-accent hover:text-accent-foreground',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
-                current && 'text-accent-foreground',
-              )}
-            >
-              <Baseline className="size-4" />
-              <span
-                className="h-1 w-3 rounded-full"
-                style={{ background: current ?? 'var(--muted-foreground)' }}
-              />
-            </button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>글자색</TooltipContent>
-      </Tooltip>
-      <PopoverContent align="start" className="w-auto p-3">
+      <ToolbarTooltip label="글자색">
+        <PopoverTrigger
+          aria-label="글자색"
+          className={cn(toolbarItemClass, 'gap-0.5 px-1.5', current && 'text-foreground')}
+        >
+          <Baseline className="size-4" />
+          <span
+            className="h-1 w-3 rounded-full"
+            style={{ background: current ?? 'var(--muted-foreground)' }}
+          />
+        </PopoverTrigger>
+      </ToolbarTooltip>
+      <PopoverContent align="start" className="rt-pop w-auto p-3">
         <p className="mb-2 px-0.5 text-xs font-medium text-muted-foreground">
           글자색
         </p>
@@ -141,32 +121,20 @@ export function HighlightPopover({ editor }: { editor: Editor }) {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              aria-label="형광펜"
-              data-active={isActive ? '' : undefined}
-              className={cn(
-                'inline-flex h-8 items-center justify-center gap-0.5 rounded-md px-1.5',
-                'text-muted-foreground transition-all duration-200',
-                'hover:bg-accent hover:text-accent-foreground',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60',
-                'data-[active]:bg-primary/15 data-[active]:text-primary',
-              )}
-            >
-              <Highlighter className="size-4" />
-              <span
-                className="h-1 w-3 rounded-full"
-                style={{ background: current ?? 'var(--muted-foreground)' }}
-              />
-            </button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>형광펜</TooltipContent>
-      </Tooltip>
-      <PopoverContent align="start" className="w-auto p-3">
+      <ToolbarTooltip label="형광펜">
+        <PopoverTrigger
+          aria-label="형광펜"
+          data-active={isActive ? '' : undefined}
+          className={cn(toolbarItemClass, 'gap-0.5 px-1.5')}
+        >
+          <Highlighter className="size-4" />
+          <span
+            className="h-1 w-3 rounded-full"
+            style={{ background: current ?? 'var(--muted-foreground)' }}
+          />
+        </PopoverTrigger>
+      </ToolbarTooltip>
+      <PopoverContent align="start" className="rt-pop w-auto p-3">
         <div className="mb-2 flex items-center justify-between gap-4 px-0.5">
           <p className="text-xs font-medium text-muted-foreground">배경색</p>
           <button

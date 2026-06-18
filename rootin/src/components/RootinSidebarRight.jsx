@@ -1,213 +1,689 @@
-import { useState } from 'react';
-import { Sidebar, SidebarContent } from "@/components/ui/sidebar";
-import { Plant } from '@/plants.jsx';
+import { useEffect, useRef, useState } from 'react';
+import { motion, useReducedMotion } from 'framer-motion';
 import { useTilEditor } from '@/components/til/til-editor-context';
+import { PixelPlant, PIXEL_SPECIES } from '@/pixel-plants.jsx';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChevronDown, Sprout, FileText, Pencil, Lightbulb, Sparkles, Flame, Loader2, Plus } from 'lucide-react';
+import { getMyTils, getTil, getDraft } from '@/api/til.js';
+import { cn } from '@/lib/utils';
+import { inferSpecies } from '@/utils/plant.js';
+import { playSfx } from '@/lib/sfx.js';
+import '@/til-editor.css';
+import './sidebar-right-monitor.css';
 
-function ProgressBar({ value }) {
+const SLIDE_OUT = 400;  // 접힘 시 디바이스를 우측으로 슬라이드 아웃하는 거리(슬롯 overflow가 담음)
+
+const GROWTH_STAGE_TO_PIXEL_STAGE = {
+  SEED: 'seed',
+  SPROUT: 'sprout',
+  MATURE: 'leaf',
+  LEAF: 'leaf',
+  BLOOM: 'bloom',
+  FULL_BLOOM: 'full',
+};
+
+const GROWTH_STAGE_LABEL = {
+  SEED: '씨앗',
+  SPROUT: '새싹',
+  MATURE: '성숙',
+  LEAF: '성숙',
+  BLOOM: '개화',
+  FULL_BLOOM: '만개',
+};
+
+
+function calculateEstimatedExp(contentLength, streakDays) {
+  if (contentLength <= 0) return 0;
+  const baseExp = Math.min(contentLength * 0.2, 300);
+  const multiplier = 1 + Math.min(Math.max(streakDays, 0) * 0.05, 0.5);
+  return Math.floor(baseExp * multiplier);
+}
+
+function formatTilDate(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+}
+
+const TIL_PAGE_SIZE = 30;
+
+function mapTil(t) {
+  return {
+    id: t.tilId,
+    title: t.title,
+    date: formatTilDate(t.publishedAt ?? t.createdAt),
+    tags: Array.isArray(t.tags) ? t.tags : [],
+    potId: t.potId,
+  };
+}
+
+// Stagger choreography — panel sections rise in sequence (Card Status List 패턴)
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.07, delayChildren: 0.04 } },
+};
+const sectionVariants = {
+  hidden: { opacity: 0, y: 16, scale: 0.985 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 320, damping: 26 } },
+};
+
+// 공통 카드 셸 — rounded-2xl + 시맨틱 토큰 (ProfileCard / Card Status List 어휘)
+function PanelCard({ className, children }) {
   return (
-    <div style={{ width: '100%', height: 6, background: 'var(--rule)', borderRadius: 3, overflow: 'hidden' }}>
-      <div style={{ width: `${value * 100}%`, height: '100%', background: 'var(--moss)', borderRadius: 3 }} />
-    </div>
+    <motion.section
+      variants={sectionVariants}
+      className={cn(
+        'rounded-[var(--r-card)] border-2 border-[var(--leaf)] bg-[var(--paper-card)] shadow-[5px_5px_0_0_var(--leaf)]',
+        className,
+      )}
+    >
+      {children}
+    </motion.section>
   );
 }
 
-function SectionHeader({ eyebrow, title, action }) {
+// 현재 편집 대상임을 알리는 라이브 배지 (맥동하는 점 + 라벨)
+function EditingBadge({ label, tone = 'moss' }) {
+  const color = tone === 'amber' ? 'var(--amber)' : 'var(--leaf-2)';
   return (
-    <div style={{ marginBottom: 14 }}>
-      <div className="eyebrow">{eyebrow}</div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 16, color: 'var(--ink)' }}>{title}</div>
-        {action}
+    <motion.span
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 420, damping: 24 }}
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+      style={{ background: `color-mix(in oklch, ${color} 15%, transparent)`, color }}
+    >
+      <motion.span
+        className="size-1.5 rounded-full"
+        style={{ background: color }}
+        animate={{ opacity: [1, 0.3, 1], scale: [1, 0.75, 1] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      {label}
+    </motion.span>
+  );
+}
+
+export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = true, onToggle }) {
+  const {
+    editor,
+    selectedPotId, setSelectedPotId, pots, potsLoading,
+    currentTilId, dirty, draftSavedAt, resumeDraft, startNewTil,
+    selectedPotDashboard, selectedPotDashboardLoading,
+  } = useTilEditor();
+
+  const [tils, setTils] = useState([]);
+  const [tilsLoading, setTilsLoading] = useState(false);
+  const [tilsLoadingMore, setTilsLoadingMore] = useState(false);
+  const [tilTotalCount, setTilTotalCount] = useState(0);
+  const [tilPage, setTilPage] = useState(0);
+  const [draft, setDraft] = useState(null);
+  const [contentLength, setContentLength] = useState(0);
+  // "이어쓰기"로 임시저장본을 에디터에 띄운 상태인지(=임시저장본을 보는 중) 추적
+  const [draftResumed, setDraftResumed] = useState(false);
+
+  // "더 보기" 비동기 응답이 도착했을 때 화분이 바뀌었는지 검사하기 위한 참조
+  const selectedPotIdRef = useRef(selectedPotId);
+  useEffect(() => { selectedPotIdRef.current = selectedPotId; }, [selectedPotId]);
+
+  // 임시저장본을 보는 중인지 — 발행 TIL 편집 중(currentTilId 존재)이면 아님
+  const draftActive = draftResumed && currentTilId == null;
+
+  // 본문 글자 수 추적 (예상 경험치 계산용)
+  useEffect(() => {
+    if (!editor) {
+      setContentLength(0);
+      return;
+    }
+    const updateContentLength = () => {
+      setContentLength(editor.getText().replace(/\s/g, '').length);
+    };
+    updateContentLength();
+    editor.on('update', updateContentLength);
+    return () => {
+      editor.off('update', updateContentLength);
+    };
+  }, [editor]);
+
+  // 선택된 화분의 TIL 목록 로딩 (첫 페이지)
+  useEffect(() => {
+    if (!selectedPotId) {
+      setTils([]);
+      setTilTotalCount(0);
+      setTilPage(0);
+      return;
+    }
+    let active = true;
+    setTilsLoading(true);
+    getMyTils({ potId: selectedPotId, page: 0, size: TIL_PAGE_SIZE, sort: 'latest' })
+      .then((page) => {
+        if (!active) return;
+        const content = Array.isArray(page?.content) ? page.content : [];
+        setTils(content.map(mapTil));
+        setTilTotalCount(page?.totalElements ?? content.length);
+        setTilPage(0);
+      })
+      .catch(() => { if (active) { setTils([]); setTilTotalCount(0); setTilPage(0); } })
+      .finally(() => { if (active) setTilsLoading(false); });
+    return () => { active = false; };
+  }, [selectedPotId]);
+
+  // 선택된 화분의 임시저장본 로딩 (자동저장 성공 시점에도 갱신)
+  useEffect(() => {
+    if (!selectedPotId) {
+      setDraft(null);
+      return;
+    }
+    let active = true;
+    getDraft(selectedPotId)
+      .then((d) => { if (active) setDraft(d); })
+      .catch(() => { if (active) setDraft(null); });
+    return () => { active = false; };
+  }, [selectedPotId, draftSavedAt]);
+
+  // "새 TIL 작성" → 에디터 비우고 신규 작성 상태로. 작성 중 내용 있으면 확인.
+  const handleNewTil = () => {
+    const hasContent = (editor?.getText().trim().length ?? 0) > 0;
+    if (dirty && hasContent) {
+      if (!window.confirm('작성 중인 내용이 사라질 수 있어요. 새 TIL을 시작할까요?')) return;
+    }
+    playSfx('confirm');
+    startNewTil();
+    onNewTil?.();
+    setDraftResumed(false);
+  };
+
+  // 임시저장본 "이어쓰기" → 에디터에 적용 + 수정 모드 해제
+  const handleResumeDraft = () => {
+    if (currentTilId && dirty) {
+      if (!window.confirm('수정 중인 변경 사항이 사라질 수 있어요. 임시저장본으로 이동할까요?')) return;
+    }
+    playSfx('nav');
+    resumeDraft(draft);
+    onResumeDraft?.(selectedPotId);
+    setDraftResumed(true);
+  };
+
+  // TIL 클릭 → 수정 모드 진입. 수정 중 저장 안 된 변경이 있으면 확인.
+  const handleEdit = async (til) => {
+    if (currentTilId && String(currentTilId) !== String(til.id) && dirty) {
+      if (!window.confirm('저장하지 않은 변경 사항이 사라질 수 있어요. 이동할까요?')) return;
+    }
+    playSfx('nav');
+    setDraftResumed(false);
+    try {
+      const d = await getTil(til.id);
+      onEditTil?.({ ...d, id: d.tilId, potId: d.potId ?? til.potId });
+    } catch {
+      onEditTil?.({ ...til });
+    }
+  };
+
+  // "더 보기" → 다음 페이지를 불러와 목록 끝에 이어 붙임
+  const handleLoadMore = async () => {
+    if (!selectedPotId || tilsLoadingMore) return;
+    const potId = selectedPotId;
+    const nextPage = tilPage + 1;
+    setTilsLoadingMore(true);
+    try {
+      const page = await getMyTils({ potId, page: nextPage, size: TIL_PAGE_SIZE, sort: 'latest' });
+      if (selectedPotIdRef.current !== potId) return; // 응답 도착 전 화분이 바뀌면 폐기
+      const content = Array.isArray(page?.content) ? page.content : [];
+      setTils((prev) => [...prev, ...content.map(mapTil)]);
+      if (typeof page?.totalElements === 'number') setTilTotalCount(page.totalElements);
+      setTilPage(nextPage);
+    } catch {
+      /* noop — 다음 페이지 로딩 실패 시 조용히 무시 */
+    } finally {
+      setTilsLoadingMore(false);
+    }
+  };
+
+  return (
+    <aside className="rt-app rt-app-editor rt-monitor-slot">
+      {/* 모니터 디바이스 — 고정 오버레이라 여닫아도 에디터 인셋이 안 변함(본문 떨림 없음).
+          좌측 Game Boy 와 동일한 슬라이드(translateX)·색·입체. 내부 기능은 불변. */}
+      <div
+        className="rt-monitor-device"
+        style={{
+          transform: open ? 'none' : `translateX(${SLIDE_OUT}px)`,
+          opacity: open ? 1 : 0,
+          pointerEvents: open ? 'auto' : 'none',
+          transition: 'transform 0.52s cubic-bezier(0.7, 0, 0.18, 1), opacity 0.4s ease',
+        }}
+        aria-hidden={!open}
+      >
+        {/* 세로형 토글 — 모니터 왼쪽 모서리에 박힘(좌측 .side-toggle 차용) */}
+        <button
+          type="button"
+          onClick={() => { playSfx('nav'); onToggle?.(); }}
+          aria-expanded={open}
+          aria-label="사이드 패널 접기"
+          className="rt-monitor-handle"
+        >
+          <span className="rt-mh-grip" aria-hidden="true" />
+          <span className="rt-mh-chevron" aria-hidden="true" />
+          <span className="rt-mh-cap" aria-hidden="true">패널</span>
+        </button>
+
+        {/* 모니터 본체 — 크림 플라스틱 셸(다층 입체) */}
+        <div className="rt-monitor-body">
+          {/* 회청색 베젤 — 좌측과 동일한 색 4겹 구조(셸→베젤→검은프레임→스크린) */}
+          <div className="rt-monitor-bezel">
+            {/* 베젤 상단 — 전원 LED + 캡션 */}
+            <div className="rt-monitor-top">
+              <span className="rt-monitor-led" aria-hidden="true" />
+              <span className="rt-monitor-cap">Rootin · Grow Display</span>
+            </div>
+
+            {/* 스크린 — 검은 프레임 안에 밝은 콘텐츠 + CRT 오버레이 */}
+            <div className="rt-monitor-screen">
+          <div className="rt-monitor-content scrollbar-subtle">
+        <motion.div
+          className="flex flex-col gap-3.5 p-4 pb-12"
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          {/* 새 TIL 작성 — 에디터를 비우고 새 글 시작 */}
+          <motion.button
+            type="button"
+            onClick={handleNewTil}
+            variants={sectionVariants}
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.99 }}
+            className="flex w-full items-center justify-center gap-1.5 rounded-[var(--r-chip)] border-2 border-[var(--leaf)] px-4 py-2.5 text-sm font-semibold text-[color:var(--paper-card)] transition-[transform,box-shadow] duration-150"
+            style={{ background: 'var(--leaf)', boxShadow: '2px 2px 0 0 var(--leaf-2)' }}
+          >
+            <Plus className="size-4" />
+            새 TIL 작성
+          </motion.button>
+
+          {/* ① 저장할 화분 선택 */}
+          <PanelCard className="p-4">
+            <div className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[color:var(--leaf-2)]">
+              <Sprout className="size-3.5 text-[var(--leaf-2)]" />
+              저장할 화분
+            </div>
+            <Select value={selectedPotId ?? undefined} onValueChange={(v) => { playSfx('toggle'); setSelectedPotId(v); setDraftResumed(false); }}>
+              <SelectTrigger
+                aria-label="화분 선택"
+                className="h-11 w-full gap-2 rounded-[var(--r-chip)] border-2 border-[var(--leaf)] bg-[var(--paper-card)] px-3.5 text-sm text-[color:var(--leaf)] shadow-[2px_2px_0_0_var(--leaf)] transition-[transform,box-shadow] hover:-translate-x-px hover:-translate-y-px hover:shadow-[3px_3px_0_0_var(--leaf)] data-[state=open]:shadow-[3px_3px_0_0_var(--leaf)]"
+                disabled={potsLoading}
+              >
+                <SelectValue placeholder={potsLoading ? '불러오는 중…' : '화분을 선택하세요'} />
+              </SelectTrigger>
+              <SelectContent className="rt-pop">
+                {pots.length === 0 ? (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">화분이 없습니다</div>
+                ) : (
+                  pots.map((pot) => (
+                    <SelectItem key={pot.id} value={String(pot.id)}>{pot.title}</SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </PanelCard>
+
+          {/* ② 지금 키우는 식물 + 경험치 + 예상 XP */}
+          <div className="guide-editor-plant-status">
+            <PlantHeroCard
+              dashboard={selectedPotDashboard}
+              loading={selectedPotDashboardLoading}
+              contentLength={contentLength}
+            />
+          </div>
+
+          {/* ③ 이 화분의 TIL 목록 + 임시저장본 */}
+          <PanelCard className="guide-editor-history overflow-hidden">
+            <div className="flex items-center justify-between px-3 pb-2.5 pt-4">
+              <div className="flex items-center gap-1.5 text-sm font-semibold text-[color:var(--leaf)]">
+                <FileText className="size-4 text-[var(--leaf-2)]" />
+                이 화분의 TIL
+              </div>
+              {selectedPotId && !tilsLoading && (
+                <span className="rounded-[var(--r-chip)] bg-[var(--paper-warm)] px-2 py-0.5 text-[11px] text-[color:var(--muted-2)]" style={{ fontFamily: 'var(--font-mono)' }}>
+                  {tilTotalCount}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2 px-3 pb-4">
+              {/* 임시저장본 (발행 전) — 클릭 시 이어쓰기. 보는 중이면 활성 표시 */}
+              {selectedPotId && draft && (
+                <motion.button
+                  type="button"
+                  onClick={handleResumeDraft}
+                  whileHover={{ y: -1 }}
+                  whileTap={{ scale: 0.99 }}
+                  className="group relative block w-full overflow-hidden rounded-[var(--r-chip)] border-2 px-3 py-2.5 text-left transition-[transform,box-shadow] duration-200"
+                  style={{
+                    background: draftActive ? 'var(--amber-soft)' : 'color-mix(in oklch, var(--amber-soft) 55%, var(--paper-card))',
+                    borderColor: 'var(--amber)',
+                    boxShadow: draftActive ? '3px 3px 0 0 var(--amber)' : '2px 2px 0 0 var(--amber)',
+                  }}
+                >
+                  {draftActive && (
+                    <motion.span
+                      initial={{ opacity: 0, scaleY: 0.3 }}
+                      animate={{ opacity: 1, scaleY: 1 }}
+                      transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                      className="absolute inset-y-1.5 left-0 w-[3px] rounded-full"
+                      style={{ background: 'linear-gradient(180deg, var(--amber) 0%, color-mix(in oklch, var(--amber) 65%, white) 100%)' }}
+                    />
+                  )}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: '#9a7322' }}>
+                      <Pencil className="size-3" />
+                      임시저장 · 발행 전
+                    </span>
+                    {draftActive ? (
+                      <EditingBadge label="이어쓰는 중" tone="amber" />
+                    ) : (
+                      <span className="text-[11px] text-[color:var(--muted-2)] transition-transform group-hover:translate-x-0.5">이어쓰기 →</span>
+                    )}
+                  </div>
+                  <div className="mt-1 line-clamp-2 text-[13px] font-medium leading-snug text-[color:var(--leaf)]">
+                    {draft.title?.trim() || '(제목 없음)'}
+                  </div>
+                </motion.button>
+              )}
+
+              {!selectedPotId ? (
+                <div className="rounded-[var(--r-chip)] border-2 border-dashed border-[var(--line-strong)] px-3 py-4 text-center text-xs text-[color:var(--muted-2)]">
+                  화분을 먼저 선택하세요.
+                </div>
+              ) : tilsLoading ? (
+                <div className="flex flex-col gap-2">
+                  <Skeleton className="h-14 w-full rounded-xl" />
+                  <Skeleton className="h-14 w-full rounded-xl" />
+                  <Skeleton className="h-14 w-full rounded-xl" />
+                </div>
+              ) : tils.length === 0 ? (
+                <div className="rounded-[var(--r-chip)] border-2 border-dashed border-[var(--line-strong)] px-3 py-4 text-center text-xs text-[color:var(--muted-2)]">
+                  아직 이 화분에 발행된 TIL이 없어요.
+                </div>
+              ) : (
+                <div className="scrollbar-subtle flex max-h-[440px] flex-col gap-2 overflow-y-auto pr-0.5">
+                  {tils.map((t, index) => {
+                    const isActive = currentTilId != null && String(t.id) === String(currentTilId);
+                    return (
+                      <motion.button
+                        key={t.id}
+                        type="button"
+                        onClick={() => handleEdit(t)}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: Math.min(index * 0.02, 0.2), type: 'spring', stiffness: 360, damping: 28 }}
+                        whileHover={{ y: -1 }}
+                        whileTap={{ scale: 0.99 }}
+                        className={cn(
+                          'relative w-full shrink-0 overflow-hidden rounded-[var(--r-chip)] border-2 px-3 py-2.5 text-left transition-[transform,box-shadow] duration-200',
+                          isActive
+                            ? 'border-[var(--leaf)] bg-[var(--paper-warm)] shadow-[3px_3px_0_0_var(--leaf)]'
+                            : 'border-[var(--line-strong)] bg-[var(--paper-card)] shadow-[2px_2px_0_0_var(--line-strong)] hover:border-[var(--leaf-2)] hover:shadow-[3px_3px_0_0_var(--leaf-2)]',
+                        )}
+                      >
+                        {/* 활성 항목 좌측 액센트 레일 — 활성화 시 부드럽게 펼쳐짐 */}
+                        {isActive && (
+                          <motion.span
+                            initial={{ opacity: 0, scaleY: 0.3 }}
+                            animate={{ opacity: 1, scaleY: 1 }}
+                            transition={{ type: 'spring', stiffness: 460, damping: 34 }}
+                            className="absolute inset-y-1.5 left-0 w-[3px] rounded-full"
+                            style={{ background: 'linear-gradient(180deg, var(--leaf) 0%, var(--leaf-3) 100%)' }}
+                          />
+                        )}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 line-clamp-2 text-[13px] font-medium leading-snug text-[color:var(--leaf)]">
+                            {t.title || '(제목 없음)'}
+                          </div>
+                          <div className="mt-px shrink-0 text-[11px] text-[color:var(--muted-2)]" style={{ fontFamily: 'var(--font-mono)' }}>{t.date}</div>
+                        </div>
+                        {(t.tags.length > 0 || isActive) && (
+                          <div className="mt-1.5 flex items-center justify-between gap-2">
+                            <div className="flex min-w-0 flex-wrap gap-1">
+                              {t.tags.slice(0, 3).map((tag) => (
+                                <span key={tag} className="rounded-[3px] bg-[var(--paper-2)] px-1.5 py-px text-[10.5px]" style={{ color: 'var(--leaf-2)' }}>#{tag}</span>
+                              ))}
+                            </div>
+                            {isActive && <EditingBadge label="편집 중" tone="moss" />}
+                          </div>
+                        )}
+                      </motion.button>
+                    );
+                  })}
+
+                  {tils.length < tilTotalCount && (
+                    <button
+                      type="button"
+                      onClick={handleLoadMore}
+                      disabled={tilsLoadingMore}
+                      className="mt-0.5 flex shrink-0 items-center justify-center gap-1.5 rounded-[var(--r-chip)] border-2 border-[var(--line-strong)] bg-[var(--paper-card)] py-2 text-[12px] font-medium text-[color:var(--muted-2)] transition-colors hover:border-[var(--leaf-2)] hover:text-[color:var(--leaf)] disabled:opacity-60"
+                    >
+                      {tilsLoadingMore ? (
+                        <><Loader2 className="size-3.5 animate-spin" /> 불러오는 중…</>
+                      ) : (
+                        <><ChevronDown className="size-3.5" /> 더 보기 ({tilTotalCount - tils.length}개)</>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </PanelCard>
+
+          {/* ④ 경험치 가중치 팁 */}
+          <PanelCard className="p-3.5">
+            <div className="flex gap-2.5">
+              <div className="flex size-7 shrink-0 items-center justify-center rounded-[var(--r-chip)]" style={{ background: 'color-mix(in oklch, var(--leaf-3) 30%, var(--paper-card))', color: 'var(--leaf-2)' }}>
+                <Lightbulb className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-[color:var(--leaf)]">경험치 가중치</div>
+                <div className="mt-0.5 text-[11.5px] leading-relaxed text-[color:var(--muted-2)]">
+                  글자수 · 연속 작성일에 따라 식물에게 가는 물의 양이 달라져요. 짧아도 매일 쓰는 게 가장 강해요.
+                </div>
+              </div>
+            </div>
+          </PanelCard>
+        </motion.div>
+          </div>
+
+          {/* CRT 오버레이 — 클릭/스크롤 통과(pointer-events:none) */}
+          <span className="rt-monitor-fx rt-monitor-scan" aria-hidden="true" />
+          <span className="rt-monitor-fx rt-monitor-glass" aria-hidden="true" />
+          <span className="rt-monitor-fx rt-monitor-vignette" aria-hidden="true" />
+            </div>
+          </div>
+
+          {/* 브랜드 + 통풍구 (크림 셸 위) */}
+          <div className="rt-monitor-brandrow" aria-hidden="true">
+            <span className="rt-monitor-brand">ROOTIN<i>™</i></span>
+            <span className="rt-monitor-vent" />
+          </div>
+        </div>
+      </div>
+
+      {/* 접힘 미니 독 — 좌측 Game Boy Micro 차용. 새 TIL + 식물/레벨/연속일 요약 + 펼치기 */}
+      <MiniDock dashboard={selectedPotDashboard} open={open} onToggle={onToggle} onNewTil={handleNewTil} />
+    </aside>
+  );
+}
+
+function MiniDock({ dashboard, open, onToggle, onNewTil }) {
+  const hasData = !!dashboard;
+  const growthStage = dashboard?.plant?.growthStage ?? 'SEED';
+  const level = dashboard?.level ?? null;
+  const streak = Math.max(0, Number(dashboard?.streakDays) || 0);
+  const progress = Math.min(100, Math.max(0, Math.round(dashboard?.progressPercentage ?? 0)));
+  const species = inferSpecies(dashboard?.plant?.name ?? '기본 씨앗');
+  const stage = GROWTH_STAGE_TO_PIXEL_STAGE[growthStage] ?? 'seed';
+  const stageLabel = GROWTH_STAGE_LABEL[growthStage] ?? '씨앗';
+
+  return (
+    <div className="rt-monitor-dock" data-shown={!open || undefined} aria-hidden={open}>
+      <div className="rt-mdock">
+        {/* 새 TIL 작성 — 접힌 상태에서도 바로 새 글 시작 */}
+        <button type="button" className="rt-mdock-new" aria-label="새 TIL 작성" onClick={() => onNewTil?.()}>
+          <Plus className="size-4" />
+          새 TIL
+        </button>
+        {hasData && <span className="rt-mdock-title">{dashboard.title}</span>}
+        <div className="rt-mdock-screen">
+          <div className="rt-mdock-lcd">
+            {hasData
+              ? <PixelPlant species={species} stage={stage} size={40} />
+              : <span style={{ fontSize: 28 }}>🌱</span>}
+          </div>
+        </div>
+        <span className="rt-mdock-lv">Lv.{level ?? '–'}</span>
+        <span className="rt-mdock-stage">{hasData ? stageLabel : '화분 선택'}</span>
+        {hasData && (
+          <div className="rt-mdock-exp" role="img" aria-label={`경험치 ${progress}%`}>
+            <div className="rt-mdock-exp-fill" style={{ width: `${progress}%` }} />
+          </div>
+        )}
+        <div className="rt-mdock-stats">
+          <span className="rt-mdock-stat"><Flame className="size-3" style={{ color: 'var(--amber)' }} />{streak}</span>
+          <span className="rt-mdock-stat"><Sparkles className="size-3" style={{ color: 'var(--leaf-2)' }} />{progress}%</span>
+        </div>
+        <button
+          type="button"
+          className="rt-mdock-expand"
+          aria-label="사이드 패널 펼치기"
+          onClick={() => { playSfx('nav'); onToggle?.(); }}
+        >
+          <span className="rt-mdock-chev" aria-hidden="true" />
+          <span className="rt-mdock-expand-cap">펼치기</span>
+        </button>
       </div>
     </div>
   );
 }
 
-function TemplateButton({ name, desc, highlight, onApply, onDelete }) {
+function StatCell({ label, value, divider }) {
   return (
-    <div style={{ position: 'relative' }}>
-      <button
-        type="button"
-        onClick={onApply}
-        style={{
-          width: '100%',
-          textAlign: 'left',
-          padding: 12,
-          paddingRight: onDelete ? 34 : 12,
-          borderRadius: 10,
-          background: highlight ? 'var(--paper-2)' : '#fff',
-          border: '0.5px solid var(--rule)',
-          cursor: 'pointer',
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', fontFamily: 'var(--font-display)' }}>{name}</div>
-        {desc && <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3 }}>{desc}</div>}
-      </button>
-      {onDelete && (
-        <button
-          type="button"
-          aria-label={`${name} 템플릿 삭제`}
-          onClick={onDelete}
-          style={{
-            position: 'absolute', top: 10, right: 10,
-            width: 20, height: 20, borderRadius: 6,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'var(--ink-3)', background: 'transparent', border: 'none', cursor: 'pointer',
-            fontSize: 14, lineHeight: 1,
-          }}
-        >
-          ×
-        </button>
-      )}
+    <div className={cn('flex flex-col items-center justify-center px-1', divider && 'border-x-2 border-[var(--line-strong)]')}>
+      <div className="text-[13px] font-bold text-[color:var(--leaf)]">{value}</div>
+      <div className="mt-0.5 text-[10px] text-[color:var(--muted-2)]">{label}</div>
     </div>
   );
 }
 
-export function RootinSidebarRight({ ...props }) {
-  const xpGain = 120;
-  const { editor, applyTemplate, templates, saveCustomTemplate, deleteCustomTemplate } = useTilEditor();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [saving, setSaving] = useState(false);
+function PlantHeroCard({ dashboard, loading, contentLength }) {
+  const reduceMotion = useReducedMotion();
+  const floatProps = reduceMotion
+    ? {}
+    : { animate: { y: [0, -5, 0] }, transition: { duration: 4.2, repeat: Infinity, ease: 'easeInOut' } };
 
-  // BM-06 템플릿 이용 — 본문에 내용이 있으면 덮어쓰기 확인
-  const handleApply = (content) => {
-    if (!editor) return;
-    const hasContent = editor.getText().trim().length > 0;
-    if (hasContent && !window.confirm('현재 작성 중인 본문을 템플릿 내용으로 덮어쓸까요?')) return;
-    applyTemplate(content);
-  };
+  if (loading) {
+    return (
+      <PanelCard className="overflow-hidden">
+        <div className="h-16" style={{ background: 'linear-gradient(180deg, var(--paper-warm), var(--paper-2))', boxShadow: 'inset 0 0 0 1px var(--line)' }} />
+        <div className="-mt-8 px-5 pb-5">
+          <Skeleton className="mx-auto size-20 rounded-2xl" />
+          <Skeleton className="mx-auto mt-3 h-3.5 w-2/3 rounded-full" />
+          <Skeleton className="mt-4 h-2 w-full rounded-full" />
+          <Skeleton className="mt-4 h-12 w-full rounded-xl" />
+        </div>
+      </PanelCard>
+    );
+  }
 
-  // BM-07 템플릿 제작 — 현재 본문을 새 템플릿으로 저장 (서버 연동)
-  const handleSaveTemplate = async () => {
-    const name = newName.trim();
-    if (!name || saving) return;
-    setSaving(true);
-    try {
-      await saveCustomTemplate(name);
-      setNewName('');
-      setDialogOpen(false);
-    } catch {
-      window.alert('템플릿 저장에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setSaving(false);
-    }
-  };
+  if (!dashboard) {
+    return (
+      <PanelCard className="overflow-hidden">
+        <div className="h-16" style={{ background: 'linear-gradient(180deg, var(--paper-warm), var(--paper-2))', boxShadow: 'inset 0 0 0 1px var(--line)' }} />
+        <div className="-mt-8 px-5 pb-5 text-center">
+          <div className="mx-auto flex size-20 items-center justify-center rounded-[var(--r-card)] border-4 border-[var(--paper-card)] bg-[var(--paper-2)] text-3xl shadow-[2px_2px_0_0_var(--line-strong)]">🌱</div>
+          <div className="mt-3 text-[12px] leading-relaxed text-muted-foreground">
+            화분을 선택하면 현재 식물과<br />이번 글의 예상 경험치를 볼 수 있어요.
+          </div>
+        </div>
+      </PanelCard>
+    );
+  }
 
-  // 템플릿 삭제 (서버 연동) — 기본 제공 템플릿은 삭제 불가
-  const handleDeleteTemplate = (id) => {
-    if (!window.confirm('이 템플릿을 삭제할까요?')) return;
-    deleteCustomTemplate(id).catch(() => {
-      window.alert('템플릿 삭제에 실패했습니다.');
-    });
-  };
+  const plantName = dashboard.plant?.name ?? '기본 씨앗';
+  const species = inferSpecies(plantName);
+  const growthStage = dashboard.plant?.growthStage ?? 'SEED';
+  const stage = GROWTH_STAGE_TO_PIXEL_STAGE[growthStage] ?? 'seed';
+  const stageLabel = GROWTH_STAGE_LABEL[growthStage] ?? '씨앗';
+  const stageName = PIXEL_SPECIES[species]?.stages?.[stage]?.name ?? plantName;
+  const progress = Math.min(100, Math.max(0, Math.round(dashboard.progressPercentage ?? 0)));
+  const estimatedExp = calculateEstimatedExp(contentLength, dashboard.streakDays ?? 0);
+  const currentExp = Math.max(0, Number(dashboard.currentLevelExp) || 0);
+  const nextExp = Math.max(1, Number(dashboard.nextLevelExpRequired) || 100);
+  const level = dashboard.level ?? 1;
+  const streakDays = Math.max(0, Number(dashboard.streakDays) || 0);
 
   return (
-    <Sidebar side="right" className="border-l border-border" {...props}>
-      <SidebarContent className="p-5 flex flex-col gap-5">
-        {/* Plant preview */}
-        <div style={{
-          padding: 18,
-          background: 'linear-gradient(180deg, #ebf5ef 0%, #f5f7f5 100%)',
-          borderRadius: 14,
-          textAlign: 'center',
-          border: '0.5px solid var(--leaf)',
-        }}>
-          <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>지금 키우는 식물</div>
-          <div style={{ margin: '14px 0 10px', display: 'flex', justifyContent: 'center' }}>
-            <Plant stage="bloom" size={92} showRoots />
+    <PanelCard className="overflow-hidden">
+      {/* 그라데이션 헤더 + 레벨 배지 */}
+      <div className="relative h-16" style={{ background: 'linear-gradient(180deg, var(--paper-warm), var(--paper-2))', boxShadow: 'inset 0 0 0 1px var(--line)' }}>
+        <div className="rt-badge rt-badge--leaf absolute right-3 top-3 font-bold">
+          Lv.{level}
+        </div>
+      </div>
+
+      {/* relative z-10 — relative 헤더가 static 본문보다 늦게(위에) 그려져 아바타 윗부분을 덮는 것 방지 */}
+      <div className="relative z-10 -mt-8 px-5 pb-5">
+        {/* 식물 아바타 (헤더 위로 겹침 + 부유 모션) */}
+        <motion.div
+          {...floatProps}
+          className="mx-auto flex size-20 items-center justify-center rounded-[var(--r-card)] border-4 border-[var(--paper-card)] bg-[var(--paper-2)] shadow-[2px_2px_0_0_var(--line-strong)]"
+        >
+          <PixelPlant species={species} stage={stage} size={56} glow={species === 'moonlight'} />
+        </motion.div>
+
+        <div className="mt-2.5 text-center">
+          <div className="truncate text-sm font-bold text-[color:var(--leaf)]">
+            {dashboard.title}
           </div>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, fontSize: 14, color: 'var(--ink)' }}>
-            💻 코딩 · Lv.7 · 개화 중
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <ProgressBar value={0.62} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6, fontSize: 10.5, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
-              <span>28 / 40 TIL</span>
-              <span>다음 단계: 만개</span>
-            </div>
-          </div>
-          <div style={{
-            marginTop: 12, padding: '8px 12px',
-            background: 'rgba(255,255,255,0.6)', border: '0.5px solid var(--leaf)',
-            borderRadius: 8, fontSize: 11.5, color: 'var(--moss-2)',
-          }}>
-            ✨ 이번 글로 약 <b>+{xpGain} XP</b>
+          <div className="mt-0.5 text-[11.5px] text-[color:var(--muted-2)]">
+            {stageName} · {stageLabel} 중
           </div>
         </div>
 
-        {/* Templates */}
-        <div>
-          <SectionHeader eyebrow="템플릿" title="빠른 시작" action={
-            <button
-              onClick={() => setDialogOpen(true)}
-              style={{ fontSize: 11, color: 'var(--moss-2)', fontFamily: 'var(--font-display)', fontWeight: 500, cursor: 'pointer', background: 'transparent', border: 'none' }}
-            >+ 새 템플릿</button>
-          } />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {templates.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '4px 2px' }}>
-                저장된 템플릿이 없습니다.
-              </div>
-            ) : (
-              templates.map((t, i) => (
-                <TemplateButton
-                  key={t.id}
-                  name={t.name}
-                  desc={t.isDefault ? '기본 제공' : '내 템플릿'}
-                  highlight={i === 0}
-                  onApply={() => handleApply(t.content)}
-                  onDelete={t.isDefault ? undefined : () => handleDeleteTemplate(t.id)}
-                />
-              ))
-            )}
+        {/* EXP 프로그래스바 — 픽셀 LCD 바 */}
+        <div className="mt-3.5">
+          <div className="mb-1 flex items-center justify-between text-[10.5px] text-[color:var(--muted-2)]" style={{ fontFamily: 'var(--font-mono)' }}>
+            <span>EXP</span>
+            <span>{currentExp} / {nextExp}</span>
+          </div>
+          <div className="h-2.5 overflow-hidden rounded-[3px] bg-[var(--paper-2)] shadow-[inset_0_0_0_1px_var(--line-strong)]">
+            <motion.div
+              className="h-full"
+              style={{ background: 'var(--leaf-2)', boxShadow: 'inset 0 0 0 1px rgba(20,40,12,.18)' }}
+              initial={{ width: 0 }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+            />
           </div>
         </div>
 
-        {/* Tips */}
-        <div style={{ padding: 14, background: 'var(--paper-2)', borderRadius: 10, fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.6 }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--ink)', fontSize: 12, marginBottom: 6 }}>💡 경험치 가중치</div>
-          글자수 · 연속 작성일에 따라 식물에게 가는 물의 양이 달라져요. 짧아도 매일 쓰는 게 가장 강해요.
+        {/* 스탯 그리드 */}
+        <div className="mt-3.5 grid grid-cols-3 rounded-[var(--r-chip)] border-2 border-[var(--line-strong)] bg-[var(--paper-warm)] py-2.5">
+          <StatCell label="레벨" value={`Lv.${level}`} />
+          <StatCell label="연속" value={<span className="inline-flex items-center gap-0.5"><Flame className="size-3" style={{ color: 'var(--amber)' }} />{streakDays}일</span>} divider />
+          <StatCell label="진척도" value={`${progress}%`} />
         </div>
-      </SidebarContent>
 
-      {/* BM-07 새 템플릿 저장 다이얼로그 */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>새 템플릿 저장</DialogTitle>
-            <DialogDescription>
-              현재 작성 중인 본문을 템플릿으로 저장합니다. 다음에 빠른 시작에서 불러올 수 있어요.
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            autoFocus
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                handleSaveTemplate();
-              }
-            }}
-            placeholder="템플릿 이름"
-          />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setDialogOpen(false)}>취소</Button>
-            <Button onClick={handleSaveTemplate} disabled={!newName.trim() || saving}>{saving ? '저장 중…' : '저장'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </Sidebar>
+        {/* 이번 글 예상 경험치 */}
+        <div className="mt-3 flex items-center justify-center gap-1.5 rounded-[var(--r-chip)] px-3 py-2 text-[12px] font-semibold" style={{ background: 'var(--amber-soft)', color: '#9a7322' }}>
+          <Sparkles className="size-3.5" />
+          이번 글로 약 +{estimatedExp} XP
+        </div>
+      </div>
+    </PanelCard>
   );
 }

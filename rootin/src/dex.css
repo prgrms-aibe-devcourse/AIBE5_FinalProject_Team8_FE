@@ -1,0 +1,410 @@
+/* =========================================================================
+   ROOTIN — 도감(/collection) 화면 스킨 "POCKET DEX"
+   대시보드(sprout.css, .rt-app)·정원(garden.css)의 게임보이/CRT 시스템을 따른다.
+   게임보이 DMG 콘솔 셸 안에 좌측 "뷰어 LCD" + 우측 "도감 색인"을 담은
+   휴대용 도감 디바이스 레이아웃. 전역 부작용을 피하려 .gb-dex-page 하위로만 스코프.
+   (전역 헬퍼 .gb-fx*, .gb-garden-led, @keyframes gb-led 는 garden.css 의 것을 재사용)
+   ========================================================================= */
+
+/* 풀스크린 레이아웃 — 대시보드/정원과 동일하게 풀폭. 도크 접힘 시 좌측 비켜줌. */
+[data-screen-label="collection"] .gb-dex-page {
+  padding: 28px 56px 44px;
+  transition: padding-left .55s cubic-bezier(.7, 0, .2, 1);
+}
+[data-screen-label="collection"] .gbsb-slot.hidden ~ [data-slot="sidebar-inset"] .gb-dex-page {
+  padding-left: 132px;
+}
+
+/* 픽셀 카드(또렷한 잉크 테두리 + 하드 픽셀 그림자) — 대시보드/정원과 통일 */
+.gb-dex-page .rt-card {
+  border: 2px solid var(--leaf);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 5px 5px 0 0 var(--leaf);
+}
+.gb-dex-page .rt-page-title,
+.gb-dex-page .rt-h3 {
+  font-weight: 700;
+  text-shadow: 1px 0 0 currentColor;
+}
+
+/* 통계 타일의 미니 진행 막대 */
+.gb-dex-page .gb-dex-meter {
+  height: 9px; border-radius: 3px; margin-top: 12px;
+  background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--line-strong); overflow: hidden;
+}
+.gb-dex-page .gb-dex-meter > i {
+  display: block; height: 100%; background: var(--leaf-2);
+  box-shadow: inset 0 0 0 1px rgba(20, 40, 12, .18);
+  transition: width .4s var(--ease-soft);
+}
+.gb-dex-page .rt-stat--accent .gb-dex-meter > i { background: var(--peach); }
+.gb-dex-page .rt-stat .rt-stat-v .unit { font-size: 14px; color: var(--muted); margin-left: 6px; }
+
+/* ============================================================
+   게임보이 DMG 콘솔 셸 (도감 디바이스 본체)
+   ============================================================ */
+.gb-dex-page .gb-console {
+  position: relative;
+  display: flex; flex-direction: column; gap: 16px;
+  padding: 18px 20px 20px;
+  border-radius: 18px 18px 60px 18px;
+  background: linear-gradient(150deg, #d8d2c6 0%, #c4bdb0 46%, #ada695 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .55),
+    inset 0 -8px 18px rgba(0, 0, 0, .22),
+    inset 6px 0 14px rgba(255, 255, 255, .18),
+    inset -8px 0 16px rgba(0, 0, 0, .16),
+    0 30px 60px -20px rgba(0, 0, 0, .5),
+    0 8px 18px rgba(0, 0, 0, .32);
+}
+.gb-dex-page .gb-console::after {
+  content: ""; position: absolute; inset: 7px 7px 9px 7px;
+  border-radius: 12px 12px 52px 12px;
+  border: 1px solid rgba(0, 0, 0, .10);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  pointer-events: none;
+}
+.gb-dex-page .gb-console > * { position: relative; z-index: 1; }
+
+.gb-dex-page .gb-console-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 14px; flex-wrap: wrap; padding: 2px 4px 0;
+}
+
+/* 콘솔 헤더 물리 버튼 (DMG 키) — 정원과 동일 톤 */
+.gb-dex-page .gb-key {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: var(--font-pixel); font-size: 12px; letter-spacing: .5px; line-height: 1;
+  padding: 10px 15px; border: 0; border-radius: 999px; cursor: pointer;
+  color: #f3ede0; white-space: nowrap; user-select: none;
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, .28),
+    inset 0 -3px 6px rgba(0, 0, 0, .5),
+    0 4px 6px rgba(0, 0, 0, .4);
+  transition: transform .07s ease, box-shadow .07s ease, filter .12s ease;
+}
+.gb-dex-page .gb-key:hover { filter: brightness(1.08); }
+.gb-dex-page .gb-key:active {
+  transform: translateY(3px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, .55), 0 1px 2px rgba(0, 0, 0, .4);
+}
+.gb-dex-page .gb-key .rt-ico { font-size: 1.05em; }
+.gb-dex-page .gb-key--dark { background: linear-gradient(150deg, #3f3f45, #202024); }
+.gb-dex-page .gb-key--lcd { background: linear-gradient(#3c5c22, #233a13); color: #cdd79a; }
+
+.gb-dex-page .gb-dex-filters { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+
+/* 콘솔 하단 — 브랜드 각인 + 스피커 그릴 */
+.gb-dex-page .gb-console-foot {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  padding: 2px 6px 2px 8px;
+}
+.gb-dex-page .gb-brand { display: flex; align-items: baseline; gap: 9px; }
+.gb-dex-page .gb-brand-word {
+  font-family: Georgia, "Times New Roman", serif; font-style: italic; font-weight: 800;
+  font-size: 23px; letter-spacing: -.5px; color: #4f4b3f; text-shadow: 0 1px 0 rgba(255, 255, 255, .5);
+}
+.gb-dex-page .gb-brand-sub {
+  font-family: "Galmuri9", "Galmuri11", monospace; font-size: 8px; letter-spacing: 1.5px; color: #6a6557;
+}
+.gb-dex-page .gb-brand-sub .tm { font-size: 6px; vertical-align: super; margin-left: 1px; }
+.gb-dex-page .gb-speaker {
+  width: 96px; height: 22px; flex: 0 0 auto; border-radius: 2px; opacity: .5;
+  background: radial-gradient(circle, rgba(0, 0, 0, .34) 1.4px, transparent 1.6px) 0 0 / 9px 9px;
+}
+
+/* ============================================================
+   2분할 본문 — 좌: 뷰어 / 우: 색인
+   ============================================================ */
+.gb-dex-page .gb-dex-main {
+  display: grid;
+  grid-template-columns: minmax(340px, 1fr) minmax(380px, 1.05fr);
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1240px) {
+  .gb-dex-page .gb-dex-main { grid-template-columns: 1fr; }
+}
+
+.gb-dex-page .gb-dex-loading,
+.gb-dex-page .gb-dex-empty {
+  padding: 48px 0; text-align: center; color: var(--muted); font-size: 13px;
+}
+
+/* ---------------- 좌측 뷰어 ---------------- */
+.gb-dex-page .gb-dex-viewer { display: flex; flex-direction: column; gap: 14px; }
+
+/* LCD 베젤 (정원 씬과 동일 톤) */
+.gb-dex-page .gb-dex-screen-bezel {
+  background: linear-gradient(160deg, #6a6a70, #44444b 40%, #2c2c31);
+  border-radius: 14px 14px 26px 14px;
+  padding: 12px 14px 16px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .10),
+    inset 0 -4px 10px rgba(0, 0, 0, .5),
+    0 2px 5px rgba(0, 0, 0, .35);
+}
+.gb-dex-page .gb-dex-screen-top { display: flex; align-items: center; gap: 10px; padding: 0 2px 9px; }
+.gb-dex-page .gb-dex-screen-cap {
+  font-family: "Galmuri9", "Galmuri11", monospace;
+  font-size: 8px; letter-spacing: .5px; color: #c9c9d0; opacity: .78; margin-left: auto;
+}
+.gb-dex-page .gb-dex-screen-frame {
+  position: relative; background: #0c0c0e; border-radius: 8px; padding: 11px;
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .6), inset 0 3px 9px rgba(0, 0, 0, .8);
+}
+.gb-dex-page .gb-dex-lcd {
+  position: relative; height: 296px; border-radius: 8px; overflow: hidden;
+  image-rendering: pixelated;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, var(--paper-warm) 0%, var(--paper-2) 100%);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .25);
+}
+/* LCD 픽셀 격자 결 */
+.gb-dex-page .gb-dex-lcd::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 4;
+  background: repeating-linear-gradient(0deg, rgba(20, 32, 14, .05) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply; opacity: .55;
+}
+/* 바닥 무대 */
+.gb-dex-page .gb-dex-lcd::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 42%; z-index: 1;
+  background: radial-gradient(70% 100% at 50% 100%, rgba(95, 112, 72, .28), transparent 72%);
+  pointer-events: none;
+}
+.gb-dex-page .gb-dex-hero { position: relative; z-index: 2; transform: translateY(6px); }
+
+/* 도감 번호판 */
+.gb-dex-page .gb-dex-noplate {
+  position: absolute; top: 9px; left: 9px; z-index: 5;
+  font-family: var(--font-pixel-sm, monospace); font-size: 11px; letter-spacing: 1px;
+  color: var(--leaf); background: rgba(248, 242, 227, .82);
+  padding: 3px 8px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+/* 미발견 물음표 */
+.gb-dex-page .gb-dex-qmark {
+  position: absolute; z-index: 3; font-family: var(--font-pixel-lg, var(--font-pixel));
+  font-size: 92px; font-weight: 800; color: rgba(51, 64, 42, .16);
+  text-shadow: 2px 2px 0 rgba(255, 255, 255, .35); user-select: none;
+}
+
+/* ---- 희귀종 공통 — 어두운 LCD 위 밝은 번호판/물음표 ---- */
+.gb-dex-page .gb-dex-screen--rare .gb-dex-noplate {
+  color: #eef2f4; background: rgba(8, 10, 16, .62); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .28);
+}
+.gb-dex-page .gb-dex-screen--rare .gb-dex-qmark {
+  color: rgba(255, 255, 255, .18); text-shadow: 2px 2px 0 rgba(0, 0, 0, .3);
+}
+.gb-dex-page .gb-dex-sky { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+
+/* ───────────── 달빛 계열 — 밤하늘 ───────────── */
+.gb-dex-page .gb-dex-screen--moon .gb-dex-lcd {
+  background: linear-gradient(180deg, #16294a 0%, #0c1830 100%);
+}
+.gb-dex-page .gb-dex-screen--moon .gb-dex-lcd::after {
+  background: radial-gradient(70% 100% at 50% 100%, rgba(111, 150, 179, .35), transparent 72%);
+}
+.gb-dex-page .gb-dex-moon {
+  position: absolute; top: 26px; right: 40px; width: 34px; height: 34px; border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, #fdf6d8, #e9dca0 60%, #c9b86a);
+  box-shadow: 0 0 22px rgba(233, 220, 160, .5);
+}
+.gb-dex-page .gb-dex-star {
+  position: absolute; width: 2px; height: 2px; background: #fff; border-radius: 50%;
+  box-shadow: 0 0 4px #fff; animation: gb-dex-twinkle 2.6s ease-in-out infinite;
+}
+@keyframes gb-dex-twinkle { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+
+/* ───────────── 번개 계열 — 폭풍/번개 ───────────── */
+.gb-dex-page .gb-dex-screen--bolt .gb-dex-lcd {
+  background: linear-gradient(180deg, #232a3a 0%, #10141f 100%);
+}
+.gb-dex-page .gb-dex-screen--bolt .gb-dex-lcd::after {
+  background: radial-gradient(70% 100% at 50% 100%, rgba(250, 208, 90, .26), transparent 72%);
+}
+.gb-dex-page .gb-dex-cloud {
+  position: absolute; border-radius: 40px; background: rgba(16, 20, 32, .88); filter: blur(2px);
+}
+.gb-dex-page .gb-dex-cloud--1 { top: 16px; left: 12%; width: 96px; height: 26px; }
+.gb-dex-page .gb-dex-cloud--2 { top: 30px; right: 10%; width: 74px; height: 22px; opacity: .8; }
+.gb-dex-page .gb-dex-flash {
+  position: absolute; inset: 0; background: rgba(252, 244, 196, .55);
+  opacity: 0; animation: gb-dex-flash 3.4s steps(1) infinite .2s;
+}
+@keyframes gb-dex-flash { 0%, 3%, 100% { opacity: 0; } 1.5% { opacity: .5; } 2.4% { opacity: .12; } }
+.gb-dex-page .gb-dex-zap {
+  position: absolute; width: 26px; height: 92px;
+  background: linear-gradient(180deg, #fff6c2, #fad05a 55%, #f5a800);
+  clip-path: polygon(52% 0, 30% 46%, 50% 46%, 24% 100%, 74% 40%, 52% 40%, 70% 0);
+  filter: drop-shadow(0 0 6px rgba(250, 208, 90, .85));
+  opacity: 0; animation: gb-dex-zap 3.4s steps(1) infinite;
+}
+.gb-dex-page .gb-dex-zap--1 { top: 26px; left: 30%; animation-delay: .2s; }
+.gb-dex-page .gb-dex-zap--2 { top: 38px; right: 26%; width: 20px; height: 70px; animation-delay: 1.8s; }
+@keyframes gb-dex-zap { 0%, 6%, 100% { opacity: 0; } 2% { opacity: 1; } 4% { opacity: .4; } 5% { opacity: .9; } }
+
+/* ───────────── 흑장미 계열 — 고딕 크림슨 ───────────── */
+.gb-dex-page .gb-dex-screen--rose .gb-dex-lcd {
+  background: linear-gradient(180deg, #2a1020 0%, #140710 100%);
+}
+.gb-dex-page .gb-dex-screen--rose .gb-dex-lcd::after {
+  background: radial-gradient(70% 100% at 50% 100%, rgba(204, 51, 102, .3), transparent 72%);
+}
+.gb-dex-page .gb-dex-rose-glow {
+  position: absolute; inset: 0;
+  background: radial-gradient(60% 70% at 50% 42%, rgba(204, 51, 102, .24), transparent 70%);
+  animation: gb-dex-rose-glow 4s ease-in-out infinite;
+}
+@keyframes gb-dex-rose-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.gb-dex-page .gb-dex-petal {
+  position: absolute; top: -16px; width: 7px; height: 9px;
+  background: linear-gradient(160deg, #ff5f8f, #8b0000);
+  border-radius: 60% 60% 60% 60% / 70% 70% 40% 40%;
+  box-shadow: 0 0 3px rgba(204, 51, 102, .5);
+  animation-name: gb-dex-fall; animation-timing-function: linear; animation-iteration-count: infinite;
+}
+@keyframes gb-dex-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  12% { opacity: .95; }
+  100% { transform: translateY(312px) rotate(220deg); opacity: .12; }
+}
+
+/* 이름판 */
+.gb-dex-page .gb-dex-plate {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  background: var(--paper-card); border: 2px solid var(--leaf); border-radius: var(--r-card);
+  padding: 12px 16px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 4px 4px 0 0 var(--leaf);
+}
+.gb-dex-page .gb-dex-plate-l { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.gb-dex-page .gb-dex-plate-no {
+  font-family: var(--font-pixel-sm, monospace); font-size: 11px; letter-spacing: 1px; color: var(--muted);
+}
+.gb-dex-page .gb-dex-plate-name {
+  margin: 0; font-family: var(--font-pixel); font-size: 22px; line-height: 1.1; color: var(--leaf);
+  text-shadow: 1px 0 0 currentColor; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gb-dex-page .gb-dex-plate-r { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.gb-dex-page .gb-dex-stage-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; letter-spacing: .5px; white-space: nowrap;
+  padding: 5px 11px; border-radius: 999px;
+}
+.gb-dex-page .gb-dex-stage-badge > i { width: 8px; height: 8px; border-radius: 50%; }
+.gb-dex-page .gb-dex-stage-badge--lock { background: var(--paper-2); color: var(--muted); }
+
+/* 진화 계보 스트립 */
+.gb-dex-page .gb-dex-evo {
+  display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  background: var(--paper-2); border: 1px solid var(--line-strong); border-radius: var(--r-card);
+  padding: 12px 10px;
+}
+.gb-dex-page .gb-dex-evo-step { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.gb-dex-page .gb-dex-evo-cell {
+  display: flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px; padding: 0; cursor: pointer;
+  background: var(--paper-card); border: 2px solid var(--line-strong); border-radius: var(--r-chip);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5);
+  transition: transform .1s var(--ease-soft), border-color .1s, box-shadow .1s;
+}
+.gb-dex-page .gb-dex-evo-cell:hover { transform: translateY(-2px); }
+.gb-dex-page .gb-dex-evo-cell.is-active {
+  border-color: var(--leaf); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .5), 0 0 0 2px var(--leaf-3);
+}
+.gb-dex-page .gb-dex-evo-cell.is-locked { background: var(--paper-2); }
+.gb-dex-page .gb-dex-evo-label { font-size: 10px; color: var(--muted); letter-spacing: .3px; }
+.gb-dex-page .gb-dex-evo-cell.is-active + .gb-dex-evo-label { color: var(--leaf-2); }
+.gb-dex-page .gb-dex-evo-arrow { color: var(--line-strong); font-size: 16px; margin-bottom: 16px; }
+
+/* 정보 테이블 */
+.gb-dex-page .gb-dex-info {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  background: var(--paper-card); border: 1px solid var(--line-strong); border-radius: var(--r-card);
+  overflow: hidden;
+}
+.gb-dex-page .gb-dex-info-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 11px 14px; border-bottom: 1px dotted var(--line-strong);
+}
+.gb-dex-page .gb-dex-info-row:nth-child(odd) { border-right: 1px dotted var(--line-strong); }
+.gb-dex-page .gb-dex-info-row:nth-last-child(-n+2) { border-bottom: 0; }
+.gb-dex-page .gb-dex-info-k { font-size: 11px; letter-spacing: .5px; color: var(--leaf-2); }
+.gb-dex-page .gb-dex-info-v { font-size: 12.5px; color: var(--leaf); text-align: right; }
+.gb-dex-page .gb-dex-info-v.is-muted { color: var(--muted); }
+
+/* ---------------- 우측 색인 ---------------- */
+.gb-dex-page .gb-dex-index {
+  display: flex; flex-direction: column;
+  background: var(--paper-card); border: 2px solid var(--leaf); border-radius: var(--r-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 4px 4px 0 0 var(--leaf);
+  overflow: hidden; align-self: stretch;
+}
+.gb-dex-page .gb-dex-index-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 12px 14px; border-bottom: 2px dotted var(--line-strong); background: var(--paper-warm);
+}
+.gb-dex-page .gb-dex-index-count { font-size: 11px; color: var(--muted); letter-spacing: .5px; }
+.gb-dex-page .gb-dex-list {
+  display: flex; flex-direction: column; gap: 4px; padding: 10px;
+  max-height: 560px; overflow-y: auto;
+}
+
+.gb-dex-page .gb-dex-group + .gb-dex-group { margin-top: 6px; }
+.gb-dex-page .gb-dex-group-head {
+  display: flex; align-items: center; gap: 8px; padding: 8px 6px 6px;
+  position: sticky; top: -10px; z-index: 1;
+  background: linear-gradient(var(--paper-card) 70%, transparent);
+}
+.gb-dex-page .gb-dex-group-name {
+  font-size: 12px; font-weight: 700; letter-spacing: .5px; color: var(--leaf);
+}
+.gb-dex-page .gb-dex-group-range {
+  font-family: var(--font-pixel-sm, monospace); font-size: 10px; color: var(--muted);
+}
+.gb-dex-page .gb-dex-group-count { margin-left: auto; font-size: 11px; color: var(--leaf-2); }
+
+/* 색인 행 */
+.gb-dex-page .gb-dex-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 7px 9px; cursor: pointer;
+  background: var(--paper-warm); border: 1px solid var(--line); border-radius: var(--r-chip);
+  transition: transform .08s var(--ease-soft), border-color .08s, background .08s;
+}
+.gb-dex-page .gb-dex-row + .gb-dex-row { margin-top: 4px; }
+.gb-dex-page .gb-dex-row:hover { transform: translateX(2px); border-color: var(--leaf-2); }
+.gb-dex-page .gb-dex-row.is-active {
+  background: #e3ecca; border-color: var(--leaf);
+  box-shadow: inset 0 0 0 1px var(--leaf-3);
+}
+.gb-dex-page .gb-dex-row.is-locked { background: var(--paper-2); }
+.gb-dex-page .gb-dex-row-no {
+  font-family: var(--font-pixel-sm, monospace); font-size: 11px; color: var(--muted);
+  width: 28px; flex: 0 0 auto;
+}
+.gb-dex-page .gb-dex-row-sprite {
+  width: 34px; height: 34px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  background: var(--paper-card); border: 1px solid var(--line); border-radius: var(--r-chip);
+}
+.gb-dex-page .gb-dex-row.is-locked .gb-dex-row-sprite { background: var(--paper-3); }
+.gb-dex-page .gb-dex-row-name {
+  flex: 1; min-width: 0; font-size: 13px; color: var(--leaf);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gb-dex-page .gb-dex-row.is-locked .gb-dex-row-name { color: var(--muted); letter-spacing: 1px; }
+.gb-dex-page .gb-dex-row-stage {
+  flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .3px;
+  padding: 3px 8px; border-radius: 999px;
+}
+.gb-dex-page .gb-dex-row-stage--lock { background: transparent; color: var(--line-strong); padding: 3px 6px; }
+.gb-dex-page .gb-dex-row-check {
+  width: 18px; height: 18px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center;
+  color: var(--leaf-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gb-dex-page .gb-dex-star,
+  .gb-dex-page .gb-dex-flash,
+  .gb-dex-page .gb-dex-zap,
+  .gb-dex-page .gb-dex-rose-glow,
+  .gb-dex-page .gb-dex-petal { animation: none; }
+  /* 정적 상태에서도 번개는 은은히 보이도록 */
+  .gb-dex-page .gb-dex-zap { opacity: .9; }
+}

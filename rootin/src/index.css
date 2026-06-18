@@ -2,33 +2,55 @@
 @import 'tw-animate-css';
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+
+@keyframes rootin-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes rootin-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Rootin Design System Light Theme */
-  --paper: oklch(0.975 0.008 90);
-  --paper-2: oklch(0.955 0.012 90);
-  --ink: oklch(0.20 0.02 150);
-  --ink-2: oklch(0.38 0.02 150);
-  --ink-3: oklch(0.55 0.015 140);
-  --moss: oklch(0.42 0.085 145);
-  --moss-2: oklch(0.32 0.07 145);
-  --sprout: oklch(0.72 0.13 135);
-  --leaf: oklch(0.88 0.05 130);
-  --amber: oklch(0.74 0.13 70);
-  --amber-soft: oklch(0.93 0.05 80);
-  --rule: oklch(0.91 0.012 100);
-  --rule-2: oklch(0.85 0.015 100);
-  --danger: oklch(0.58 0.16 25);
-  
+  /* Rootin Design System Light Theme — main-design-system 기준 따뜻한 sage 팔레트 */
+  --paper: #F7F2E7;     /* warm cream paper */
+  --paper-2: #F1EAD9;   /* deeper paper / footer band */
+  --paper-3: #F3EDDE;   /* inset/track 등 한 단계 더 깊은 표면 */
+  --ink: #2E2A21;
+  --ink-2: #6C6353;
+  --ink-3: #9A9082;
+  --moss: #4F7C52;      /* brand green — warm sage */
+  --moss-2: #38593B;    /* 진한 강조 / 그라데이션 끝 */
+  --sprout: #6CA15C;
+  --leaf: #E4EEDD;      /* 연한 녹색 강조 배경 */
+  --amber: #E6B14E;
+  --amber-soft: #F8ECCC;
+  --rule: #E8DFCC;
+  --rule-2: #DBCFB6;
+  --danger: #D2674F;
+
+  /* 액센트 — 꽃·햇살 (절제해서 사용) */
+  --coral: #E08A6B;
+  --coral-weak: #F8E3D8;
+  --honey: var(--amber);
+  --honey-weak: var(--amber-soft);
+  --primary-weak: var(--leaf);
+  --primary-weak2: #EFF4E9;
+  --on-primary: #FBF8EF;
+
   /* shadcn semantic tokens mapped to Rootin design tokens */
   --background: var(--paper);
   --foreground: var(--ink);
-  --card: oklch(1 0 0); /* white */
+  --card: #FFFDF7; /* 종이 위 카드 — 순백 대신 미세한 온기 */
   --card-foreground: var(--ink);
-  --popover: oklch(1 0 0);
+  --popover: #FFFDF7;
   --popover-foreground: var(--ink);
   --primary: var(--moss);
   --primary-foreground: oklch(1 0 0);
@@ -48,7 +70,7 @@
   --chart-3: var(--amber);
   --chart-4: var(--leaf);
   --chart-5: var(--moss-2);
-  --radius: 0.625rem;
+  --radius: 0.75rem;
   --sidebar: var(--paper-2);
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--moss);
@@ -59,16 +81,26 @@
   --sidebar-ring: var(--moss);
 
   /* Restored missing legacy variables for other pages */
-  --font-display: 'Space Grotesk', 'Noto Sans KR', sans-serif;
-  --font-body: 'Noto Sans KR', 'Space Grotesk', sans-serif;
+  --font-display: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
+  --font-serif: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
+  --font-body: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --r-sm: 6px;
-  --r-md: 10px;
-  --r-lg: 14px;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
   --r-xl: 20px;
-  --shadow-sm: 0 1px 2px rgba(26, 58, 92, 0.04), 0 1px 1px rgba(26, 58, 92, 0.03);
-  --shadow-md: 0 4px 16px rgba(26, 58, 92, 0.06), 0 1px 2px rgba(26, 58, 92, 0.04);
-  --shadow-lg: 0 12px 40px rgba(26, 58, 92, 0.10);
+  --r-2xl: 26px;
+  /* 그림자 색조를 차가운 네이비 → moss 계열 따뜻한 중성으로 정제, 위계를 부드럽게 */
+  --shadow-sm: 0 1px 2px rgba(74,58,30,.05), 0 1px 3px rgba(74,58,30,.06);
+  --shadow-md: 0 2px 6px rgba(74,58,30,.05), 0 10px 24px rgba(74,58,30,.06);
+  --shadow-lg: 0 6px 14px rgba(74,58,30,.07), 0 18px 40px rgba(74,58,30,.10);
+
+  /* 역동적 강조용 — moss 글로우/포커스 링 + 은은한 그라데이션 표면 (var() 참조라 모드 자동 적응) */
+  --glow-moss: 0 0 0 3px color-mix(in oklch, var(--moss) 14%, transparent);
+  --ring-moss: color-mix(in oklch, var(--moss) 45%, transparent);
+  --grad-paper: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+  --grad-moss: linear-gradient(135deg, var(--moss) 0%, var(--moss-2) 100%);
+  --grad-sheen: linear-gradient(180deg, color-mix(in oklch, var(--card) 90%, var(--paper)) 0%, var(--card) 100%);
 }
 
 .dark {
@@ -122,13 +154,14 @@
 }
 
 @theme inline {
-  --font-sans: 'Geist Variable', sans-serif;
+  --font-sans: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
-  --font-serif: 'Newsreader', Georgia, serif;
+  --font-serif: 'Gowun Batang', 'Nanum Myeongjo', 'Noto Serif KR', serif;
   
   /* Rootin specific variables */
   --color-paper: var(--paper);
   --color-paper-2: var(--paper-2);
+  --color-paper-3: var(--paper-3);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
@@ -234,6 +267,71 @@
   }
   .scrollbar-subtle::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  /* 스크롤은 되지만 스크롤바를 숨김 — 화분 상세 좌측 컬럼용(화면엔 우측 스크롤바 1개만 보이게) */
+  .scrollbar-hide {
+    scrollbar-width: none;        /* Firefox */
+    -ms-overflow-style: none;     /* old Edge/IE */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;                /* Chrome/Safari */
+  }
+
+  /* 스크롤바 없이도 "아래에 더 있다"를 알려주는 스크롤 그림자.
+     커버(local)+그림자(scroll) 조합이라 끝에 닿으면 그림자가 사라짐 → 스크롤 가능할 때만 노출 */
+  .scroll-shadow {
+    background:
+      linear-gradient(var(--paper) 30%, transparent) center top,
+      linear-gradient(transparent, var(--paper) 70%) center bottom,
+      radial-gradient(farthest-side at 50% 0, rgba(74, 58, 30, 0.14), transparent) center top,
+      radial-gradient(farthest-side at 50% 100%, rgba(74, 58, 30, 0.14), transparent) center bottom;
+    background-repeat: no-repeat;
+    background-size: 100% 36px, 100% 36px, 100% 12px, 100% 12px;
+    background-attachment: local, local, scroll, scroll;
+    background-color: var(--paper);
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* Garden pot detail responsive layout                               */
+/* ---------------------------------------------------------------- */
+.pot-detail-layout {
+  justify-content: center;
+}
+
+.pot-detail-records {
+  width: 100%;
+  max-width: 760px;
+}
+
+@media (max-width: 1180px) {
+  .pot-detail-page {
+    max-width: 920px !important;
+  }
+
+  .pot-detail-layout {
+    grid-template-columns: minmax(340px, 380px) minmax(0, 1fr) !important;
+  }
+}
+
+@media (max-width: 920px) {
+  .pot-detail-page {
+    padding: 24px !important;
+  }
+
+  .pot-detail-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .pot-detail-records {
+    max-width: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .pot-detail-page {
+    padding: 18px !important;
   }
 }
 
@@ -359,10 +457,16 @@
 /* Blockquote */
 .til-prose .ProseMirror blockquote {
   border-left: 2px solid var(--primary);
-  padding: 0.15em 0 0.15em 1.15em;
+  padding: 0.5em 0 0.5em 1.15em;
   margin-left: 0;
   color: var(--muted-foreground);
   font-style: italic;
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--primary) 5%, transparent),
+    transparent 70%
+  );
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
 }
 
 /* Horizontal rule */
@@ -382,6 +486,52 @@
 .til-prose .ProseMirror img.ProseMirror-selectednode {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
+}
+
+/* 리사이즈 가능한 이미지 (모서리 드래그) */
+.til-prose .ProseMirror .til-image-wrapper {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  margin: 0.5em 0;
+}
+.til-prose .ProseMirror .til-image-wrapper .til-image {
+  display: block;
+  margin: 0;
+}
+.til-prose .ProseMirror .til-image-wrapper[data-selected='true'] .til-image {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.til-prose .ProseMirror .til-image-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--primary);
+  border: 1.5px solid var(--background);
+  border-radius: 9999px;
+  z-index: 2;
+}
+.til-prose .ProseMirror .til-image-handle-tl {
+  top: -5px;
+  left: -5px;
+  cursor: nwse-resize;
+}
+.til-prose .ProseMirror .til-image-handle-tr {
+  top: -5px;
+  right: -5px;
+  cursor: nesw-resize;
+}
+.til-prose .ProseMirror .til-image-handle-bl {
+  bottom: -5px;
+  left: -5px;
+  cursor: nesw-resize;
+}
+.til-prose .ProseMirror .til-image-handle-br {
+  bottom: -5px;
+  right: -5px;
+  cursor: nwse-resize;
 }
 
 /* Inline code */
@@ -404,17 +554,18 @@
   cursor: pointer;
 }
 
-/* Code block */
+/* Code block body — 프레임(테두리/라운드/그림자)은 .til-code-block 컨테이너가 담당 */
 .til-prose .ProseMirror pre {
   font-family: var(--font-mono);
-  background: oklch(0.13 0.005 70);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.1em 1.25em;
+  background: oklch(0.16 0.006 75);
+  color: oklch(0.9 0.012 95);
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  padding: 1em 1.15em;
   overflow-x: auto;
   font-size: 0.875rem;
-  line-height: 1.65;
+  line-height: 1.7;
 }
 .til-prose .ProseMirror pre code {
   background: none;
@@ -499,3 +650,326 @@
 .til-prose .ProseMirror pre .hljs-strong {
   font-weight: 700;
 }
+
+/* ---------------------------------------------------------------- */
+/* 좌측 사이드바 — Claude Design "사이드바 컴포넌트 제작" 디자인 적용  */
+/* RootinSidebarLeft = 자체 포함형 <aside> (대부분 스타일은 인라인)   */
+/* ---------------------------------------------------------------- */
+
+/* 로고 새싹 위글 — 로고 클릭 시 (Sidebar.dc.html @keyframes rootinSprout) */
+@keyframes rootinSprout {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  50%      { transform: rotate(-6deg) scale(1.08); }
+}
+
+/* 로그아웃 / 접기 토글 호버 — 디자인 style-hover 대응 (인라인 스타일로 표현 불가한 :hover) */
+.rootin-sidebar-left .rl-logout:hover {
+  background: color-mix(in oklch, var(--sidebar) 86%, var(--ink));
+  color: var(--ink);
+}
+.rootin-sidebar-left .rl-toggle:hover {
+  background: var(--moss-2);
+}
+
+/* ---------------------------------------------------------------- */
+/* 3단계: 에디터 버블 메뉴 등장 모션 (선택 시 부드럽게 떠오름)        */
+/* ---------------------------------------------------------------- */
+@keyframes til-bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.til-bubble-menu {
+  animation: til-bubble-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .til-bubble-menu {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* 4단계: 작성 페이지 — 발행 버튼 moss 그라데이션 + 호버 글로우       */
+/* ---------------------------------------------------------------- */
+.til-publish-btn {
+  background-image: var(--grad-moss);
+  box-shadow: var(--shadow-md);
+  transition: transform 160ms ease-out, box-shadow 160ms ease-out;
+}
+.til-publish-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg), var(--glow-moss);
+}
+.til-publish-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .til-publish-btn {
+    transition: none;
+  }
+  .til-publish-btn:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------- */
+/* 5단계: TIL 아일랜드 — 떠있는 툴바/패널 셸 + 카드 모션              */
+/* ---------------------------------------------------------------- */
+@keyframes til-card-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes til-plant-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+/* 글래스 아일랜드 카드 (오른쪽 패널 섹션 공유) */
+.til-island-card {
+  border-radius: var(--r-xl);
+  border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+  background: color-mix(in oklch, var(--card) 78%, transparent);
+  backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow: var(--shadow-md),
+    inset 0 1px 0 color-mix(in oklch, white 30%, transparent);
+  transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+}
+.til-island-card-in {
+  animation: til-card-in 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.til-island-card-hover:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* pull-tab (접힘 시 당겨 꺼내는 손잡이) */
+.til-pulltab {
+  background: color-mix(in oklch, var(--card) 82%, transparent);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out, color 180ms ease-out;
+}
+.til-pulltab:hover {
+  box-shadow: var(--shadow-lg), var(--glow-moss);
+  color: var(--moss-2);
+}
+
+.til-plant-float {
+  animation: til-plant-float 4.5s ease-in-out infinite;
+}
+
+/* ---------------------------------------------------------------- */
+/* 표 (Table)                                                        */
+/* ---------------------------------------------------------------- */
+.til-prose .ProseMirror .tableWrapper {
+  overflow-x: auto;
+  margin: 1em 0;
+}
+.til-prose .ProseMirror table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  overflow: hidden;
+}
+.til-prose .ProseMirror td,
+.til-prose .ProseMirror th {
+  border: 1px solid var(--border);
+  padding: 0.5em 0.7em;
+  vertical-align: top;
+  position: relative;
+  min-width: 3em;
+  box-sizing: border-box;
+}
+.til-prose .ProseMirror th {
+  background: var(--paper-2);
+  font-weight: 600;
+  text-align: left;
+}
+.til-prose .ProseMirror td > p,
+.til-prose .ProseMirror th > p {
+  margin: 0;
+}
+.til-prose .ProseMirror .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  pointer-events: none;
+}
+.til-prose .ProseMirror .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: -1px;
+  width: 4px;
+  background: var(--primary);
+  pointer-events: none;
+}
+.til-prose .ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+/* ---------------------------------------------------------------- */
+/* 동영상 임베드 (YouTube)                                           */
+/* ---------------------------------------------------------------- */
+.til-prose .ProseMirror div[data-youtube-video] {
+  margin: 0.9em 0;
+  cursor: pointer;
+}
+.til-prose .ProseMirror iframe {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  border: 0;
+  border-radius: var(--r-md);
+  display: block;
+}
+.til-prose .ProseMirror div[data-youtube-video].ProseMirror-selectednode iframe {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------- */
+/* 콜아웃 / 강조 박스 (21st Admonition 디자인 · lucide 아이콘)        */
+/* ---------------------------------------------------------------- */
+.til-prose .ProseMirror .til-callout {
+  display: flex;
+  gap: 0.75em;
+  margin: 1.1em 0;
+  padding: 0.9em 1.05em;
+  border-radius: var(--r-lg);
+  border: 1px solid var(--border);
+}
+.til-prose .ProseMirror .til-callout-icon {
+  flex-shrink: 0;
+  margin-top: 0.12em;
+  line-height: 1;
+}
+.til-prose .ProseMirror .til-callout-body {
+  flex: 1;
+  min-width: 0;
+}
+.til-prose .ProseMirror .til-callout-body > :first-child { margin-top: 0; }
+.til-prose .ProseMirror .til-callout-body > :last-child { margin-bottom: 0; }
+
+.til-prose .ProseMirror .til-callout[data-callout='info'] {
+  background: color-mix(in oklch, var(--moss) 7%, var(--card));
+  border-color: color-mix(in oklch, var(--moss) 28%, transparent);
+}
+.til-prose .ProseMirror .til-callout[data-callout='info'] .til-callout-icon { color: var(--moss); }
+.til-prose .ProseMirror .til-callout[data-callout='tip'] {
+  background: color-mix(in oklch, var(--sprout) 9%, var(--card));
+  border-color: color-mix(in oklch, var(--sprout) 30%, transparent);
+}
+.til-prose .ProseMirror .til-callout[data-callout='tip'] .til-callout-icon { color: var(--sprout); }
+.til-prose .ProseMirror .til-callout[data-callout='warning'] {
+  background: color-mix(in oklch, var(--amber) 10%, var(--card));
+  border-color: color-mix(in oklch, var(--amber) 32%, transparent);
+}
+.til-prose .ProseMirror .til-callout[data-callout='warning'] .til-callout-icon { color: var(--amber); }
+
+/* ---------------------------------------------------------------- */
+/* 코드블럭 노드뷰 — macOS 윈도우풍 헤더(트래픽 라이트·언어·복사)     */
+/* ---------------------------------------------------------------- */
+.til-prose .ProseMirror .til-code-block {
+  position: relative;
+  margin: 1.2em 0;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid oklch(0.3 0.012 75);
+  box-shadow: var(--shadow-md);
+  background: oklch(0.16 0.006 75);
+}
+.til-code-block .til-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75em;
+  padding: 0.5em 0.75em;
+  background: oklch(0.21 0.009 75);
+  border-bottom: 1px solid oklch(0.3 0.012 75);
+  user-select: none;
+}
+.til-code-block .til-code-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+}
+.til-code-block .til-code-dots > span {
+  display: block;
+  width: 0.72em;
+  height: 0.72em;
+  border-radius: 9999px;
+}
+.til-code-block .til-code-dots > span:nth-child(1) { background: #ff5f57; }
+.til-code-block .til-code-dots > span:nth-child(2) { background: #febc2e; }
+.til-code-block .til-code-dots > span:nth-child(3) { background: #28c840; }
+.til-code-block .til-code-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+}
+.til-code-block .til-code-lang,
+.til-code-block .til-code-copy {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: oklch(0.8 0.012 90);
+  background: color-mix(in oklch, white 8%, transparent);
+  border: 1px solid color-mix(in oklch, white 14%, transparent);
+  border-radius: 6px;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease;
+}
+.til-code-block .til-code-lang:hover,
+.til-code-block .til-code-copy:hover {
+  color: oklch(0.96 0.01 100);
+  background: color-mix(in oklch, white 16%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .til-island-card-in,
+  .til-plant-float { animation: none; }
+  .til-island-card,
+  .til-island-card-hover,
+  .til-pulltab { transition: none; }
+  .til-island-card-hover:hover { transform: none; }
+}
+
+/* ================================================================ */
+/* 랜딩 — 모니터(사파리) 내부 rootin.app 사이트 (landing/SiteDescriptions.jsx) */
+/* ================================================================ */
+.rootin-site-navlink {
+  font-size: 14px;
+  font-weight: 700;
+  color: #5c6b60;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.rootin-site-navlink:hover { color: #2f8f54; }
+
+.rootin-site-cta { transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease; }
+.rootin-site-cta:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.04);
+  box-shadow: 0 14px 30px rgba(34, 110, 64, 0.28);
+}
+
+@media (max-width: 900px) {
+  .rootin-site-feature { grid-template-columns: 1fr !important; direction: ltr !important; }
+}
+@media (max-width: 600px) {
+  .rootin-site-navlink { display: none; }
+}
+

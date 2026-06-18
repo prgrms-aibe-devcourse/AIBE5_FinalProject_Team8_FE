@@ -1,0 +1,521 @@
+/* =========================================================================
+   ROOTIN — 화분 상세(/garden/pots/:id) 화면 스킨
+   대시보드(sprout.css)·정원(garden.css)의 게임보이/CRT 디자인 시스템을 따른다.
+   전역 부작용을 피하기 위해 .gb-pot-page 하위로만 픽셀 음영/스타일을 적용.
+   ========================================================================= */
+
+/* 풀스크린 레이아웃 — 대시보드/정원과 동일하게 양쪽 여백 없이 풀폭 사용.
+   비전-디스플레이 베젤(.rt-vision-frame)은 app.jsx에서 framed 화면에 입혀진다.
+   사이드바 접힘(도크) 시 좌측을 도크 폭만큼 비켜준다. */
+[data-screen-label="pot-detail"] .gb-pot-page {
+  padding: 28px 56px 44px;
+  transition: padding-left .55s cubic-bezier(.7, 0, .2, 1);
+}
+[data-screen-label="pot-detail"] .gbsb-slot.hidden ~ [data-slot="sidebar-inset"] .gb-pot-page {
+  padding-left: 132px;
+}
+
+/* TIL 상세(/garden/pots/:id/tils/:id) — 본문을 화면 정중앙에 두고, 좌측 사이드바
+   (보이면 본문을 push)를 토글해도 흔들리지 않게 한다.
+   핵심: 보정을 transform(합성 레이어, 사이드바 margin 애니메이션과 다른 스레드라 프레임이
+   어긋나 움찔거림)이 아니라 **padding-right(layout)**로 한다. 그러면 사이드바의 margin-left
+   트랜지션과 "같은 레이아웃 패스"에서 함께 계산돼 어긋남이 원천적으로 없다.
+   - 사이드바 보임: 인셋 좌측이 슬롯폭(--slot-w)만큼 들어와 있으니, 우측에 동일 폭을 padding
+     으로 줘서 콘텐츠 영역을 좌우 대칭(=화면 중앙)으로 만든다.
+   - 숨김: 우측 padding 0. 둘 다 layout·동일 이징이라 토글 중 매 프레임 중심이 화면 중앙. */
+[data-screen-label="til-detail"] .gb-til-page {
+  padding: 28px var(--slot-w, 400px) 44px 0;
+  transition: padding-right .55s cubic-bezier(.7, 0, .2, 1);
+}
+[data-screen-label="til-detail"] .gbsb-slot.hidden ~ [data-slot="sidebar-inset"] .gb-til-page {
+  padding-right: 0;
+}
+.gb-til-page .gb-til-col {
+  width: 100%;
+  max-width: min(56rem, calc(100vw - 50rem));
+  margin: 0 auto;
+}
+.gb-til-page .rt-page-title,
+.gb-til-page .rt-h3 {
+  font-weight: 700;
+  text-shadow: 1px 0 0 currentColor;
+}
+/* 제목이 두 줄로 줄바꿈돼도 깜빡이 커서가 마지막 글자 옆에 붙도록 인라인 흐름으로.
+   (기본 .rt-page-title은 flex+align-center라 두 줄일 때 커서가 중앙으로 떠버림) */
+.gb-til-page h1.rt-page-title { display: block; line-height: 1.25; }
+.gb-til-page .rt-page-title .rt-title-cursor {
+  display: inline-block;
+  width: 0.42em;
+  height: 0.82em;
+  margin-left: 0.22em;
+  vertical-align: -0.08em;
+}
+
+/* 우측 플로팅 액션 — 게임보이 DMG 미니 페이스플레이트(스크롤 따라다님).
+   회색 플라스틱 셸 + 우하단 큰 라운드, 안에 입체 DMG 키
+   (수정=A버튼 마젠타 / 삭제=레드 / 뒤로=다크 플라스틱). */
+.gb-til-fab {
+  position: fixed;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 13px 22px;
+  border-radius: 16px 16px 44px 16px;
+  background: linear-gradient(150deg, #d8d2c6 0%, #c4bdb0 46%, #ada695 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .55),
+    inset 0 -8px 18px rgba(0, 0, 0, .22),
+    0 6px 14px rgba(0, 0, 0, .4);
+}
+.gb-til-fab::after {
+  content: ""; position: absolute; inset: 6px 6px 8px 6px;
+  border-radius: 11px 11px 38px 11px;
+  border: 1px solid rgba(0, 0, 0, .10);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .18);
+  pointer-events: none;
+}
+.gb-til-fab > * { position: relative; z-index: 1; }
+
+.gb-til-fab-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 13px;
+  cursor: pointer;
+  user-select: none;
+  color: #f3ede0;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  letter-spacing: .3px;
+  line-height: 1;
+  background: linear-gradient(150deg, #3f3f45, #202024);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, .28),
+    inset 0 -3px 6px rgba(0, 0, 0, .5),
+    0 4px 6px rgba(0, 0, 0, .4);
+  transition: filter .12s, transform .08s, box-shadow .08s;
+}
+.gb-til-fab-btn:hover:not(:disabled) { filter: brightness(1.1); }
+.gb-til-fab-btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, .55), 0 1px 2px rgba(0, 0, 0, .4);
+}
+.gb-til-fab-btn:disabled { opacity: .6; cursor: default; }
+.gb-til-fab-btn.is-edit   { background: radial-gradient(circle at 38% 28%, #b34a73, #8a1d44 62%, #6a1334); }
+.gb-til-fab-btn.is-danger { background: radial-gradient(circle at 38% 28%, #c2502f, #8f2f18 62%, #6a1f0f); }
+
+.gb-til-fab-msg {
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  color: #36352f;
+  text-align: center;
+  letter-spacing: .3px;
+  max-width: 54px;
+  word-break: keep-all;
+  line-height: 1.25;
+}
+.gb-til-fab-err {
+  font-size: 8px;
+  color: #7a1f10;
+  text-align: center;
+  max-width: 54px;
+  word-break: keep-all;
+  line-height: 1.2;
+}
+
+/* 대시보드/정원과 동일한 픽셀 카드(또렷한 잉크 테두리 + 하드 픽셀 그림자) */
+.gb-pot-page .rt-card {
+  border: 2px solid var(--leaf);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 5px 5px 0 0 var(--leaf);
+}
+.gb-pot-page .rt-page-title,
+.gb-pot-page .rt-section-head .rt-h3,
+.gb-pot-page .rt-h3 {
+  font-weight: 700;
+  text-shadow: 1px 0 0 currentColor;
+}
+
+/* ---------------- 페이지 헤더 (뒤로가기 액션 포함) ---------------- */
+.gb-pot-page .gb-pot-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+}
+
+/* ---------------- 2단 그리드 (프로필 + 기록) ---------------- */
+.gb-pot-page .gb-pot-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 384px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.gb-pot-page .gb-pot-aside {
+  position: sticky; top: 0;
+  display: flex; flex-direction: column; gap: 16px;
+}
+.gb-pot-page .gb-pot-records { min-width: 0; }
+@media (max-width: 1080px) {
+  .gb-pot-page .gb-pot-grid { grid-template-columns: 1fr; }
+  .gb-pot-page .gb-pot-aside { position: static; }
+}
+
+/* ---------------- 식물 무대 (미니 LCD) — 정원 gb-pot-stage와 동일 톤 ---------------- */
+.gb-pot-page .gb-pot-stage {
+  height: 196px; border-radius: var(--r-chip);
+  display: flex; align-items: flex-end; justify-content: center;
+  position: relative; overflow: hidden;
+  background: linear-gradient(180deg, var(--paper-warm), var(--paper-2));
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.gb-pot-page .gb-pot-stage::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(20, 32, 14, .05) 0 1px, transparent 1px 3px);
+  mix-blend-mode: multiply; opacity: .6;
+}
+.gb-pot-page .gb-pot-stage--rare {
+  background: linear-gradient(180deg, #16294a 0%, #0c1830 100%);
+}
+
+/* =========================================================================
+   희귀종 무대 연출 — 도감 희귀 화면(gb-dex-screen--moon/bolt/rose)과 동일.
+   계열별 그라데이션 + 바닥 무대 글로우 + 연출(달·별 / 구름·번개 / 장미빛·꽃잎).
+   .gb-pot-stage--rare 안에서 식물보다 뒤(z-index:0)로 깔린다.
+   정원 카드(.gb-garden-page)·화분 상세(.gb-pot-page) 양쪽 공용(언스코프).
+   ========================================================================= */
+.gb-rare-fx {
+  position: absolute; inset: 0; z-index: 0; overflow: hidden;
+  pointer-events: none; border-radius: inherit;
+}
+/* 바닥 무대 글로우 — 도감 LCD ::after 와 동일(색은 계열별) */
+.gb-rare-fx::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 42%;
+  pointer-events: none;
+}
+
+/* ── 달빛(moon) — 밤하늘 ── */
+.gb-rare-fx--moon { background: linear-gradient(180deg, #16294a 0%, #0c1830 100%); }
+.gb-rare-fx--moon::after { background: radial-gradient(70% 100% at 50% 100%, rgba(111, 150, 179, .35), transparent 72%); }
+.gb-rare-moon {
+  position: absolute; top: 26px; right: 40px; width: 34px; height: 34px; border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, #fdf6d8, #e9dca0 60%, #c9b86a);
+  box-shadow: 0 0 22px rgba(233, 220, 160, .5);
+}
+.gb-rare-star {
+  position: absolute; width: 2px; height: 2px; background: #fff; border-radius: 50%;
+  box-shadow: 0 0 4px #fff;
+  animation: gb-rare-twinkle 2.6s ease-in-out infinite;
+}
+@keyframes gb-rare-twinkle { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+
+/* ── 번개(bolt) — 폭풍 ── */
+.gb-rare-fx--bolt { background: linear-gradient(180deg, #232a3a 0%, #10141f 100%); }
+.gb-rare-fx--bolt::after { background: radial-gradient(70% 100% at 50% 100%, rgba(250, 208, 90, .26), transparent 72%); }
+.gb-rare-cloud { position: absolute; border-radius: 40px; background: rgba(16, 20, 32, .88); filter: blur(2px); }
+.gb-rare-cloud--1 { top: 16px; left: 12%; width: 96px; height: 26px; }
+.gb-rare-cloud--2 { top: 30px; right: 10%; width: 74px; height: 22px; opacity: .8; }
+.gb-rare-flash {
+  position: absolute; inset: 0; background: rgba(252, 244, 196, .55);
+  opacity: 0; animation: gb-rare-flash 3.4s steps(1) infinite .2s;
+}
+@keyframes gb-rare-flash { 0%, 3%, 100% { opacity: 0; } 1.5% { opacity: .5; } 2.4% { opacity: .12; } }
+.gb-rare-zap {
+  position: absolute; width: 26px; height: 92px;
+  background: linear-gradient(180deg, #fff6c2, #fad05a 55%, #f5a800);
+  clip-path: polygon(52% 0, 30% 46%, 50% 46%, 24% 100%, 74% 40%, 52% 40%, 70% 0);
+  filter: drop-shadow(0 0 6px rgba(250, 208, 90, .85));
+  opacity: 0; animation: gb-rare-zap 3.4s steps(1) infinite;
+}
+.gb-rare-zap--1 { top: 26px; left: 30%; animation-delay: .2s; }
+.gb-rare-zap--2 { top: 38px; right: 26%; width: 20px; height: 70px; animation-delay: 1.8s; }
+@keyframes gb-rare-zap { 0%, 6%, 100% { opacity: 0; } 2% { opacity: 1; } 4% { opacity: .4; } 5% { opacity: .9; } }
+
+/* ── 흑장미(rose) — 고딕 크림슨 ── */
+.gb-rare-fx--rose { background: linear-gradient(180deg, #2a1020 0%, #140710 100%); }
+.gb-rare-fx--rose::after { background: radial-gradient(70% 100% at 50% 100%, rgba(204, 51, 102, .3), transparent 72%); }
+.gb-rare-rose-glow {
+  position: absolute; inset: 0;
+  background: radial-gradient(60% 70% at 50% 42%, rgba(204, 51, 102, .24), transparent 70%);
+  animation: gb-rare-rose-glow 4s ease-in-out infinite;
+}
+@keyframes gb-rare-rose-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+.gb-rare-petal {
+  position: absolute; top: -16px; width: 7px; height: 9px;
+  background: linear-gradient(160deg, #ff5f8f, #8b0000);
+  border-radius: 60% 60% 60% 60% / 70% 70% 40% 40%;
+  box-shadow: 0 0 3px rgba(204, 51, 102, .5);
+  animation-name: gb-rare-fall; animation-timing-function: linear; animation-iteration-count: infinite;
+}
+@keyframes gb-rare-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+  12% { opacity: .95; }
+  100% { transform: translateY(312px) rotate(220deg); opacity: .12; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gb-rare-star, .gb-rare-zap, .gb-rare-rose-glow, .gb-rare-petal { animation: none; }
+  .gb-rare-flash { animation: none; opacity: 0; }
+  .gb-rare-star { opacity: .85; }
+  .gb-rare-zap { opacity: .9; }
+  .gb-rare-rose-glow { opacity: .8; }
+  .gb-rare-petal { top: 32%; opacity: .85; }
+}
+.gb-pot-page .gb-pot-stage-badge { position: absolute; top: 10px; right: 10px; z-index: 2; }
+.gb-pot-page .gb-pot-stage-name {
+  position: absolute; left: 0; right: 0; bottom: 8px; z-index: 2; text-align: center;
+  font-family: var(--font-pixel); font-size: 12px; color: var(--leaf);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .55);
+}
+
+/* ---------------- 픽셀 진행바 — 정원 gb-prog와 동일 ---------------- */
+.gb-pot-page .gb-prog {
+  height: 12px; border-radius: 3px; background: var(--paper-2);
+  box-shadow: inset 0 0 0 1px var(--line-strong); overflow: hidden;
+}
+.gb-pot-page .gb-prog > i {
+  display: block; height: 100%; background: var(--leaf-2);
+  box-shadow: inset 0 0 0 1px rgba(20, 40, 12, .18);
+  transition: width .4s var(--ease-soft);
+}
+
+/* ---------------- 스탯 목록 (경험치/상태/수확) ---------------- */
+.gb-pot-page .gb-stat-list {
+  border: 1px solid var(--line-strong); border-radius: var(--r-chip);
+  background: var(--paper-warm); overflow: hidden;
+}
+.gb-pot-page .gb-stat-row { padding: 12px 13px; }
+.gb-pot-page .gb-stat-row + .gb-stat-row { border-top: 2px dotted var(--line-strong); }
+.gb-pot-page .gb-stat-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.gb-pot-page .gb-stat-k {
+  font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--leaf-2);
+}
+.gb-pot-page .gb-stat-v { font-size: 13px; color: var(--leaf); text-align: right; line-height: 1.4; }
+.gb-pot-page .gb-stat-v.is-on { color: var(--peach-deep); }
+.gb-pot-page .gb-stat-v.is-off { color: var(--muted); }
+
+/* ---------------- 진화 계통 ---------------- */
+.gb-pot-page .gb-evo { display: flex; justify-content: space-between; align-items: flex-end; gap: 6px; }
+.gb-pot-page .gb-evo-cell { display: flex; flex-direction: column; align-items: center; gap: 5px; flex: 1; min-width: 0; }
+.gb-pot-page .gb-evo-tile {
+  width: 100%; max-width: 52px; aspect-ratio: 1; border-radius: var(--r-chip);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--paper-2); border: 1px solid var(--line-strong);
+}
+.gb-pot-page .gb-evo-tile.is-reached { background: var(--paper-warm); }
+.gb-pot-page .gb-evo-tile.is-active { border: 2px solid var(--leaf); background: #dbe6bb; }
+.gb-pot-page .gb-evo-tile.is-active.is-rare { border-color: var(--sky); background: var(--sky-soft); }
+.gb-pot-page .gb-evo-tile.is-locked { opacity: .42; }
+.gb-pot-page .gb-evo-name { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.2; }
+.gb-pot-page .gb-evo-cell.is-active .gb-evo-name { color: var(--leaf-2); }
+.gb-pot-page .gb-evo-min { font-size: 9px; color: var(--muted); font-family: "Galmuri9", var(--font-pixel); }
+
+/* ---------------- 기록 컬럼 컨트롤 (페이지크기 + 검색) ---------------- */
+.gb-pot-page .gb-rec-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gb-pot-page .gb-search { position: relative; display: inline-flex; align-items: center; }
+.gb-pot-page .gb-search .gb-search-ico {
+  position: absolute; left: 10px; color: var(--muted); display: inline-flex; pointer-events: none; font-size: 13px;
+}
+.gb-pot-page .gb-search input {
+  height: 36px; width: 218px; max-width: 38vw;
+  border: 2px solid var(--line-strong); border-radius: var(--r-chip);
+  background: var(--paper-card); color: var(--leaf);
+  font-family: var(--font-pixel); font-size: 12px; letter-spacing: .3px;
+  padding: 0 30px; outline: none;
+}
+.gb-pot-page .gb-search input::placeholder { color: var(--muted); }
+.gb-pot-page .gb-search input:focus { border-color: var(--leaf-2); }
+.gb-pot-page .gb-search .gb-search-clear {
+  position: absolute; right: 6px; width: 22px; height: 22px; border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted); border: 0; background: transparent; cursor: pointer;
+}
+.gb-pot-page .gb-search .gb-search-clear:hover { color: var(--leaf); }
+
+/* ---------------- 태그 필터 칩 ---------------- */
+.gb-pot-page .gb-tags { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gb-pot-page .gb-tag-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 10px; border-radius: var(--r-pill);
+  border: 1px solid var(--line); background: var(--paper-2);
+  color: var(--leaf-2); font-family: var(--font-pixel); font-size: 11px; cursor: pointer;
+  transition: background var(--dur-fast), color var(--dur-fast);
+}
+.gb-pot-page .gb-tag-chip:hover { background: var(--paper-warm); }
+.gb-pot-page .gb-tag-chip.is-active { background: var(--leaf); color: var(--paper-card); border-color: var(--leaf); }
+/* 태그에 달린 숫자 = 해당 태그 TIL 개수. book 아이콘 + 배지로 "개수"임을 분명히 한다.
+   배경/글자를 currentColor 기반으로 깔아 칩이 활성(어두움)/비활성(밝음)일 때 모두 또렷하다. */
+.gb-pot-page .gb-tag-count {
+  display: inline-flex; align-items: center; gap: 3px;
+  padding: 1px 6px; border-radius: var(--r-pill);
+  background: color-mix(in srgb, currentColor 15%, transparent);
+  font-size: 10px; font-variant-numeric: tabular-nums; line-height: 1;
+}
+.gb-pot-page .gb-tag-count .rt-ico { width: 10px; height: 10px; opacity: .85; }
+.gb-pot-page .gb-tag-reset {
+  font-family: var(--font-pixel); font-size: 11px; color: var(--leaf-2);
+  background: none; border: 0; cursor: pointer; padding: 4px;
+}
+
+/* ---------------- TIL 기록 카드 ---------------- */
+.gb-pot-page .gb-til-card {
+  cursor: pointer; text-align: left; display: block; width: 100%;
+  transition: transform var(--dur-fast) var(--ease-soft), box-shadow var(--dur-fast);
+}
+.gb-pot-page .gb-til-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 7px 7px 0 0 var(--leaf);
+}
+.gb-pot-page .gb-til-card:active {
+  transform: translate(1px, 1px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 3px 3px 0 0 var(--leaf);
+}
+.gb-pot-page .gb-til-meta { font-size: 11px; color: var(--muted); font-family: "Galmuri9", var(--font-pixel); }
+.gb-pot-page .gb-til-title {
+  font-size: 16px; color: var(--leaf); line-height: 1.45; margin-top: 5px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.gb-pot-page .gb-til-excerpt {
+  font-size: 13px; color: var(--text-body); line-height: 1.6; margin-top: 7px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.gb-pot-page .gb-til-tag,
+.gb-til-page .gb-til-tag {
+  font-size: 10.5px; padding: 2px 8px; border-radius: var(--r-pill);
+  background: var(--paper-2); color: var(--muted-2); font-family: var(--font-pixel);
+}
+/* 상세 페이지는 크림 배경 위라 칩이 텍스트처럼 안 보이는 문제 → 살짝 테두리로 구분 */
+.gb-til-page .gb-til-tag { border: 1px solid var(--line-strong); }
+
+/* ---------------- 페이지네이션 ---------------- */
+.gb-pot-page .gb-pager { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.gb-pot-page .gb-page-btn {
+  min-width: 36px; height: 38px; padding: 0 6px;
+  border: 2px solid var(--line-strong); border-radius: var(--r-chip);
+  background: var(--paper-card); color: var(--leaf);
+  font-family: var(--font-pixel); font-size: 13px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .2s var(--ease-soft), border-color .2s var(--ease-soft), color .2s var(--ease-soft);
+}
+.gb-pot-page .gb-page-btn:hover:not(:disabled) { background: var(--paper-warm); border-color: var(--leaf-2); }
+.gb-pot-page .gb-page-btn.is-active { background: var(--leaf); color: var(--paper-card); border-color: var(--leaf); }
+/* 활성 버튼 위에 올렸을 때 글자가 묻히지 않도록 어두운 배경 + 밝은 글자 유지 */
+.gb-pot-page .gb-page-btn.is-active:hover:not(:disabled) { background: var(--leaf-2); border-color: var(--leaf-2); color: var(--paper-card); }
+.gb-pot-page .gb-page-btn:disabled { opacity: .4; cursor: default; }
+.gb-pot-page .gb-page-ellipsis {
+  /* 페이지 버튼과 동일 폭 → 슬롯이 균일해 페이저 폭이 출렁이지 않음 */
+  min-width: 36px; height: 38px; display: inline-flex; align-items: center; justify-content: center;
+  color: var(--muted); user-select: none;
+}
+/* 페이지를 옮길 때 슬롯에 새로 나타나는 숫자/말줄임이 톡 떠오르듯 전환 */
+@keyframes gb-page-pop {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.gb-pot-page .gb-pager .gb-page-btn,
+.gb-pot-page .gb-pager .gb-page-ellipsis { animation: gb-page-pop .2s var(--ease-soft); }
+@media (prefers-reduced-motion: reduce) {
+  .gb-pot-page .gb-page-btn { transition: none; }
+  .gb-pot-page .gb-pager .gb-page-btn,
+  .gb-pot-page .gb-pager .gb-page-ellipsis { animation: none; }
+}
+
+/* 페이지 전환 시 목록을 비웠다 다시 그리지 않고, 다음 페이지를 불러오는 동안
+   기존 카드를 살짝 흐리게만 유지해 깜빡임 없이 부드럽게 전환되도록 한다. */
+.gb-pot-page .gb-til-list { transition: opacity var(--dur-med, .22s) var(--ease-soft, ease); }
+.gb-pot-page .gb-til-list[data-loading="true"] { opacity: .45; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .gb-pot-page .gb-til-list { transition: none; }
+}
+
+/* 빈/로딩/에러 상태 카드 */
+.gb-pot-page .gb-note {
+  font-size: 13px; line-height: 1.6; color: var(--text-body);
+}
+.gb-pot-page .gb-note--error { color: var(--berry); }
+
+/* berry 톤 위험(삭제) 버튼 — rt-btn 변형 */
+.gb-pot-page .rt-btn--danger {
+  background: var(--berry); color: #fff; border-color: var(--berry);
+  box-shadow: 2px 2px 0 0 #8f3157;
+}
+.gb-pot-page .rt-btn--danger:hover { box-shadow: 3px 3px 0 0 #8f3157; }
+.gb-pot-page .rt-btn--danger:active { box-shadow: 0 0 0 0 #8f3157; }
+
+/* =========================================================================
+   모달 — 픽셀 카드 다이얼로그 (전역 오버레이, .gb-pot-page 스코프)
+   ========================================================================= */
+.gb-pot-page .gb-modal-overlay {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+  background: rgba(22, 28, 14, .52);
+  backdrop-filter: blur(3px);
+  overscroll-behavior: contain;
+}
+.gb-pot-page .gb-modal-card {
+  background: var(--paper-card);
+  border: 2px solid var(--leaf); border-radius: var(--r-card);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 6px 6px 0 0 var(--leaf);
+  display: flex; flex-direction: column; overflow: hidden;
+  width: 100%;
+}
+.gb-pot-page .gb-modal-card--danger { border-color: var(--berry); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .55), 6px 6px 0 0 var(--berry); }
+.gb-pot-page .gb-modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 22px 24px 16px;
+}
+.gb-pot-page .gb-modal-x {
+  width: 34px; height: 34px; flex: 0 0 auto; border-radius: 5px;
+  border: 2px solid var(--line-strong); background: var(--paper-card); color: var(--muted-2);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.gb-pot-page .gb-modal-x:hover { border-color: var(--leaf-2); color: var(--leaf); }
+.gb-pot-page .gb-modal-x:disabled { opacity: .5; cursor: default; }
+.gb-pot-page .gb-modal-body { padding: 0 24px; }
+.gb-pot-page .gb-modal-foot {
+  display: flex; align-items: center; gap: 10px; padding: 18px 24px 22px;
+}
+
+/* 모달 본문 폼 입력 */
+.gb-pot-page .gb-field { display: flex; flex-direction: column; gap: 7px; }
+.gb-pot-page .gb-field-label {
+  display: flex; justify-content: space-between; font-size: 11px; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--leaf-2);
+}
+.gb-pot-page .gb-field-count { color: var(--muted); }
+.gb-pot-page .gb-field-count.is-over { color: var(--berry); }
+.gb-pot-page .gb-input,
+.gb-pot-page .gb-textarea {
+  border: 2px solid var(--line-strong); border-radius: var(--r-chip);
+  background: var(--paper-warm); color: var(--leaf);
+  font-family: var(--font-pixel); font-size: 13px; padding: 10px 12px; outline: none;
+}
+.gb-pot-page .gb-input:focus,
+.gb-pot-page .gb-textarea:focus { border-color: var(--leaf-2); }
+.gb-pot-page .gb-input.is-invalid,
+.gb-pot-page .gb-textarea.is-invalid { border-color: var(--berry); }
+.gb-pot-page .gb-textarea { resize: none; line-height: 1.6; }
+
+/* 모달 안내/경고 박스 */
+.gb-pot-page .gb-modal-warn {
+  padding: 12px 14px; border-radius: var(--r-chip); line-height: 1.6; font-size: 12.5px;
+  background: var(--berry-soft); border: 1px solid var(--berry); color: var(--berry);
+}
+.gb-pot-page .gb-modal-info {
+  padding: 12px 14px; border-radius: var(--r-chip); line-height: 1.6; font-size: 12px;
+  background: var(--paper-2); border: 1px solid var(--line-strong); color: var(--muted-2);
+  font-family: "Galmuri9", var(--font-pixel);
+  display: flex; justify-content: space-around; gap: 12px;
+}
+
+/* TIL 상세 모달 본문 프로즈 톤 */
+.gb-pot-page .gb-til-prose { font-size: 14.5px; line-height: 1.8; color: var(--leaf); }
+.gb-pot-page .gb-til-prose a { color: var(--leaf-2); }

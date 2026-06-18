@@ -12,11 +12,22 @@ dist
 dist-ssr
 *.local
 
+# Env
+.env
+.env.*
+!.env.example
+
+# 보관용 디자인 변형(로컬 전용, 깃허브 미반영)
+design-variants/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+
+# 로컬 전용 디자인 보관본 (깃허브 미반영)
+design-variants/
 *.suo
 *.ntvs*
 *.njsproj

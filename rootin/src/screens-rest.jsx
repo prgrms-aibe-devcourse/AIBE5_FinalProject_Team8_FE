@@ -17,22 +17,12 @@ import { inferSpecies } from './utils/plant.js';
 import './dex.css';
 import './ai.css';
 import './profile.css';
+import { SPECIES_TO_PIXEL, STAGE_KEYS, GROWTH_STAGE_TO_STAGE, TIL_MODAL_PAGE_SIZE, TIL_IDS_MAX_SIZE } from './screens-rest.logic.js';
 
 // Collection (식물도감), AI, Profile, Auth screens
 
 // BE speciesKey → PixelPlant species 키 매핑
-const SPECIES_TO_PIXEL = {
-  seed:   'seed',
-  shroom: 'mushroom',
-  cactus: 'cactus',
-  fire:   'fire',
-  ice:    'ice',
-  moon:   'moonlight',
-  bolt:   'bolt',
-  rose:   'rose',
-};
 
-const STAGE_KEYS = ['seed', 'sprout', 'leaf', 'bloom', 'full'];
 
 // 단계별 강조색 — 올리브 LCD 팔레트 위에 단계마다 다른 게임 뱃지 톤(sprout 토큰 재사용)
 const STAGE_ACCENT = {
@@ -453,8 +443,6 @@ function CollectionScreen() {
 
 // === AI Screen ===
 
-const TIL_MODAL_PAGE_SIZE = 10;
-const TIL_IDS_MAX_SIZE = 200; // BE AiPolicy.TIL_IDS_MAX_SIZE 와 동기화 — AI에 전달 가능한 선택 최대 개수
 
 const formatDate = (iso) => {
   if (!iso) return '';
@@ -788,9 +776,6 @@ function AiTilSelectModal({ potId, onConfirm, onClose }) {
 }
 
 // growthStage → PixelPlant stage 매핑
-const GROWTH_STAGE_TO_STAGE = {
-  SEED: 'seed', SPROUT: 'sprout', MATURE: 'leaf', BLOOM: 'bloom', FULL_BLOOM: 'full',
-};
 
 function PotCard({ pot, selected, onClick }) {
   const species = inferSpecies(pot.plantName);

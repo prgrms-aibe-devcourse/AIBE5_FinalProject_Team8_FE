@@ -5,6 +5,7 @@ import { getSummary, getGrass, getWeekly, getDistribution, getInterests, getQues
 import { getPointSummary } from './api/points.js';
 import { useUser } from './context/UserContext.jsx';
 import { playSfx } from './lib/sfx.js';
+import { GRASS_WEEKS, STREAK_CHAR_COUNT_CAP, DAY_LABELS, formatDateKey, formatShortDate, getGrassStartDate, buildGrassState, buildRecentStreakDays, calculateCurrentStreakFromCells, transformWeekly } from './screens-dashboard.logic.js';
 
 // ─── SPROUT 팔레트 — 디자인 시스템 토큰(sprout.css)을 단일 소스로 참조 ──
 // 차트/SVG에서 쓰는 색은 모두 CSS 변수로 위임해 테마와 항상 일치시킨다.
@@ -28,122 +29,20 @@ const SPROUT = {
 // ─── 변환 유틸 ────────────────────────────────────────────────
 
 // 잔디는 항상 1년치(52주) 고정 — 클래식 테마와 동일하게 기간 선택 없이 한 해를 보여준다.
-const GRASS_WEEKS = 52;
-const STREAK_CHAR_COUNT_CAP = 1200;
 const STREAK_MAX_BAR_HEIGHT = 48;
 
 // 로컬 기준 날짜 키(YYYY-MM-DD). toISOString()은 UTC라 KST 등에서 하루 밀리므로 사용 금지.
-function formatDateKey(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
-function formatShortDate(dateKey) {
-  const [, month, day] = dateKey.split('-');
-  return `${month}.${day}`;
-}
 
-function getGrassStartDate(referenceDate = new Date(), weeks = GRASS_WEEKS) {
-  const start = new Date(referenceDate);
-  start.setDate(referenceDate.getDate() - referenceDate.getDay() - (weeks - 1) * 7);
-  return start;
-}
 
-function buildGrassState(cells = []) {
-  const startDate = getGrassStartDate();
-  return {
-    grid: buildGrassGrid(cells, startDate),
-    startDate,
-  };
-}
 
 // BE cells([{date, tilCount, charCount, level}]) → 52주×7일 2D 배열 (0~4) — 항상 1년 고정
-function buildGrassGrid(cells = [], startDate = getGrassStartDate()) {
-  const levelMap = {};
-  cells.forEach(c => {
-    levelMap[String(c.date ?? '').slice(0, 10)] = c.level;
-  });
-
-  return Array.from({ length: GRASS_WEEKS }, (_, w) =>
-    Array.from({ length: 7 }, (_, d) => {
-      const dt = new Date(startDate);
-      dt.setDate(startDate.getDate() + w * 7 + d);
-      return levelMap[formatDateKey(dt)] ?? 0;
-    })
-  );
-}
 
 // 최근 maxDays일의 작성 활동(스트릭 막대용) — 잔디 셀에서 실제 글자수/활성 여부를 뽑아낸다.
-function buildRecentStreakDays(cells = [], maxDays = 30) {
-  const cellMap = new Map(
-    cells.map(cell => [String(cell.date ?? '').slice(0, 10), {
-      tilCount: Number(cell.tilCount) || 0,
-      charCount: Number(cell.charCount) || 0,
-      level: Number(cell.level) || 0,
-    }])
-  );
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return Array.from({ length: maxDays }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (maxDays - 1 - index));
-    const dateKey = formatDateKey(date);
-    const record = cellMap.get(dateKey) ?? { tilCount: 0, charCount: 0 };
-
-    return {
-      date: dateKey,
-      tilCount: record.tilCount,
-      charCount: record.charCount,
-      active: record.level > 0 || record.tilCount > 0 || record.charCount > 0,
-    };
-  });
-}
 
 // 잔디 셀 기준 현재 연속 기록 계산 — API 캐시가 늦을 때의 보정값.
-function calculateCurrentStreakFromCells(cells = []) {
-  const activeDates = new Set(
-    cells
-      .filter(cell =>
-        (Number(cell.level) || 0) > 0 ||
-        (Number(cell.tilCount) || 0) > 0 ||
-        (Number(cell.charCount) || 0) > 0
-      )
-      .map(cell => String(cell.date ?? '').slice(0, 10))
-      .filter(Boolean)
-  );
-
-  if (activeDates.size === 0) return 0;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const cursor = new Date(today);
-
-  if (!activeDates.has(formatDateKey(cursor))) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  let count = 0;
-
-  while (activeDates.has(formatDateKey(cursor))) {
-    count += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  return count;
-}
 
 // BE weeklyData([{date, tilCount}]) → [{day:'월', count:2}, ...]
-const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
-function transformWeekly(weeklyData = []) {
-  return weeklyData.map(d => ({
-    day: DAY_LABELS[new Date(d.date + 'T00:00:00').getDay()],
-    count: d.tilCount,
-  }));
-}
 
 // ─── 공용 SPROUT 프리미티브 (이 화면 전용) ─────────────────────
 

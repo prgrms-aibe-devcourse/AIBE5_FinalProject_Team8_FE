@@ -12,6 +12,7 @@ import { PixelPals } from './auth-pixel-pals.jsx';
 import { useUser } from './context/UserContext.jsx';
 import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
+import { SPECIES_TO_PIXEL, STAGE_KEYS, GROWTH_STAGE_TO_STAGE, TIL_MODAL_PAGE_SIZE, TIL_IDS_MAX_SIZE } from './screens-rest.logic.js';
 
 // Collection (식물도감), AI, Profile, Auth screens
 
@@ -22,18 +23,7 @@ const THEME_OPTIONS = [
 ];
 
 // BE speciesKey → PixelPlant species 키 매핑
-const SPECIES_TO_PIXEL = {
-  seed:   'seed',
-  shroom: 'mushroom',
-  cactus: 'cactus',
-  fire:   'fire',
-  ice:    'ice',
-  moon:   'moonlight',
-  bolt:   'bolt',
-  rose:   'rose',
-};
 
-const STAGE_KEYS = ['seed', 'sprout', 'leaf', 'bloom', 'full'];
 
 const STAGE_BADGE_STYLE = {
   seed:   { background: '#fff4e0', color: '#8b6340', border: '#f0dcb5' },
@@ -263,8 +253,6 @@ function CollectionScreen() {
 
 // === AI Screen ===
 
-const TIL_MODAL_PAGE_SIZE = 10;
-const TIL_IDS_MAX_SIZE = 200; // BE AiPolicy.TIL_IDS_MAX_SIZE 와 동기화 — AI에 전달 가능한 선택 최대 개수
 
 const createGuideAiTils = () => {
   const guideDate = new Date().toISOString();
@@ -697,9 +685,6 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
   );
 }
 // growthStage → PixelPlant stage 매핑
-const GROWTH_STAGE_TO_STAGE = {
-  SEED: 'seed', SPROUT: 'sprout', MATURE: 'leaf', BLOOM: 'bloom', FULL_BLOOM: 'full',
-};
 
 function PotCard({ pot, selected, onClick }) {
   const species = inferSpecies(pot.plantName);

@@ -3,54 +3,20 @@ import { Card, Pill, Btn, StatTile, SectionHeader, ProgressBar, Icon } from './u
 import { Plant } from './plants.jsx';
 import { getSummary, getGrass, getWeekly, getDistribution, getInterests, getQuests } from './api/dashboard.js';
 import { getPointSummary } from './api/points.js';
+import { GRASS_WEEKS, STREAK_CHAR_COUNT_CAP, DAY_LABELS, formatDateKey, formatShortDate, getGrassStartDate, buildGrassState, buildRecentStreakDays, calculateCurrentStreakFromCells, transformWeekly } from './screens-dashboard.logic.js';
 
 // ─── 변환 유틸 ────────────────────────────────────────────────
 
-const GRASS_WEEKS = 52;
-const STREAK_CHAR_COUNT_CAP = 1200;
 const STREAK_MAX_BAR_HEIGHT = 82;
 
 // 섹션 카드 공통 — 은은한 상단 채광 sheen + 떠 있는 그림자(온실 깊이감)
 const CARD_SHEEN = { background: 'var(--grad-sheen)', boxShadow: 'var(--shadow-md)' };
 
-function getGrassStartDate(referenceDate = new Date(), weeks = GRASS_WEEKS) {
-  const start = new Date(referenceDate);
-  start.setDate(referenceDate.getDate() - referenceDate.getDay() - (weeks - 1) * 7);
-  return start;
-}
 
-function buildGrassState(cells = []) {
-  const startDate = getGrassStartDate();
-  return {
-    grid: buildGrassGrid(cells, startDate),
-    startDate,
-  };
-}
 
 // BE cells([{date, tilCount, charCount, level}]) → 52주×7일 2D 배열 (0~4) — 항상 1년 고정
-function buildGrassGrid(cells = [], startDate = getGrassStartDate()) {
-  const levelMap = {};
-  cells.forEach(c => {
-    levelMap[String(c.date ?? '').slice(0, 10)] = c.level;
-  });
-
-  return Array.from({ length: GRASS_WEEKS }, (_, w) =>
-    Array.from({ length: 7 }, (_, d) => {
-      const dt = new Date(startDate);
-      dt.setDate(startDate.getDate() + w * 7 + d);
-      return levelMap[formatDateKey(dt)] ?? 0;
-    })
-  );
-}
 
 // BE weeklyData([{date, tilCount}]) → [{day:'월', count:2}, ...]
-const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
-function transformWeekly(weeklyData = []) {
-  return weeklyData.map(d => ({
-    day: DAY_LABELS[new Date(d.date + 'T00:00:00').getDay()],
-    count: d.tilCount,
-  }));
-}
 
 // ─── 컴포넌트 ──────────────────────────────────────────────────
 
@@ -113,76 +79,9 @@ function GrassGraph({ data, startDate }) {
   );
 }
 
-function formatDateKey(date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
-function formatShortDate(dateKey) {
-  const [, month, day] = dateKey.split('-');
-  return `${month}.${day}`;
-}
 
-function buildRecentStreakDays(cells = [], maxDays = 30) {
-  const cellMap = new Map(
-    cells.map(cell => [String(cell.date ?? '').slice(0, 10), {
-      tilCount: Number(cell.tilCount) || 0,
-      charCount: Number(cell.charCount) || 0,
-      level: Number(cell.level) || 0,
-    }])
-  );
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  return Array.from({ length: maxDays }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (maxDays - 1 - index));
-    const dateKey = formatDateKey(date);
-    const record = cellMap.get(dateKey) ?? { tilCount: 0, charCount: 0 };
-
-    return {
-      date: dateKey,
-      tilCount: record.tilCount,
-      charCount: record.charCount,
-      active: record.level > 0 || record.tilCount > 0 || record.charCount > 0,
-    };
-  });
-}
-
-function calculateCurrentStreakFromCells(cells = []) {
-  const activeDates = new Set(
-    cells
-      .filter(cell =>
-        (Number(cell.level) || 0) > 0 ||
-        (Number(cell.tilCount) || 0) > 0 ||
-        (Number(cell.charCount) || 0) > 0
-      )
-      .map(cell => String(cell.date ?? '').slice(0, 10))
-      .filter(Boolean)
-  );
-
-  if (activeDates.size === 0) return 0;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const cursor = new Date(today);
-
-  if (!activeDates.has(formatDateKey(cursor))) {
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  let count = 0;
-
-  while (activeDates.has(formatDateKey(cursor))) {
-    count += 1;
-    cursor.setDate(cursor.getDate() - 1);
-  }
-
-  return count;
-}
 
 function StreakActivityChart({ days }) {
   const maxCharCount = Math.max(...days.map(day => Math.min(day.charCount, STREAK_CHAR_COUNT_CAP)), 1);

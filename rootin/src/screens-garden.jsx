@@ -12,6 +12,7 @@ import { inferSpecies } from './utils/plant.js';
 import { TilContentView } from './components/til/til-content-view';
 import './garden.css';
 import './pot-detail.css';
+import { useDeferredLoading } from './hooks/useDeferredLoading.js';
 import { POT_TITLE_MAX_LENGTH, POT_DESCRIPTION_MAX_LENGTH, EMPTY_POT_INTRO, POT_TITLE_PREVIEW_STYLE, POT_DESCRIPTION_PREVIEW_STYLE, getPotTier, formatPotExperience, formatPlantGrowthPercent, getPlantStageStatus, getHarvestStatus, toGardenPot, toDashboardPot, formatDateTime, getKstDateString, getMsUntilKstMidnight, formatTilDateTime, toTilListItem, getLayoutSlot, findNearestVisiblePotId, getPottedPlantAlignment } from './screens-garden.logic.js';
 
 function PottedPlant({ species, stage, size = 64, locked = false, glow = false, potLevel = 1 }) {
@@ -566,6 +567,8 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
   const [potsLoading, setPotsLoading] = useState(true);
   const [potsError, setPotsError] = useState(null);
   const [showCreatePot, setShowCreatePot] = useState(false);
+  // 로딩 안내는 200ms 이상 걸릴 때만 노출 — 빠른 환경의 깜빡임 방지
+  const showPotsLoading = useDeferredLoading(potsLoading);
   const lastFetchDateRef = useRef(getKstDateString());
   const mountedRef = useRef(true);
   const requestIdRef = useRef(0);
@@ -1116,7 +1119,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
       </div>
 
       <div className="rt-grid rt-grid--3 guide-garden-pots">
-        {potsLoading && (
+        {showPotsLoading && (
           <div className="rt-card" style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
             화분 목록을 불러오는 중이에요.
           </div>
@@ -1443,6 +1446,11 @@ function PotDetailSidebar({ pot, stage, dashboard, onStartTil, onShowHarvest, on
           {monName && <span className="gb-pot-stage-name">{monName}</span>}
         </div>
 
+        {/* 화분 이름 — 기본 테마와 동일하게 식물 아래·배지 위 */}
+        <div className="gb-pot-title" title={`${pot.emoji} ${pot.name}`} style={POT_TITLE_PREVIEW_STYLE}>
+          {pot.emoji} {pot.name}
+        </div>
+
         {/* 배지 + 화분 수정 */}
         <div className="guide-pot-detail-info" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', minWidth: 0 }}>
@@ -1459,6 +1467,11 @@ function PotDetailSidebar({ pot, stage, dashboard, onStartTil, onShowHarvest, on
               <RtIcon name="gear" /> 화분 수정
             </button>
           )}
+        </div>
+
+        {/* 화분 소개 — 기본 테마와 동일 구조 */}
+        <div className="gb-pot-intro" title={pot.intro} style={POT_DESCRIPTION_PREVIEW_STYLE}>
+          {pot.intro}
         </div>
 
         {/* 스탯 목록 */}
@@ -1546,6 +1559,9 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onOpenTil 
   const [tilPage, setTilPage] = useState(0);
   const [tilPageSize, setTilPageSize] = useState(10);
   const [tilTotalPages, setTilTotalPages] = useState(0);
+  // 로딩 안내는 200ms 이상 걸릴 때만 노출 — 빠른 환경의 깜빡임 방지
+  const showDashboardLoading = useDeferredLoading(dashboardLoading);
+  const showTilsLoading = useDeferredLoading(tilsLoading);
 
   useEffect(() => {
     if (!potId) return;
@@ -1614,16 +1630,20 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onOpenTil 
   if (dashboardLoading && !pot) {
     return (
       <div className="rt-app gb-pot-page" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', minHeight: '100%' }}>
-        <div className="rt-page-head gb-pot-head">
-          <div>
-            <span className="rt-tag"><RtIcon name="leaf" /> ROOTIN · 화분 상세</span>
-            <h1 className="rt-page-title">화분 상세 <span className="rt-title-cursor" /></h1>
-          </div>
-          <PotDetailBackButton onBack={onBack} />
-        </div>
-        <div className="rt-card gb-note" style={{ textAlign: 'center', color: 'var(--muted)' }}>
-          화분 대시보드를 불러오는 중이에요.
-        </div>
+        {showDashboardLoading && (
+          <>
+            <div className="rt-page-head gb-pot-head">
+              <div>
+                <span className="rt-tag"><RtIcon name="leaf" /> ROOTIN · 화분 상세</span>
+                <h1 className="rt-page-title">화분 상세 <span className="rt-title-cursor" /></h1>
+              </div>
+              <PotDetailBackButton onBack={onBack} />
+            </div>
+            <div className="rt-card gb-note" style={{ textAlign: 'center', color: 'var(--muted)' }}>
+              화분 대시보드를 불러오는 중이에요.
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -1718,16 +1738,8 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onOpenTil 
         </div>
       </div>
 
-      {/* 페이지 헤더 + 뒤로가기 */}
-      <div className="rt-page-head gb-pot-head">
-        <div style={{ minWidth: 0 }}>
-          <span className="rt-tag"><RtIcon name="leaf" /> ROOTIN · 화분 상세</span>
-          <h1 className="rt-page-title">
-            <span style={POT_TITLE_PREVIEW_STYLE}>{pot.emoji} {pot.name}</span>
-            <span className="rt-title-cursor" />
-          </h1>
-          <p className="rt-page-sub" style={{ ...POT_DESCRIPTION_PREVIEW_STYLE, maxWidth: 640 }}>{pot.intro}</p>
-        </div>
+      {/* 뒤로가기 — 초록 HUD 바 아래 좌측 */}
+      <div>
         <PotDetailBackButton onBack={onBack} />
       </div>
 
@@ -1843,7 +1855,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onOpenTil 
             data-loading={dashboard && tilsLoading && displayedTils.length > 0 ? 'true' : undefined}
             style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
           >
-            {dashboard && tilsLoading && displayedTils.length === 0 && (
+            {dashboard && showTilsLoading && displayedTils.length === 0 && (
               <div className="rt-card gb-note">이 화분의 TIL 목록을 불러오는 중이에요.</div>
             )}
             {dashboard && !tilsLoading && tilsError && (
@@ -1932,11 +1944,14 @@ export function TilDetailScreen({ tilId, onBack, onEdit, onDeleted }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  // 로딩 안내는 200ms 이상 걸릴 때만 노출 — 빠른 환경의 깜빡임 방지
+  const showLoading = useDeferredLoading(loading);
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    setTil(null);
     setError(null);
+    setLoading(true);
     setConfirmDelete(false);
     setDeleteError(null);
     getTil(tilId)
@@ -1962,77 +1977,94 @@ export function TilDetailScreen({ tilId, onBack, onEdit, onDeleted }) {
 
   return (
     <div className="rt-app gb-til-page" style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%', minHeight: '100%' }}>
-      {/* 헤더 — 제목/메타/태그를 본문과 같은 폭으로, 아래 구분선으로 본문과 분리 */}
-      <div className="gb-til-col" style={{ borderBottom: '2px dotted var(--line-strong)', paddingBottom: 18 }}>
+      {/* 상단 라벨 — 화분 페이지 HUD처럼 최상단 */}
+      <div className="gb-til-col">
         <span className="rt-tag"><RtIcon name="book" /> ROOTIN · TIL 기록</span>
-        <h1 className="rt-page-title" style={{ marginTop: 10 }}>
-          <span style={{ wordBreak: 'keep-all' }}>
-            {loading ? 'TIL 불러오는 중' : (til?.title ?? 'TIL')}
-            <span className="rt-title-cursor" />
-          </span>
-        </h1>
-        {til && !error && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8, color: 'var(--muted)', fontSize: 12, fontFamily: '"Galmuri9", var(--font-pixel)' }}>
-            <span>{formatTilDateTime(til.publishedAt ?? til.createdAt)}</span>
-            <span>·</span>
-            <span>{til.chars}자</span>
-            {til.potName && (
-              <>
+      </div>
+
+      {/* 뒤로가기 — 라벨 아래, 화분 페이지와 동일 디자인 */}
+      <div className="gb-til-col">
+        <button
+          type="button"
+          className="rt-btn rt-btn--sm"
+          onClick={() => { playSfx('nav'); onBack && onBack(); }}
+        >
+          <RtIcon name="arrow" style={{ transform: 'rotate(180deg)' }} />
+          화분으로 돌아가기
+        </button>
+      </div>
+
+      {/* 헤더 — 제목/메타/태그(좌) + 수정·삭제 액션(우), 아래 구분선으로 본문과 분리 */}
+      <div className="gb-til-col" style={{ borderBottom: '2px dotted var(--line-strong)', paddingBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h1 className="rt-page-title" style={{ marginTop: 0 }}>
+              <span style={{ wordBreak: 'keep-all' }}>
+                {til?.title ?? (showLoading ? 'TIL 불러오는 중' : error ? 'TIL' : '')}
+                <span className="rt-title-cursor" />
+              </span>
+            </h1>
+            {til && !error && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8, color: 'var(--muted)', fontSize: 12, fontFamily: '"Galmuri9", var(--font-pixel)' }}>
+                <span>{formatTilDateTime(til.publishedAt ?? til.createdAt)}</span>
                 <span>·</span>
-                <span>{til.potName} 화분</span>
-              </>
+                <span>{til.chars}자</span>
+                {til.potName && (
+                  <>
+                    <span>·</span>
+                    <span>{til.potName} 화분</span>
+                  </>
+                )}
+              </div>
+            )}
+            {til && !error && til.tags.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+                {til.tags.map(tag => <span key={tag} className="gb-til-tag">#{tag}</span>)}
+              </div>
             )}
           </div>
-        )}
-        {til && !error && til.tags.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-            {til.tags.map(tag => <span key={tag} className="gb-til-tag">#{tag}</span>)}
-          </div>
-        )}
+
+          {/* 수정 / 삭제 액션 — 제목 컨테이너 우측 하단 (삭제 확인도 이 안에서) */}
+          {til && !error && (
+            <div className="gb-til-actions" role="group" aria-label="TIL 액션">
+              {confirmDelete ? (
+                <>
+                  <span className="gb-til-act-msg">삭제할까요?</span>
+                  <button type="button" className="rt-btn rt-btn--sm gb-btn-danger" onClick={() => { playSfx('delete'); handleDeleteConfirm(); }} disabled={deleting}>
+                    <RtIcon name="check" /> {deleting ? '삭제중' : '확인'}
+                  </button>
+                  <button type="button" className="rt-btn rt-btn--sm" onClick={() => { playSfx('cancel'); setConfirmDelete(false); setDeleteError(null); }} disabled={deleting}>
+                    <RtIcon name="xmark" /> 취소
+                  </button>
+                  {deleteError && <span className="gb-til-act-err">{deleteError}</span>}
+                </>
+              ) : (
+                <>
+                  <button type="button" className="rt-btn rt-btn--sm rt-btn--primary" onClick={() => { playSfx('confirm'); onEdit && onEdit(til); }}>
+                    <RtIcon name="gear" /> 수정
+                  </button>
+                  <button type="button" className="rt-btn rt-btn--sm gb-btn-danger" onClick={() => { playSfx('nav'); setConfirmDelete(true); }}>
+                    <RtIcon name="xmark" /> 삭제
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 본문 — 카드 없이 페이지 배경 위, 에디터와 같은 폭 */}
       <div className="gb-til-col">
-        {loading ? (
+        {showLoading ? (
           <div style={{ color: 'var(--muted)', fontSize: 14 }}>TIL 내용을 불러오는 중이에요.</div>
         ) : error ? (
           <div className="gb-note gb-note--error">{error}</div>
         ) : contentHtml ? (
           <TilContentView content={contentHtml} />
-        ) : (
-          <div style={{ color: 'var(--muted)' }}>{til?.excerpt}</div>
-        )}
+        ) : til ? (
+          <div style={{ color: 'var(--muted)' }}>{til.excerpt}</div>
+        ) : null}
       </div>
-
-      {/* 우측 플로팅 액션 바 — 스크롤을 따라다니는 수정/삭제/돌아가기 (삭제 확인도 이 안에서) */}
-      {til && !error && (
-        <div className="gb-til-fab" role="group" aria-label="TIL 액션">
-          {confirmDelete ? (
-            <>
-              <span className="gb-til-fab-msg">삭제할까요?</span>
-              <button type="button" className="gb-til-fab-btn is-danger" onClick={() => { playSfx('delete'); handleDeleteConfirm(); }} disabled={deleting}>
-                <RtIcon name="check" size={15} /><span>{deleting ? '삭제중' : '확인'}</span>
-              </button>
-              <button type="button" className="gb-til-fab-btn" onClick={() => { playSfx('cancel'); setConfirmDelete(false); setDeleteError(null); }} disabled={deleting}>
-                <RtIcon name="xmark" size={15} /><span>취소</span>
-              </button>
-              {deleteError && <span className="gb-til-fab-err">{deleteError}</span>}
-            </>
-          ) : (
-            <>
-              <button type="button" className="gb-til-fab-btn is-edit" onClick={() => { playSfx('confirm'); onEdit && onEdit(til); }}>
-                <RtIcon name="gear" size={15} /><span>수정</span>
-              </button>
-              <button type="button" className="gb-til-fab-btn is-danger" onClick={() => { playSfx('nav'); setConfirmDelete(true); }}>
-                <RtIcon name="xmark" size={15} /><span>삭제</span>
-              </button>
-              <button type="button" className="gb-til-fab-btn" onClick={() => { playSfx('nav'); onBack && onBack(); }}>
-                <RtIcon name="arrow" size={15} style={{ transform: 'rotate(180deg)' }} /><span>뒤로</span>
-              </button>
-            </>
-          )}
-        </div>
-      )}
     </div>
   );
 }

@@ -15,7 +15,7 @@ import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
 import { GuideOverlay } from './components/GuideOverlay.jsx';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
 import { DashboardScreen as DashboardClassic } from './screens-dashboard.classic.jsx';
-import { GardenScreen as GardenClassic, PotDetailScreen as PotDetailClassic } from './screens-garden.classic.jsx';
+import { GardenScreen as GardenClassic, PotDetailScreen as PotDetailClassic, TilDetailScreen as TilDetailClassic } from './screens-garden.classic.jsx';
 import { CollectionScreen as CollectionClassic, AIScreen as AIClassic, ProfileScreen as ProfileClassic } from './screens-rest.classic.jsx';
 import { LogoutConfirmModal as LogoutConfirmModalClassic } from '@/components/LogoutConfirmModal.classic.jsx';
 import { EditorScreen as EditorClassic } from './screens-editor.classic.jsx';
@@ -145,7 +145,7 @@ function AppShell() {
   const baseFramed = screen === 'dashboard' || screen === 'garden' || screen === 'pot-detail' || screen === 'collection' || screen === 'ai' || screen === 'profile';
   // 테마 토글: classic 테마에서는 게임보이 베젤/사이드바를 끄고 원본 셸(RootinSidebarLeft)로 렌더한다.
   // 대상 화면(대시보드/정원/화분상세/도감/AI/프로필)은 classic 구현이 있다. 에디터·TIL상세는 게임보이 유지.
-  const CLASSIC_SHELL_SCREENS = ['dashboard', 'garden', 'pot-detail', 'collection', 'ai', 'profile', 'editor'];
+  const CLASSIC_SHELL_SCREENS = ['dashboard', 'garden', 'pot-detail', 'til-detail', 'collection', 'ai', 'profile', 'editor'];
   const useClassicShell = theme === 'classic' && CLASSIC_SHELL_SCREENS.includes(screen);
   const framed = baseFramed && !useClassicShell;
   // 에디터 스택을 테마별로 선택 (Provider·화면·우측 패널은 같은 til 트리/컨텍스트끼리 묶여야 한다)
@@ -332,12 +332,12 @@ function AppShell() {
                 onCelebrated={() => setGrowthCelebratePotId(null)}
                 onBack={() => navigate('/garden')}
                 onStartTil={openEditorForPot}
-                onEditTil={openEditorForTil}
                 onOpenTil={(potId, tilId) => navigate(`/garden/pots/${potId}/tils/${tilId}`)}
               />
             )} />
             <Route path="/garden/pots/:potId/tils/:tilId" element={(
               <TilDetailRoute
+                theme={theme}
                 onBack={(potId) => navigate(`/garden/pots/${potId}`)}
                 onEdit={openEditorForTil}
                 onDeleted={(potId) => {
@@ -429,7 +429,7 @@ function AppShell() {
   );
 }
 
-function PotDetailRoute({ theme, refreshKey, celebratePotId, onCelebrated, onBack, onStartTil, onEditTil, onOpenTil }) {
+function PotDetailRoute({ theme, refreshKey, celebratePotId, onCelebrated, onBack, onStartTil, onOpenTil }) {
   const { potId } = useParams();
   const numericPotId = parseRoutePotId(potId);
 
@@ -437,7 +437,7 @@ function PotDetailRoute({ theme, refreshKey, celebratePotId, onCelebrated, onBac
     return <Navigate to="/garden" replace />;
   }
 
-  // classic 화분 상세는 TIL을 전용 라우트가 아니라 에디터(onEditTil)로 연다.
+  // 양 테마 모두 TIL을 전용 상세 라우트(onOpenTil)로 연다.
   if (theme === 'classic') {
     return (
       <PotDetailClassic
@@ -445,7 +445,7 @@ function PotDetailRoute({ theme, refreshKey, celebratePotId, onCelebrated, onBac
         refreshKey={refreshKey}
         onBack={onBack}
         onStartTil={onStartTil}
-        onEditTil={onEditTil}
+        onOpenTil={(tilId) => onOpenTil(numericPotId, tilId)}
       />
     );
   }
@@ -463,7 +463,7 @@ function PotDetailRoute({ theme, refreshKey, celebratePotId, onCelebrated, onBac
   );
 }
 
-function TilDetailRoute({ onBack, onEdit, onDeleted }) {
+function TilDetailRoute({ theme, onBack, onEdit, onDeleted }) {
   const { potId, tilId } = useParams();
   const numericPotId = parseRoutePotId(potId);
   const numericTilId = parseRoutePotId(tilId);
@@ -472,8 +472,10 @@ function TilDetailRoute({ onBack, onEdit, onDeleted }) {
     return <Navigate to="/garden" replace />;
   }
 
+  const DetailScreen = theme === 'classic' ? TilDetailClassic : TilDetailScreen;
+
   return (
-    <TilDetailScreen
+    <DetailScreen
       tilId={numericTilId}
       onBack={() => onBack(numericPotId)}
       onEdit={onEdit}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
 import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, TILS } from './data.jsx';
 import { harvestPot, getGardenState, updateGardenTheme, updateGardenLayout } from './api/garden.js';
 import { createPot, deletePot, getGardenDashboard, getPots, updatePot } from './api/pot.js';
@@ -8,6 +8,9 @@ import { Icon, Pill, Btn, Card, SectionHeader, ProgressBar } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { tilCountToStage, STAGE_META } from './plants.jsx';
 import { inferSpecies } from './utils/plant.js';
+import { useDeferredLoading } from './hooks/useDeferredLoading.js';
+import { TilContentView } from './components/til-classic/til-content-view';
+import { useSidebar } from '@/components/ui/sidebar';
 import { POT_TITLE_MAX_LENGTH, POT_DESCRIPTION_MAX_LENGTH, EMPTY_POT_INTRO, POT_TITLE_PREVIEW_STYLE, POT_DESCRIPTION_PREVIEW_STYLE, getPotTier, formatPotExperience, formatPlantGrowthPercent, getPlantStageStatus, getHarvestStatus, toGardenPot, toDashboardPot, formatDateTime, getKstDateString, getMsUntilKstMidnight, formatTilDateTime, toTilListItem, getLayoutSlot, findNearestVisiblePotId, getPottedPlantAlignment } from './screens-garden.logic.js';
 
 function PottedPlant({ species, stage, size = 64, locked = false, glow = false, potLevel = 1 }) {
@@ -1665,7 +1668,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
   );
 }
 
-function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil }) {
+function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onOpenTil }) {
   const { user } = useUser();
   const fallbackPot = POTS.find(p => p.id === potId);
   const [showHarvest, setShowHarvest] = useState(false);
@@ -1678,14 +1681,11 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   const [tilsLoading, setTilsLoading] = useState(true);
   const [tilsError, setTilsError] = useState(null);
   const [tilTotalCount, setTilTotalCount] = useState(0);
-  const [selectedTil, setSelectedTil] = useState(null);
-  const [tilDetailLoading, setTilDetailLoading] = useState(false);
   const [tilSearchQuery, setTilSearchQuery] = useState('');
   const [selectedTilTag, setSelectedTilTag] = useState(null);
   const [tilPage, setTilPage] = useState(0);
   const [tilPageSize, setTilPageSize] = useState(10);
   const [tilTotalPages, setTilTotalPages] = useState(0);
-  const [tilsRefreshKey, setTilsRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!potId) return;
@@ -1742,18 +1742,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
     return () => {
       active = false;
     };
-  }, [potId, user?.userId, refreshKey, tilPage, tilPageSize, tilsRefreshKey]);
-
-  useEffect(() => {
-    if (!selectedTil) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [selectedTil]);
+  }, [potId, user?.userId, refreshKey, tilPage, tilPageSize]);
 
   const refreshDashboard = useCallback(async () => {
     const updatedDashboard = await getGardenDashboard(potId);
@@ -1823,42 +1812,9 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   const handleStartTil = () => {
     onStartTil && onStartTil(pot.id);
   };
-  const handleOpenTilDetail = async (til) => {
-    setSelectedTil(til);
+  const handleOpenTilDetail = (til) => {
     if (!til.id) return;
-
-    setTilDetailLoading(true);
-    try {
-      const detail = await getTil(til.id);
-      setSelectedTil(current => ({
-        ...current,
-        ...toTilListItem(detail),
-      }));
-    } catch {
-      setSelectedTil(til);
-    } finally {
-      setTilDetailLoading(false);
-    }
-  };
-  const handleEditTil = (til) => {
-    setSelectedTil(null);
-    onEditTil && onEditTil({
-      ...til,
-      potId: til.potId ?? pot.id,
-    });
-  };
-  const handleDeleteTil = async () => {
-    if (!selectedTil?.id) return;
-    await deleteTil(selectedTil.id);
-    setSelectedTil(null);
-    setTilPage(0);
-    setTilsRefreshKey(k => k + 1);
-    try {
-      await refreshDashboard();
-    } catch (err) {
-      console.error('dashboard 갱신 실패:', err);
-      // 목록은 이미 갱신됐으므로 사용자에게 별도 에러를 노출하지 않음
-    }
+    onOpenTil && onOpenTil(til.id);
   };
   const handleHarvested = async () => {
     try {
@@ -2161,15 +2117,6 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
           }}
         />
       )}
-      {selectedTil && (
-        <TilDetailModal
-          til={selectedTil}
-          loading={tilDetailLoading}
-          onClose={() => setSelectedTil(null)}
-          onEdit={() => handleEditTil(selectedTil)}
-          onDelete={handleDeleteTil}
-        />
-      )}
       {showEditPot && (
         <EditPotModal
           pot={pot}
@@ -2185,82 +2132,151 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onEditTil 
   );
 }
 
-function TilDetailModal({ til, loading, onClose, onEdit, onDelete }) {
-  const contentHtml = til.content?.trim();
+// 발행된 TIL 전용 상세 페이지(클래식 테마).
+// 화분 상세에서 기록 카드를 누르면 모달 대신 이 페이지(/garden/pots/:potId/tils/:tilId)로 들어온다.
+// 본문은 읽기 전용 Tiptap(TilContentView)로 렌더해 클래식 에디터와 1:1로 같은 모양(글꼴·콜아웃·코드블록·수식)이다.
+function TilDetailScreen({ tilId, onBack, onEdit, onDeleted }) {
+  const [til, setTil] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const { state } = useSidebar();
+  // 로딩 안내는 200ms 이상 걸릴 때만 노출 — 빠른 환경의 깜빡임 방지
+  const showLoading = useDeferredLoading(loading);
+
+  useEffect(() => {
+    let active = true;
+    setTil(null);
+    setError(null);
+    setLoading(true);
+    setConfirmDelete(false);
+    setDeleteError(null);
+    getTil(tilId)
+      .then(detail => { if (active) setTil(toTilListItem(detail)); })
+      .catch(() => { if (active) setError('TIL을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [tilId]);
 
   const handleDeleteConfirm = async () => {
     setDeleting(true);
     setDeleteError(null);
     try {
-      await onDelete();
+      await deleteTil(tilId);
+      onDeleted && onDeleted();
     } catch (err) {
       setDeleteError(err?.body?.message ?? 'TIL을 삭제하지 못했어요. 잠시 후 다시 시도해 주세요.');
       setDeleting(false);
     }
   };
 
-  const handleClose = () => {
-    if (deleting) return;
-    setConfirmDelete(false);
-    setDeleteError(null);
-    onClose();
+  const contentHtml = til?.content?.trim();
+
+  // 본문 컬럼 폭
+  const col = {
+    width: '100%',
+    maxWidth: 'min(56rem, calc(100vw - 50rem))',
+    margin: '0 auto',
   };
 
+  // 본문 컬럼을 사이드바 토글과 무관하게 항상 "뷰포트 중앙"에 고정.
+  const wrapRef = useRef(null);
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    let prev = null;
+    let frame = null;
+    const recompute = () => {
+      const rect = el.getBoundingClientRect();
+      // 서브픽셀까지 정확히 계산하여 1px 덜컹거림(Jitter) 제거
+      const next = (window.innerWidth / 2) - (rect.left + rect.width / 2);
+      if (prev !== null && Math.abs(prev - next) < 0.1) return;
+      prev = next;
+      const t = `translateX(${next}px)`;
+      for (const child of el.children) child.style.transform = t;
+    };
+    recompute();
+    const ro = new ResizeObserver(() => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(recompute);
+    });
+    ro.observe(el);
+    window.addEventListener('resize', recompute);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', recompute);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(15, 42, 71, 0.38)',
+    <div ref={wrapRef} style={{
       display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 60,
-      backdropFilter: 'blur(4px)',
-      padding: 24,
-      overscrollBehavior: 'contain',
-    }} onClick={handleClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        width: 'min(760px, 100%)',
-        height: 'min(720px, calc(100vh - 48px))',
-        background: '#fff',
-        borderRadius: 18,
-        border: '0.5px solid var(--rule)',
-        boxShadow: 'var(--shadow-lg)',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        overscrollBehavior: 'contain',
-      }}>
-        <div style={{
-          padding: '24px 28px 18px',
-          borderBottom: '0.5px solid var(--rule)',
-          background: 'linear-gradient(180deg, #fff 0%, var(--paper) 100%)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18 }}>
-            <div style={{ minWidth: 0 }}>
-              <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>TIL Detail</div>
-              <h2 style={{
-                fontFamily: 'var(--font-display)',
-                fontSize: 24,
-                fontWeight: 700,
-                color: 'var(--ink)',
-                marginTop: 7,
-                lineHeight: 1.3,
-                wordBreak: 'keep-all',
-              }}>
-                {til.title}
-              </h2>
+      flexDirection: 'column',
+      gap: 16,
+      width: '100%',
+      minHeight: '100%',
+      padding: '40px 32px 80px',
+      fontFamily: 'var(--font-body)',
+      overflowX: 'hidden',
+    }}>
+      {/* 상단 라벨 — 게임보이 상세와 동일한 흐름(라벨 → 뒤로가기 → 헤더 → 본문) */}
+      <div style={col}>
+        <div className="eyebrow" style={{ color: 'var(--moss-2)' }}>ROOTIN · TIL 기록</div>
+      </div>
+
+      {/* 뒤로가기 */}
+      <div style={col}>
+        <button
+          type="button"
+          onClick={onBack}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 7,
+            padding: '8px 12px',
+            borderRadius: 999,
+            border: '0.5px solid #c9dccd',
+            background: '#fff',
+            color: 'var(--moss-2)',
+            fontSize: 12.5,
+            fontWeight: 700,
+            fontFamily: 'var(--font-display)',
+            boxShadow: '0 4px 12px rgba(40, 84, 57, 0.08)',
+          }}
+        >
+          <span style={{ transform: 'rotate(180deg)', display: 'inline-flex' }}>{Icon.arrow}</span>
+          화분으로 돌아가기
+        </button>
+      </div>
+
+      {/* 헤더 — 제목/메타/태그(좌) + 수정·삭제 액션(우), 아래 구분선으로 본문과 분리 */}
+      <div style={{ ...col, borderBottom: '1px solid var(--rule)', paddingBottom: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 18 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h1 style={{
+              fontFamily: 'var(--font-display)',
+              fontSize: 'clamp(30px, 3.6vw, 42px)',
+              fontWeight: 700,
+              color: 'var(--ink)',
+              margin: 0,
+              lineHeight: 1.18,
+              letterSpacing: '-0.02em',
+              wordBreak: 'keep-all',
+            }}>
+              {til?.title ?? (showLoading ? 'TIL 불러오는 중' : error ? 'TIL' : '')}
+            </h1>
+            {til && !error && (
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 8,
                 flexWrap: 'wrap',
-                marginTop: 10,
+                marginTop: 12,
                 color: 'var(--ink-3)',
-                fontSize: 12,
+                fontSize: 12.5,
                 fontFamily: 'var(--font-mono)',
               }}>
                 <span>{formatTilDateTime(til.publishedAt ?? til.createdAt)}</span>
@@ -2273,115 +2289,69 @@ function TilDetailModal({ til, loading, onClose, onEdit, onDelete }) {
                   </>
                 )}
               </div>
-            </div>
-            <button type="button" onClick={handleClose} style={{
-              width: 34,
-              height: 34,
-              borderRadius: 10,
-              border: '0.5px solid var(--rule)',
-              color: 'var(--ink-3)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              background: '#fff',
-            }}>
-              {Icon.close}
-            </button>
-          </div>
-
-          {til.tags.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 14 }}>
-              {til.tags.map(tag => (
-                <span key={tag} style={{
-                  fontSize: 11,
-                  padding: '3px 9px',
-                  borderRadius: 999,
-                  background: 'var(--paper-2)',
-                  color: 'var(--ink-3)',
-                  fontFamily: 'var(--font-mono)',
-                }}>
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="scrollbar" style={{
-          flex: 1,
-          overflow: 'auto',
-          overscrollBehavior: 'contain',
-          padding: '26px 30px 30px',
-        }}>
-          {loading ? (
-            <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
-              TIL 상세 내용을 불러오는 중이에요.
-            </div>
-          ) : contentHtml ? (
-            <div
-              className="til-prose"
-              style={{ fontSize: 14.5, lineHeight: 1.8, color: 'var(--ink)' }}
-              dangerouslySetInnerHTML={{ __html: contentHtml }}
-            />
-          ) : (
-            <div style={{ color: 'var(--ink-2)', fontSize: 14, lineHeight: 1.7 }}>
-              {til.excerpt}
-            </div>
-          )}
-        </div>
-
-        <div style={{
-          borderTop: '0.5px solid var(--rule)',
-          background: 'var(--paper)',
-        }}>
-          {confirmDelete && (
-            <div style={{
-              padding: '12px 22px',
-              background: '#fff3f5',
-              borderBottom: '0.5px solid #f7c1c1',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 12,
-              flexWrap: 'wrap',
-            }}>
-              <span style={{ fontSize: 13, color: '#b8536a', fontWeight: 500 }}>
-                이 TIL을 정말 삭제할까요? 삭제 후에는 복구할 수 없어요.
-              </span>
-              {deleteError && (
-                <span style={{ fontSize: 12, color: '#b8536a' }}>{deleteError}</span>
-              )}
-              <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                <Btn type="button" variant="secondary" size="sm" onClick={() => { setConfirmDelete(false); setDeleteError(null); }} disabled={deleting}>
-                  취소
-                </Btn>
-                <Btn type="button" variant="danger" size="sm" onClick={handleDeleteConfirm} disabled={deleting}>
-                  {deleting ? '삭제 중...' : '삭제 확인'}
-                </Btn>
+            )}
+            {til && !error && til.tags.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 14 }}>
+                {til.tags.map(tag => (
+                  <span key={tag} style={{
+                    fontSize: 11,
+                    padding: '3px 9px',
+                    borderRadius: 999,
+                    background: 'var(--paper-2)',
+                    color: 'var(--ink-3)',
+                    fontFamily: 'var(--font-mono)',
+                  }}>
+                    #{tag}
+                  </span>
+                ))}
               </div>
+            )}
+          </div>
+
+          {/* 수정 / 삭제 액션 — 삭제 확인도 이 안에서 인라인으로 처리 */}
+          {til && !error && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
+              {confirmDelete ? (
+                <>
+                  <span style={{ fontSize: 12.5, color: '#b8536a', fontWeight: 600, whiteSpace: 'nowrap' }}>삭제할까요?</span>
+                  <Btn type="button" variant="danger" size="sm" onClick={handleDeleteConfirm} disabled={deleting}>
+                    {deleting ? '삭제 중...' : '삭제 확인'}
+                  </Btn>
+                  <Btn type="button" variant="secondary" size="sm" onClick={() => { setConfirmDelete(false); setDeleteError(null); }} disabled={deleting}>
+                    취소
+                  </Btn>
+                  {deleteError && (
+                    <span style={{ flexBasis: '100%', textAlign: 'right', fontSize: 12, color: '#b8536a', lineHeight: 1.4 }}>{deleteError}</span>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Btn type="button" variant="green" size="md" icon={Icon.edit} onClick={() => onEdit && onEdit(til)}>
+                    수정하기
+                  </Btn>
+                  <Btn type="button" variant="danger" size="md" onClick={() => setConfirmDelete(true)}>
+                    삭제
+                  </Btn>
+                </>
+              )}
             </div>
           )}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 10,
-            padding: '16px 22px',
-          }}>
-            <Btn type="button" variant="danger" size="md" onClick={() => setConfirmDelete(true)} disabled={loading || confirmDelete || deleting}>
-              삭제
-            </Btn>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <Btn type="button" variant="secondary" size="md" onClick={handleClose} disabled={deleting}>
-                닫기
-              </Btn>
-              <Btn type="button" variant="green" size="md" icon={Icon.edit} onClick={onEdit} disabled={loading || deleting}>
-                수정하기
-              </Btn>
-            </div>
-          </div>
         </div>
+      </div>
+
+      {/* 본문 — 카드 없이 페이지 위, 에디터와 같은 폭/렌더 */}
+      <div style={col}>
+        {showLoading ? (
+          <div style={{ color: 'var(--ink-3)', fontSize: 13 }}>
+            TIL 내용을 불러오는 중이에요.
+          </div>
+        ) : error ? (
+          <div style={{ color: '#b8536a', fontSize: 13, lineHeight: 1.6 }}>{error}</div>
+        ) : contentHtml ? (
+          <TilContentView content={contentHtml} />
+        ) : til ? (
+          <div style={{ color: 'var(--ink-2)', fontSize: 14, lineHeight: 1.7 }}>{til.excerpt}</div>
+        ) : null}
       </div>
     </div>
   );
@@ -2795,4 +2765,4 @@ function HarvestModal({ pot, onClose, onHarvested }) {
   );
 }
 
-export { GardenScreen, PotDetailScreen, GardenScene };
+export { GardenScreen, PotDetailScreen, TilDetailScreen, GardenScene };

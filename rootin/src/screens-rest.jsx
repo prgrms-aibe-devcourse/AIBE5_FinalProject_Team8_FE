@@ -14,6 +14,7 @@ import { playSfx } from './lib/sfx.js';
 import { useUser } from './context/UserContext.jsx';
 import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
+import { useDeferredLoading } from './hooks/useDeferredLoading.js';
 import './dex.css';
 import './ai.css';
 import './profile.css';
@@ -261,6 +262,8 @@ function CollectionScreen() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedNum, setSelectedNum] = useState(null);
+  // 로딩 안내는 200ms 이상 걸릴 때만 노출 — 빠른 환경의 깜빡임 방지
+  const showLoading = useDeferredLoading(loading);
 
   useEffect(() => {
     getPlants()
@@ -388,9 +391,9 @@ function CollectionScreen() {
           </div>
         </div>
 
-        {loading ? (
+        {showLoading ? (
           <div className="gb-dex-loading">도감을 불러오는 중…</div>
-        ) : (
+        ) : loading ? null : (
           <div className="gb-dex-main">
             {/* 좌측 뷰어 */}
             <DexViewer data={selected} onSelect={selectNum} />

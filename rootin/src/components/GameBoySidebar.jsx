@@ -310,12 +310,21 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
   const leaveNow = useCallback(() => {
     bypassRef.current = true;
     armedRef.current = false;
-    // 트랩이 깔려 있으면 트랩+에디터 항목을 함께 건너뛴다. 단 새 탭/북마크로
-    // 에디터에 바로 진입한 경우(앞선 항목이 없음) go(-2)가 무반응이 되어 갇히므로
-    // 그때는 한 칸만 뒤로 보낸다.
-    if (window.history.state?.__gbTrap && window.history.length > 2) window.history.go(-2);
-    else window.history.back();
-  }, []);
+    if (window.history.state?.__gbTrap && window.history.length > 2) {
+      // [이전 화면, 에디터, 트랩] — 트랩+에디터 항목을 함께 건너뛰어 실제 이전 화면으로.
+      window.history.go(-2);
+    } else if (window.history.state?.__gbTrap) {
+      // [에디터, 트랩] — 새 탭/북마크/새로고침으로 에디터가 첫 항목이라 건너뛸 이전 화면이 없다.
+      // 이때 back()은 첫 항목에서 무반응(popstate도 안 옴)이라 bypass 플래그가 영구히 남고
+      // B 버튼을 누를 때마다 모달만 반복된다. 그래서 라우터로 기본 화면(대시보드)으로 보내
+      // 확실히 에디터를 벗어난다. (이동하면 에디터가 언마운트되며 자기 navGuard를 스스로 해제)
+      bypassRef.current = false; // 우리가 일으킨 popstate가 없으므로 직접 해제
+      onNav?.('dashboard');
+    } else {
+      // 트랩이 없는 일반 상황 — 한 칸 뒤로.
+      window.history.back();
+    }
+  }, [onNav]);
 
   /* ---------- 뒤로가기(B) — 미저장 작업이 있으면 경고 모달 ---------- */
   const goBack = useCallback(() => {

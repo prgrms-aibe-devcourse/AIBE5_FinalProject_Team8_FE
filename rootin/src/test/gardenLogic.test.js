@@ -20,6 +20,16 @@ describe('formatPotExperience — 실제 EXP 수치 표기', () => {
     expect(formatPotExperience(pot)).toBe('30 / 100 EXP');
   });
 
+  it('currentLevelExp가 nextLevelExpRequired를 초과하면 clamp된다', () => {
+    const pot = { level: 2, currentLevelExp: 150, nextLevelExpRequired: 100 };
+    expect(formatPotExperience(pot)).toBe('100 / 100 EXP');
+  });
+
+  it('소수점 EXP가 와도 정수로 표기한다', () => {
+    const pot = { level: 2, currentLevelExp: 50.7, nextLevelExpRequired: 100 };
+    expect(formatPotExperience(pot)).toBe('50 / 100 EXP');
+  });
+
   it('진행률(%)을 분수처럼 표기하던 기존 형식(80/100)을 더 이상 쓰지 않는다', () => {
     const pot = { level: 2, totalExp: 150, levelProgress: 0.25 };
     // 기존: percentFromRatio(0.25) -> "25/100" (진행률), 신규: 실제 EXP "50 / 200 EXP"

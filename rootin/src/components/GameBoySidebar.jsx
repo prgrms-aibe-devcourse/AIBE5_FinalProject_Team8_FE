@@ -117,9 +117,6 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
     const { type = 'square', vol = 0.06, when = 0, glide = null } = o;
     try {
       const c = ac(), t = c.currentTime + when;
-      // 오디오가 잠긴(suspended) 동안 예약한 소리는, 첫 사용자 제스처로 resume 되는 순간
-      // 한꺼번에 터져 서로(특히 부팅음과) 겹친다. 컨텍스트가 running 일 때만 예약한다.
-      if (c.state !== 'running') return;
       const osc = c.createOscillator(), g = c.createGain();
       osc.type = type; osc.frequency.setValueAtTime(freq, t);
       if (glide) osc.frequency.exponentialRampToValueAtTime(glide, t + dur);

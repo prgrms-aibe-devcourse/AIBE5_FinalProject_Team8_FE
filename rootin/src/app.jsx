@@ -349,6 +349,8 @@ function AppShell() {
             <Route path="/collection" element={theme === 'classic' ? <CollectionClassic /> : <CollectionScreen />} />
             <Route path="/ai" element={theme === 'classic' ? <AIClassic onOpenGuide={() => setGuideOpen(true)} /> : <AIScreen />} />
             <Route path="/profile" element={theme === 'classic' ? <ProfileClassic /> : <ProfileScreen />} />
+            <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/landing" element={<Navigate to="/dashboard" replace />} />
             <Route path="*" element={<NotFoundScreen />} />
           </Routes>
         </div>

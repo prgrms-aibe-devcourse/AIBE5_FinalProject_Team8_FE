@@ -2073,14 +2073,19 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   }, []);
 
   async function handleGoogleLogin() {
-    if (!GOOGLE_CLIENT_ID || !window.google) return;
+    if (!GOOGLE_CLIENT_ID || !window.google || loading) return;
     setError(null);
     setLoading(true);
     try {
       const idToken = await new Promise((resolve, reject) => {
         googleCallbackRef.current = resolve;
         window.google.accounts.id.prompt(notification => {
-          if (notification.isNotDisplayed()) {
+          if (
+            notification.isNotDisplayed() ||
+            notification.isDismissedMoment() ||
+            notification.isTapOutsideMoment() ||
+            notification.isCancelMoment()
+          ) {
             googleCallbackRef.current = null;
             reject(new Error('Google 로그인 창을 열 수 없습니다.'));
           }

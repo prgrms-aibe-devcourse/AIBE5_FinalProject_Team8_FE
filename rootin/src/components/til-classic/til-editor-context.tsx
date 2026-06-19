@@ -5,7 +5,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
   type Dispatch,
   type ReactNode,
@@ -18,10 +17,10 @@ import {
   saveDraft as apiSaveDraft,
   getDraft as apiGetDraft,
   deleteDraft as apiDeleteDraft,
-  getTemplates as apiGetTemplates,
   createTemplate as apiCreateTemplate,
   deleteTemplate as apiDeleteTemplate,
 } from '@/api/til.js'
+import { useTemplatesLoader, type Template } from '@/hooks/useTemplatesLoader'
 
 export type Pot = {
   id: number
@@ -45,13 +44,6 @@ export type PotDashboard = {
     growthPercentage?: number
     canHarvest?: boolean
   } | null
-}
-
-export type Template = {
-  id: number
-  name: string
-  content: string
-  isDefault: boolean
 }
 
 export type DraftData = {
@@ -116,10 +108,7 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
   const [potsLoading, setPotsLoading] = useState(true)
   const [selectedPotDashboard, setSelectedPotDashboard] = useState<PotDashboard | null>(null)
   const [selectedPotDashboardLoading, setSelectedPotDashboardLoading] = useState(false)
-  const [templates, setTemplates] = useState<Template[]>([])
-  const templatesLoadedRef = useRef(false)
-  const templatesRequestRef = useRef<Promise<void> | null>(null)
-  const templatesRequestIdRef = useRef(0)
+  const { templates, refreshTemplates } = useTemplatesLoader()
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [publishing, setPublishing] = useState(false)
   // 사이드바가 현재 편집 중인 TIL 강조 + 저장 안 된 변경 여부를 알 수 있도록 노출
@@ -164,41 +153,6 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
       cancelled = true
     }
   }, [selectedPotId])
-
-  // 템플릿은 에디터 진입 시점에만 지연 로딩합니다.
-  const refreshTemplates = useCallback(async (force = false) => {
-    if (!force && templatesLoadedRef.current) return
-    if (!force && templatesRequestRef.current) return templatesRequestRef.current
-
-    const requestId = templatesRequestIdRef.current + 1
-    templatesRequestIdRef.current = requestId
-    const requestPromise = apiGetTemplates()
-      .then((list) => {
-        if (templatesRequestIdRef.current !== requestId) return
-        const normalized: Template[] = (Array.isArray(list) ? list : []).map((t: any) => ({
-          id: t.templateId,
-          name: t.title,
-          content: t.content,
-          isDefault: t.isDefault,
-        }))
-        setTemplates(normalized)
-        templatesLoadedRef.current = true
-      })
-      .catch((error) => {
-        if (templatesRequestIdRef.current !== requestId) return
-        console.error('템플릿 목록 조회 실패:', error)
-        setTemplates([])
-        templatesLoadedRef.current = false
-      })
-      .finally(() => {
-        if (templatesRequestIdRef.current === requestId) {
-          templatesRequestRef.current = null
-        }
-      })
-
-    templatesRequestRef.current = requestPromise
-    return requestPromise
-  }, [])
 
   const applyTemplate = useCallback(
     (content: string) => {

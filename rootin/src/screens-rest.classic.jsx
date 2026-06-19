@@ -1986,6 +1986,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   const [showPw, setShowPw] = useState(false);
   const [focusField, setFocusField] = useState(null);
   const googleCallbackRef = useRef(null);
+  const googleLoginInFlightRef = useRef(false);
 
   // Google SDK 로드 + initialize (페이지 로드 시 1회)
   useEffect(() => {
@@ -2016,16 +2017,19 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   }, []);
 
   async function handleGoogleLogin() {
-    if (!GOOGLE_CLIENT_ID || !window.google || loading) return;
+    if (!GOOGLE_CLIENT_ID || !window.google || googleLoginInFlightRef.current) return;
+    googleLoginInFlightRef.current = true;
     setError(null);
     setLoading(true);
     try {
       const idToken = await new Promise((resolve, reject) => {
         googleCallbackRef.current = resolve;
         window.google.accounts.id.prompt(notification => {
+          const isDismissed = notification.isDismissedMoment?.();
+          const dismissedReason = isDismissed ? notification.getDismissedReason?.() : null;
           if (
-            notification.isNotDisplayed() ||
-            notification.isDismissedMoment()
+            notification.isNotDisplayed?.() ||
+            (isDismissed && dismissedReason !== 'credential_returned')
           ) {
             googleCallbackRef.current = null;
             reject(new Error('Google 로그인 창을 열 수 없습니다.'));
@@ -2040,6 +2044,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
     } catch (err) {
       setError(err?.message ?? parseApiError(err));
     } finally {
+      googleLoginInFlightRef.current = false;
       setLoading(false);
       googleCallbackRef.current = null;
     }

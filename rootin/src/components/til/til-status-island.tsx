@@ -20,8 +20,20 @@ import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { useTilEditor } from './til-editor-context'
 import { playSfx } from '@/lib/sfx.js'
+import { EditorConfirmModal } from '@/components/EditorConfirmModal.jsx'
 
 type Stats = { words: number; chars: number; minutes: number }
+
+// 템플릿 메뉴에서 띄우는 확인/알림 모달 (게임보이 테마). hideCancel 이면 확인 버튼만 있는 알림.
+type TemplateModal = {
+  icon: string
+  tag: string
+  title: string
+  description: string
+  confirmLabel: string
+  hideCancel?: boolean
+  onConfirm?: () => void
+}
 
 function TemplateMenu() {
   const { editor, templates, applyTemplate, saveCustomTemplate, deleteCustomTemplate } =
@@ -30,14 +42,26 @@ function TemplateMenu() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [newName, setNewName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [modal, setModal] = useState<TemplateModal | null>(null)
 
   // BM-06 템플릿 이용 — 본문에 내용이 있으면 덮어쓰기 확인
   const handleApply = (content: string) => {
     if (!editor) return
+    const apply = () => { applyTemplate(content); setOpen(false) }
     const hasContent = editor.getText().trim().length > 0
-    if (hasContent && !window.confirm('현재 작성 중인 본문을 템플릿 내용으로 덮어쓸까요?')) return
-    applyTemplate(content)
-    setOpen(false)
+    if (hasContent) {
+      setOpen(false)
+      setModal({
+        icon: 'book',
+        tag: '템플릿',
+        title: '본문을 템플릿으로 덮어쓸까요?',
+        description: '현재 작성 중인 내용이 선택한 템플릿으로 대체돼요.',
+        confirmLabel: '덮어쓰기',
+        onConfirm: apply,
+      })
+      return
+    }
+    apply()
   }
 
   // BM-07 템플릿 제작 — 현재 본문을 새 템플릿으로 저장 (서버 연동)
@@ -51,7 +75,14 @@ function TemplateMenu() {
       setNewName('')
       setDialogOpen(false)
     } catch {
-      window.alert('템플릿 저장에 실패했습니다. 다시 시도해주세요.')
+      setModal({
+        icon: 'bell',
+        tag: '저장 실패',
+        title: '템플릿을 저장하지 못했어요',
+        description: '잠시 후 다시 시도해 주세요.',
+        confirmLabel: '확인',
+        hideCancel: true,
+      })
     } finally {
       setSaving(false)
     }
@@ -59,10 +90,26 @@ function TemplateMenu() {
 
   // 템플릿 삭제 (서버 연동) — 기본 제공 템플릿은 삭제 불가
   const handleDeleteTemplate = (id: number) => {
-    if (!window.confirm('이 템플릿을 삭제할까요?')) return
-    playSfx('delete')
-    deleteCustomTemplate(id).catch(() => {
-      window.alert('템플릿 삭제에 실패했습니다.')
+    setOpen(false)
+    setModal({
+      icon: 'xmark',
+      tag: '템플릿 삭제',
+      title: '이 템플릿을 삭제할까요?',
+      description: '삭제한 템플릿은 다시 불러올 수 없어요.',
+      confirmLabel: '삭제',
+      onConfirm: () => {
+        playSfx('delete')
+        deleteCustomTemplate(id).catch(() => {
+          setModal({
+            icon: 'bell',
+            tag: '삭제 실패',
+            title: '템플릿을 삭제하지 못했어요',
+            description: '잠시 후 다시 시도해 주세요.',
+            confirmLabel: '확인',
+            hideCancel: true,
+          })
+        })
+      },
     })
   }
 
@@ -162,6 +209,20 @@ function TemplateMenu() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 템플릿 덮어쓰기/삭제 확인 · 실패 알림 (브라우저 alert/confirm 대체) */}
+      {modal && (
+        <EditorConfirmModal
+          icon={modal.icon}
+          tag={modal.tag}
+          title={modal.title}
+          description={modal.description}
+          confirmLabel={modal.confirmLabel}
+          hideCancel={modal.hideCancel}
+          onConfirm={() => { const run = modal.onConfirm; setModal(null); run?.() }}
+          onClose={() => setModal(null)}
+        />
+      )}
     </>
   )
 }

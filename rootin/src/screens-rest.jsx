@@ -14,6 +14,7 @@ import { playSfx } from './lib/sfx.js';
 import { useUser } from './context/UserContext.jsx';
 import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
+import { useDeferredLoading } from './hooks/useDeferredLoading.js';
 import './dex.css';
 import './ai.css';
 import './profile.css';
@@ -261,6 +262,8 @@ function CollectionScreen() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedNum, setSelectedNum] = useState(null);
+  // 로딩 안내는 200ms 이상 걸릴 때만 노출 — 빠른 환경의 깜빡임 방지
+  const showLoading = useDeferredLoading(loading);
 
   useEffect(() => {
     getPlants()
@@ -388,9 +391,9 @@ function CollectionScreen() {
           </div>
         </div>
 
-        {loading ? (
+        {showLoading ? (
           <div className="gb-dex-loading">도감을 불러오는 중…</div>
-        ) : (
+        ) : loading ? null : (
           <div className="gb-dex-main">
             {/* 좌측 뷰어 */}
             <DexViewer data={selected} onSelect={selectNum} />
@@ -1924,7 +1927,7 @@ function validate({ mode, email, password, nickname }) {
 
 // API 에러 → 사용자 메시지 변환
 function parseApiError(err) {
-  if (err?.status === 401) return '비밀번호가 올바르지 않습니다.';
+  if (err?.status === 401) return '이메일 또는 비밀번호가 올바르지 않습니다.';
   if (err?.status === 409) return '이미 사용 중인 이메일입니다.';
   if (err?.status === 404) return '등록되지 않은 이메일입니다.';
   return err?.body?.message ?? '오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
@@ -2041,33 +2044,53 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [focusField, setFocusField] = useState(null);
+  const googleCallbackRef = useRef(null);
+  const googleLoginInFlightRef = useRef(false);
 
-  // Google SDK 초기화
+  // Google SDK 로드 + initialize (페이지 로드 시 1회)
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
+
+    const initGoogle = () => {
+      if (!window.google) return;
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: ({ credential }) => {
+          googleCallbackRef.current?.(credential);
+        },
+      });
+    };
+
     const scriptId = 'google-gsi-script';
-    if (document.getElementById(scriptId)) return;
+    if (document.getElementById(scriptId)) {
+      initGoogle();
+      return;
+    }
     const script = document.createElement('script');
     script.id = scriptId;
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
+    script.onload = initGoogle;
     document.head.appendChild(script);
   }, []);
 
   async function handleGoogleLogin() {
-    if (!GOOGLE_CLIENT_ID || !window.google) return;
+    if (!GOOGLE_CLIENT_ID || !window.google || googleLoginInFlightRef.current) return;
+    googleLoginInFlightRef.current = true;
     setError(null);
     setLoading(true);
     try {
       const idToken = await new Promise((resolve, reject) => {
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: ({ credential }) => resolve(credential),
-          error_callback: reject,
-        });
+        googleCallbackRef.current = resolve;
         window.google.accounts.id.prompt(notification => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          const isDismissed = notification.isDismissedMoment?.();
+          const dismissedReason = isDismissed ? notification.getDismissedReason?.() : null;
+          if (
+            notification.isNotDisplayed?.() ||
+            (isDismissed && dismissedReason !== 'credential_returned')
+          ) {
+            googleCallbackRef.current = null;
             reject(new Error('Google 로그인 창을 열 수 없습니다.'));
           }
         });
@@ -2080,7 +2103,9 @@ function AuthScreen({ onAuth, onBackToLanding }) {
     } catch (err) {
       setError(err?.message ?? parseApiError(err));
     } finally {
+      googleLoginInFlightRef.current = false;
       setLoading(false);
+      googleCallbackRef.current = null;
     }
   }
 

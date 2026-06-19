@@ -225,10 +225,14 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
 
   // 새 TIL 작성 — 에디터/제목/태그를 비우고 수정 모드 해제 (화분 선택은 유지)
   const startNewTil = useCallback(() => {
-    editor?.chain().focus().clearContent().run()
+    editor?.commands.clearContent()
     setTitle('')
     setTags([])
     setCurrentTilId(null)
+    // 새 글은 제목부터 쓰도록 커서를 본문이 아닌 제목 입력란으로 보낸다.
+    requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>('.guide-editor-title')?.focus()
+    })
   }, [editor])
 
   // 발행 — 성공 시 해당 화분의 임시저장 삭제 후 에디터 초기화

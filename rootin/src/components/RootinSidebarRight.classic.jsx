@@ -14,6 +14,7 @@ import { ChevronRight, ChevronDown, Sprout, FileText, Pencil, Lightbulb, Sparkle
 import { getMyTils, getTil, getDraft } from '@/api/til.js';
 import { cn } from '@/lib/utils';
 import { inferSpecies } from '@/utils/plant.js';
+import { EditorConfirmModal } from './EditorConfirmModal.classic.jsx';
 
 const PANEL_WIDTH = 344;
 
@@ -126,6 +127,9 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
   const [contentLength, setContentLength] = useState(0);
   // "이어쓰기"로 임시저장본을 에디터에 띄운 상태인지(=임시저장본을 보는 중) 추적
   const [draftResumed, setDraftResumed] = useState(false);
+  // 에디터 확인 모달 — 저장 안 된 변경을 잃을 수 있는 동작(새 TIL/임시저장 불러오기/다른 TIL 수정) 공용.
+  // null 이면 닫힘, { tag, title, description, confirmLabel, onConfirm } 객체면 노출.
+  const [confirmAction, setConfirmAction] = useState(null);
 
   // "더 보기" 비동기 응답이 도착했을 때 화분이 바뀌었는지 검사하기 위한 참조
   const selectedPotIdRef = useRef(selectedPotId);
@@ -186,32 +190,56 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
     return () => { active = false; };
   }, [selectedPotId, draftSavedAt]);
 
-  // "새 TIL 작성" → 에디터 비우고 신규 작성 상태로. 작성 중 내용 있으면 확인.
-  const handleNewTil = () => {
-    const hasContent = (editor?.getText().trim().length ?? 0) > 0;
-    if (dirty && hasContent) {
-      if (!window.confirm('작성 중인 내용이 사라질 수 있어요. 새 TIL을 시작할까요?')) return;
-    }
+  // 새 TIL 시작 실행 — 에디터 비우고 신규 작성 상태로.
+  const proceedNewTil = () => {
     startNewTil();
     onNewTil?.();
     setDraftResumed(false);
   };
 
-  // 임시저장본 "이어쓰기" → 에디터에 적용 + 수정 모드 해제
-  const handleResumeDraft = () => {
-    if (currentTilId && dirty) {
-      if (!window.confirm('수정 중인 변경 사항이 사라질 수 있어요. 임시저장본으로 이동할까요?')) return;
+  // "새 TIL 작성" → 작성 중 내용이 있으면 확인 모달, 없으면 바로 시작.
+  const handleNewTil = () => {
+    const hasContent = (editor?.getText().trim().length ?? 0) > 0;
+    // 임시저장 글도 보호한다. 작성 모드(currentTilId == null)에서 내용이 있으면,
+    // 자동저장으로 dirty=false 여도 새 TIL로 넘어가 한 글자만 입력하면 그 임시저장본이
+    // 덮어써져 사라진다. 그래서 '저장 안 됨'뿐 아니라 작성 모드에 내용이 있으면 항상 경고한다.
+    if (hasContent && (dirty || currentTilId == null)) {
+      setConfirmAction({
+        tag: '새 TIL',
+        title: '작성 중인 글을 비울까요?',
+        description: <>지금 작성 중인 글이 사라져요.<br />새 TIL을 시작할까요?</>,
+        confirmLabel: '새로 작성',
+        onConfirm: proceedNewTil,
+      });
+      return;
     }
+    proceedNewTil();
+  };
+
+  // 임시저장본 "이어쓰기" 실행 — 에디터에 적용 + 수정 모드 해제
+  const proceedResumeDraft = () => {
     resumeDraft(draft);
     onResumeDraft?.(selectedPotId);
     setDraftResumed(true);
   };
 
-  // TIL 클릭 → 수정 모드 진입. 수정 중 저장 안 된 변경이 있으면 확인.
-  const handleEdit = async (til) => {
-    if (currentTilId && String(currentTilId) !== String(til.id) && dirty) {
-      if (!window.confirm('저장하지 않은 변경 사항이 사라질 수 있어요. 이동할까요?')) return;
+  // 임시저장본 "이어쓰기" → 수정 중 변경이 있으면 확인 모달
+  const handleResumeDraft = () => {
+    if (currentTilId && dirty) {
+      setConfirmAction({
+        tag: '임시저장',
+        title: '임시저장본을 불러올까요?',
+        description: <>수정 중인 변경 사항은 사라져요.<br />임시저장본으로 이동할까요?</>,
+        confirmLabel: '이어쓰기',
+        onConfirm: proceedResumeDraft,
+      });
+      return;
     }
+    proceedResumeDraft();
+  };
+
+  // TIL 수정 진입 실행
+  const proceedEdit = async (til) => {
     setDraftResumed(false);
     try {
       const d = await getTil(til.id);
@@ -219,6 +247,21 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
     } catch {
       onEditTil?.({ ...til });
     }
+  };
+
+  // TIL 클릭 → 수정 모드 진입. 수정 중 저장 안 된 변경이 있으면 확인 모달.
+  const handleEdit = (til) => {
+    if (currentTilId && String(currentTilId) !== String(til.id) && dirty) {
+      setConfirmAction({
+        tag: '수정',
+        title: '다른 TIL로 이동할까요?',
+        description: <>저장하지 않은 변경 사항은 사라져요.<br />선택한 TIL을 수정할까요?</>,
+        confirmLabel: '이동',
+        onConfirm: () => proceedEdit(til),
+      });
+      return;
+    }
+    proceedEdit(til);
   };
 
   // "더 보기" → 다음 페이지를 불러와 목록 끝에 이어 붙임
@@ -572,6 +615,17 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
         </motion.div>
       </div>
       </div>
+
+      {confirmAction && (
+        <EditorConfirmModal
+          tag={confirmAction.tag}
+          title={confirmAction.title}
+          description={confirmAction.description}
+          confirmLabel={confirmAction.confirmLabel}
+          onConfirm={() => { const run = confirmAction.onConfirm; setConfirmAction(null); run(); }}
+          onClose={() => setConfirmAction(null)}
+        />
+      )}
     </aside>
   );
 }

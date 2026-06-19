@@ -100,6 +100,7 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
   const actxRef = useRef(null);
   const toastTimer = useRef(null);
   const powerTimer = useRef(null);
+  const bootEndTimer = useRef(null);    // 부팅 종료(1650ms) 타이머 — 토글/언마운트 시 취소
 
   useEffect(() => { cursorRef.current = cursor; }, [cursor]);
   useEffect(() => { mutedRef.current = muted; }, [muted]);
@@ -211,6 +212,7 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
   /* ---------- power ---------- */
   const powerOn = useCallback((boot = true) => {
     clearTimeout(powerTimer.current);
+    clearTimeout(bootEndTimer.current);
     if (fxOffRef.current) fxOffRef.current.classList.remove('collapse');
     setPowered(true); LS.set('power', '1');
     if (!boot) { setBooting(false); return; }
@@ -218,10 +220,14 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
     const bootEl = bootRef.current;
     if (bootEl) { bootEl.classList.remove('run', 'flash'); void bootEl.offsetWidth; bootEl.classList.add('run'); }
     powerTimer.current = setTimeout(() => {
-      SFX.current.boot();
+      // 오디오가 풀린 상태(running)면 부팅 애니메이션 중 부팅음을 낸다(테마 변경 등 클릭 진입).
+      // 새로고침처럼 막힌 상태(suspended)면 미루지 않고 생략한다 —
+      // 미뤄서 첫 클릭에 내면 그 클릭/페이지 효과음과 겹치기 때문.
+      // 아직 컨텍스트가 없으면(제스처 전) 만들지 않는다 — actxRef 를 직접 본다.
+      if (actxRef.current?.state === 'running') SFX.current.boot();
       if (bootRef.current) bootRef.current.classList.add('flash');
     }, 1040);
-    setTimeout(() => {
+    bootEndTimer.current = setTimeout(() => {
       if (bootRef.current) bootRef.current.classList.remove('run', 'flash');
       setBooting(false);
     }, 1650);
@@ -284,6 +290,7 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
     return () => {
       window.removeEventListener('pointerdown', resume);
       clearTimeout(powerTimer.current);
+      clearTimeout(bootEndTimer.current);
       clearTimeout(toastTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -2047,31 +2047,16 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   const googleCallbackRef = useRef(null);
   const googleLoginInFlightRef = useRef(false);
 
-  // Google SDK 로드 + initialize (페이지 로드 시 1회)
+  // Google SDK 스크립트 로드 (페이지 로드 시 1회)
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
-
-    const initGoogle = () => {
-      if (!window.google) return;
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        callback: ({ credential }) => {
-          googleCallbackRef.current?.(credential);
-        },
-      });
-    };
-
     const scriptId = 'google-gsi-script';
-    if (document.getElementById(scriptId)) {
-      initGoogle();
-      return;
-    }
+    if (document.getElementById(scriptId)) return;
     const script = document.createElement('script');
     script.id = scriptId;
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
-    script.onload = initGoogle;
     document.head.appendChild(script);
   }, []);
 
@@ -2082,6 +2067,13 @@ function AuthScreen({ onAuth, onBackToLanding }) {
     setLoading(true);
     try {
       const idToken = await new Promise((resolve, reject) => {
+        // initialize()를 매 호출마다 재실행하여 취소 후 재시도 시 suppression 상태 리셋
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: ({ credential }) => {
+            googleCallbackRef.current?.(credential);
+          },
+        });
         googleCallbackRef.current = resolve;
         window.google.accounts.id.prompt(notification => {
           const isDismissed = notification.isDismissedMoment?.();

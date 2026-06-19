@@ -139,7 +139,21 @@ function percentFromRatio(value = 0) {
 }
 
 function formatPotExperience(pot) {
-  return `${percentFromRatio(pot.levelProgress)}/100`;
+  // 진행률(%)이 아니라 실제 경험치 수치로 표기해 에디터 사이드바와 통일한다.
+  // currentLevelExp/nextLevelExpRequired(대시보드 응답)가 있으면 그대로 쓰고,
+  // 없으면(정원 목록 등) totalExp와 level로 BE 레벨 공식과 동일하게 파생한다.
+  const level = Math.max(1, Number(pot.level) || 1);
+  // 다음 레벨 필요 EXP는 항상 양수다. 누락(undefined)이거나 toDashboardPot의
+  // 기본값 0으로 내려오는 경우 BE 레벨 공식(level*100)으로 파생한다.
+  const providedNext = Number(pot.nextLevelExpRequired);
+  const nextLevelExpRequired = providedNext > 0 ? providedNext : level * 100;
+  const minExpForLevel = ((level - 1) * level * 100) / 2;
+  const currentLevelExp = pot.currentLevelExp != null
+    ? Number(pot.currentLevelExp)
+    : Math.max(0, (Number(pot.totalExp) || 0) - minExpForLevel);
+  const clamped = Math.min(Math.max(0, currentLevelExp), nextLevelExpRequired);
+  // EXP는 정수로 표기(소수점 응답이 와도 사이드바 표기와 어긋나지 않게).
+  return `${Math.floor(clamped)} / ${Math.floor(nextLevelExpRequired)} EXP`;
 }
 
 function formatPlantGrowthPercent(pot) {

@@ -2,7 +2,7 @@ import { request } from './client.js';
 
 let summaryRequest = null;
 
-function getSummaryCacheKey() {
+function getSummaryRequestKey() {
   try {
     return localStorage.getItem('accessToken') ?? '';
   } catch {
@@ -11,9 +11,9 @@ function getSummaryCacheKey() {
 }
 
 export const getSummary      = ()            => {
-  const cacheKey = getSummaryCacheKey();
-  if (!summaryRequest || summaryRequest.cacheKey !== cacheKey) {
-    const requestEntry = { cacheKey, promise: null };
+  const requestKey = getSummaryRequestKey();
+  if (!summaryRequest || summaryRequest.requestKey !== requestKey) {
+    const requestEntry = { requestKey, promise: null };
     requestEntry.promise = request('/api/v1/dashboard/summary')
       .then(r => r.data)
       .finally(() => {

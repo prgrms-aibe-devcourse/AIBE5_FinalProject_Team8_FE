@@ -1,11 +1,16 @@
-'use client'
-
 import { useCallback, useRef, useState } from 'react'
 import { getTemplates as apiGetTemplates } from '@/api/til.js'
 
 export type Template = {
   id: number
   name: string
+  content: string
+  isDefault: boolean
+}
+
+type TemplateResponse = {
+  templateId: number
+  title: string
   content: string
   isDefault: boolean
 }
@@ -25,7 +30,7 @@ export function useTemplatesLoader() {
     const requestPromise = apiGetTemplates()
       .then((list) => {
         if (templatesRequestIdRef.current !== requestId) return
-        const normalized: Template[] = (Array.isArray(list) ? list : []).map((t: any) => ({
+        const normalized: Template[] = (Array.isArray(list) ? list : []).map((t: TemplateResponse) => ({
           id: t.templateId,
           name: t.title,
           content: t.content,

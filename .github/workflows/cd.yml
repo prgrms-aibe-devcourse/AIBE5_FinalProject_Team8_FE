@@ -1,12 +1,13 @@
 name: CD - Docker Hub Push on Main
-
+ 
 on:
   push:
     branches:
       - main
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+permissions:
+  id-token: write     # OIDC 토큰 발급
+  contents: read      # checkout
 
 jobs:
   build-and-push:
@@ -32,3 +33,50 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/rootin-fe:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/rootin-fe:${{ github.sha }}
+          build-args: |
+            VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+            VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to EC2 via SSM
+        env:
+          INSTANCE_ID: ${{ secrets.EC2_ID }}
+        run: |
+          set -euo pipefail
+
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy FE from ${{ github.repository }}" \
+            --parameters 'commands=["cd /home/ubuntu/rootin && docker compose -f docker-compose.yml pull fe && docker compose -f docker-compose.yml up -d --no-deps fe && docker image prune -f"]' \
+            --query "Command.CommandId" --output text)
+          echo "Command ID: $CMD_ID"
+
+          sleep 5
+
+          while true; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" \
+              --query "Status" --output text 2>/dev/null || echo "Pending")
+            echo "Current status: $STATUS"
+            case "$STATUS" in
+              Success|Failed|Cancelled|TimedOut) break ;;
+            esac
+            sleep 5
+          done
+
+          echo "----- stdout -----"
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query "StandardOutputContent" --output text
+          echo "----- stderr -----"
+          aws ssm get-command-invocation --command-id "$CMD_ID" --instance-id "$INSTANCE_ID" --query "StandardErrorContent" --output text
+
+          if [ "$STATUS" != "Success" ]; then
+            echo "::error::Deployment failed with status: $STATUS"
+            exit 1
+          fi
+          echo "Deployment succeeded ✅"

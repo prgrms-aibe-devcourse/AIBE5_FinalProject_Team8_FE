@@ -11,6 +11,7 @@ import { RtIcon } from './pixel-icons.jsx';
 import { RootinWordmark } from './landing/RootinWordmark.jsx';
 import { PixelPals } from './auth-pixel-pals.jsx';
 import { playSfx } from './lib/sfx.js';
+import { setNavGuard, clearNavGuard } from './lib/navGuard.js';
 import { useUser } from './context/UserContext.jsx';
 import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
@@ -843,6 +844,24 @@ function AIScreen({ onOpenGuide }) {
       clearTimeout(savedTimerRef.current);
     }
   }, []);
+
+  // 생성했지만 보관함에 저장하지 않은 결과가 있으면 이탈 가드 등록
+  // → 사이드바 뒤로가기(B) 시 경고 모달. (saved는 2초 피드백이라 못 쓰고,
+  //   현재 결과가 보관함 목록에 들어갔는지로 "저장됨"을 판정한다)
+  useEffect(() => {
+    const fn = () => {
+      const unsaved =
+        generated &&
+        !!aiResult &&
+        !aiResult.isGuideMock &&
+        !savedResults.some((r) => r.content === aiResult);
+      return unsaved
+        ? '생성한 AI 학습 결과를 아직 저장하지 않았어요.\n나가면 결과가 사라져요.'
+        : null;
+    };
+    setNavGuard(fn);
+    return () => clearNavGuard(fn);
+  }, [generated, aiResult, savedResults]);
 
   // 이용 가이드 투어가 AI 화면 단계(.guide-ai-*)를 지날 때 화면 상태를 자동 제어한다.
   // (classic AI 화면과 동일한 rootin-guide-step 프로토콜 공유)

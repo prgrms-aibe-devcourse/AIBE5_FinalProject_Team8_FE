@@ -18,6 +18,7 @@ import { useTilEditor, type DraftData } from './til-editor-context'
 import { getTooLongTilTags, TIL_TAG_MAX_LENGTH } from './til-policy'
 import { updateTil } from '@/api/til.js'
 import { playSfx } from '@/lib/sfx.js'
+import { setNavGuard, clearNavGuard } from '@/lib/navGuard.js'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -130,6 +131,21 @@ export function TilEditorPage({
   useEffect(() => {
     setDirty(!saved)
   }, [saved, setDirty])
+
+  // 미저장 변경이 있으면 이탈 가드 등록 → 사이드바 뒤로가기(B) 시 경고 모달.
+  // 빈 에디터(제목·태그·본문 모두 비어있음)에서는 막지 않는다(오탐 방지).
+  // 미저장 여부(=메시지)가 바뀔 때만 재등록한다. 키 입력마다 setNavGuard가
+  // 불리면 사이드바 트랩 재무장이 과하게 일어나므로 파생 메시지에만 의존한다.
+  const leaveGuardMessage =
+    !saved && (title.trim().length > 0 || tags.length > 0 || (editor ? !editor.isEmpty : false))
+      ? '작성 중인 내용이 저장되지 않았어요.\n나가면 변경한 내용이 사라질 수 있어요.'
+      : null
+  useEffect(() => {
+    if (leaveGuardMessage == null) return
+    const fn = () => leaveGuardMessage
+    setNavGuard(fn)
+    return () => clearNavGuard(fn)
+  }, [leaveGuardMessage])
 
   useEffect(() => {
     if (isEditMode || !editor || entryMode !== 'new') return

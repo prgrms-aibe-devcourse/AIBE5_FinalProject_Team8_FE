@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useUser } from '../context/UserContext.jsx';
+import { checkNavGuard, subscribeNavGuard } from '../lib/navGuard.js';
 import './gameboy-sidebar.css';
 
 /* =========================================================================
@@ -48,6 +49,18 @@ const NAV_ITEMS = MENU.filter((m) => !m.logout); // 도크 레일은 내비게�
 const PALETTES = ['dmg', 'moss', 'noir', 'berry', 'dawn'];
 const PAL_NAME = { dmg: 'MOSS GREEN', moss: 'FOREST', noir: 'MONO', berry: 'BERRY', dawn: 'DAWN' };
 
+/* ---------- 조작 설명서(레트로 매뉴얼) 항목 — 콘솔 버튼 + 키보드 단축키 ----------
+   전원은 재미요소라 안내에 대놓고 두지 않고 맨 끝에서 살짝만 언급한다(fun). */
+const MANUAL_ROWS = [
+  { keys: ['↑', '↓'], desc: '메뉴 이동 (D-패드·방향키)' },
+  { keys: ['A', 'Enter'], desc: '선택' },
+  { keys: ['B', '⌫'], desc: '이전 화면으로 뒤로가기' },
+  { keys: ['SELECT', 'S'], desc: '화면 색 바꾸기' },
+  { keys: ['START', 'M'], desc: '소리 켜기 / 끄기' },
+  { keys: ['MENU', 'H'], desc: '사이드바 접기 / 펴기' },
+  { keys: ['POWER', 'P'], desc: '전원 — 한번 꺼볼까요? 다시 켜면 부팅 연출이 나와요 😉', fun: true },
+];
+
 const LS = {
   get: (k, d) => { try { const v = localStorage.getItem('rootin_gb_' + k); return v === null ? d : v; } catch { return d; } },
   set: (k, v) => { try { localStorage.setItem('rootin_gb_' + k, v); } catch { /* noop */ } },
@@ -82,6 +95,9 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
   );
   const [toastText, setToastText] = useState('');
   const [toastOn, setToastOn] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualSeen, setManualSeen] = useState(() => LS.get('manualSeen', '0') === '1');
+  const [leaveWarn, setLeaveWarn] = useState(null); // 미저장 이탈 경고 메시지(null이면 닫힘)
 
   /* ---------- refs ---------- */
   const consoleRef = useRef(null);
@@ -97,6 +113,10 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
   const mutedRef = useRef(muted);
   const poweredRef = useRef(powered);
   const bootingRef = useRef(booting);
+  const manualOpenRef = useRef(false);
+  const leaveWarnRef = useRef(false);
+  const armedRef = useRef(false);      // 브라우저 뒤로가기를 잡을 히스토리 '트랩'이 깔려있는지
+  const bypassRef = useRef(false);     // 우리가 의도적으로 일으킨 popstate는 가드 없이 통과시킨다
   const actxRef = useRef(null);
   const toastTimer = useRef(null);
   const powerTimer = useRef(null);
@@ -106,6 +126,8 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
   useEffect(() => { mutedRef.current = muted; }, [muted]);
   useEffect(() => { poweredRef.current = powered; }, [powered]);
   useEffect(() => { bootingRef.current = booting; }, [booting]);
+  useEffect(() => { manualOpenRef.current = manualOpen; }, [manualOpen]);
+  useEffect(() => { leaveWarnRef.current = !!leaveWarn; }, [leaveWarn]);
 
   const slotHidden = forceHidden || internalHidden;
   const dockShown = internalHidden && !forceHidden;
@@ -277,6 +299,96 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
     });
   }, [tone]);
 
+  /* ---------- 조작 설명서 열기/닫기 ---------- */
+  const openManual = useCallback(() => {
+    setManualOpen(true);
+    setManualSeen((seen) => { if (!seen) LS.set('manualSeen', '1'); return true; });
+    SFX.current.select();
+  }, []);
+  const closeManual = useCallback(() => {
+    setManualOpen(false);
+    SFX.current.back();
+  }, []);
+
+  /* ---------- 실제 이탈 — 트랩이 깔려 있으면 그 항목까지 함께 건너뛴다 ----------
+     미저장 중에는 현재 히스토리 최상단이 우리가 깐 트랩이라, 이전 화면으로 가려면
+     트랩(+에디터 항목)을 한꺼번에 건너뛰어야 한다. 트랩이 없으면 평범하게 한 칸 뒤로. */
+  const leaveNow = useCallback(() => {
+    bypassRef.current = true;
+    armedRef.current = false;
+    if (window.history.state?.__gbTrap && window.history.length > 2) {
+      // [이전 화면, 에디터, 트랩] — 트랩+에디터 항목을 함께 건너뛰어 실제 이전 화면으로.
+      window.history.go(-2);
+    } else if (window.history.state?.__gbTrap) {
+      // [에디터, 트랩] — 새 탭/북마크/새로고침으로 에디터가 첫 항목이라 건너뛸 이전 화면이 없다.
+      // 이때 back()은 첫 항목에서 무반응(popstate도 안 옴)이라 bypass 플래그가 영구히 남고
+      // B 버튼을 누를 때마다 모달만 반복된다. 그래서 라우터로 기본 화면(대시보드)으로 보내
+      // 확실히 에디터를 벗어난다. (이동하면 에디터가 언마운트되며 자기 navGuard를 스스로 해제)
+      bypassRef.current = false; // 우리가 일으킨 popstate가 없으므로 직접 해제
+      onNav?.('dashboard');
+    } else {
+      // 트랩이 없는 일반 상황 — 한 칸 뒤로.
+      window.history.back();
+    }
+  }, [onNav]);
+
+  /* ---------- 뒤로가기(B) — 미저장 작업이 있으면 경고 모달 ---------- */
+  const goBack = useCallback(() => {
+    if (!poweredRef.current || bootingRef.current) return;
+    const warn = checkNavGuard();
+    if (warn) { SFX.current.deny(); setLeaveWarn(warn); return; }
+    SFX.current.back();
+    leaveNow();
+  }, [leaveNow]);
+  const confirmLeave = useCallback(() => {
+    setLeaveWarn(null);
+    SFX.current.back();
+    leaveNow();
+  }, [leaveNow]);
+  const cancelLeave = useCallback(() => {
+    setLeaveWarn(null);
+    SFX.current.move();
+  }, []);
+
+  /* ---------- 브라우저 뒤로가기도 같은 경고로 잡기 ----------
+     BrowserRouter라 useBlocker를 못 써서, 미저장 작업이 생기면 히스토리에 '트랩'
+     항목을 하나 올려둔다. 그래야 브라우저 뒤로가기가 화면을 즉시 떠나(언마운트해
+     작성 내용을 잃지) 않고 popstate로 잡혀, B 버튼과 동일한 경고 모달을 띄울 수 있다.
+     pushState로 같은 URL 항목을 더하므로 주소·라우터 화면은 그대로다(보이지 않음). */
+  useEffect(() => {
+    const arm = () => {
+      if (armedRef.current || checkNavGuard() == null) return;
+      armedRef.current = true;
+      // 이미 트랩 위에 있으면 다시 쌓지 않는다(중복 누적 방지).
+      if (!window.history.state?.__gbTrap) {
+        window.history.pushState({ ...window.history.state, __gbTrap: 1 }, '');
+      }
+    };
+    const onPop = () => {
+      if (bypassRef.current) { bypassRef.current = false; return; }
+      const warn = checkNavGuard();
+      if (warn) {
+        // 미저장 → 떠나지 못하게 트랩을 다시 올리고 B와 동일한 경고 모달.
+        // 이미 트랩 위면 중복 누적을 막는다.
+        armedRef.current = true;
+        if (!window.history.state?.__gbTrap) {
+          window.history.pushState({ ...window.history.state, __gbTrap: 1 }, '');
+        }
+        SFX.current.deny();
+        setLeaveWarn(warn);
+      } else if (armedRef.current) {
+        // 저장이 끝나 막을 필요는 없지만 트랩이 남아 사용자가 그걸 pop함
+        // → 한 번의 뒤로가기로 실제로 이전 화면까지 가도록 이어서 back
+        armedRef.current = false;
+        window.history.back();
+      }
+    };
+    const unsub = subscribeNavGuard(arm);
+    window.addEventListener('popstate', onPop);
+    arm(); // 마운트 시점에 이미 미저장이면 즉시 트랩 무장
+    return () => { unsub(); window.removeEventListener('popstate', onPop); };
+  }, []);
+
   /* ---------- 라우트(current)가 바뀌면 커서를 따라가게 ---------- */
   useEffect(() => {
     if (currentIdx >= 0) { setCursor(currentIdx); cursorRef.current = currentIdx; }
@@ -324,10 +436,14 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
       const t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
       const k = e.key.toLowerCase();
+      // 설명서가 열려 있으면 콘솔 단축키는 막고 ESC로만 닫는다.
+      if (manualOpenRef.current) { if (k === 'escape') setManualOpen(false); return; }
+      // 이탈 경고 모달이 떠 있으면 ESC=머무르기 / Enter=나가기만 받는다.
+      if (leaveWarnRef.current) { if (k === 'escape') cancelLeave(); else if (k === 'enter') confirmLeave(); return; }
       if (k === 'arrowup')        { e.preventDefault(); nav('up'); }
       else if (k === 'arrowdown') { e.preventDefault(); nav('down'); }
       else if (k === 'enter' || k === 'a') { activate(); press('a'); }
-      else if (k === 'b' || k === 'backspace') { if (poweredRef.current && !bootingRef.current) { moveCursor(currentIdx >= 0 ? currentIdx : cursorRef.current, false); SFX.current.back(); } press('b'); }
+      else if (k === 'b' || k === 'backspace') { goBack(); press('b'); }
       else if (k === 's') { cyclePalette(); press('select'); }
       else if (k === 'm') { toggleMute(); press('start'); }
       else if (k === 'p') { togglePower(); }
@@ -335,7 +451,7 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [nav, activate, moveCursor, cyclePalette, toggleMute, togglePower, setHidden, internalHidden, currentIdx]);
+  }, [nav, activate, moveCursor, cyclePalette, toggleMute, togglePower, setHidden, internalHidden, currentIdx, goBack, confirmLeave, cancelLeave]);
 
   /* ---------- wrapper style: 픽셀 아이콘 CSS 변수 주입 ---------- */
   const iconVars = {
@@ -381,6 +497,16 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
               <span className="ps-knob" />
             </div>
             <span className="power-label">POWER</span>
+            <button
+              type="button"
+              className={`gb-help${manualSeen ? '' : ' pulse'}`}
+              aria-label="조작 설명서 열기"
+              title="조작 설명서 (버튼·단축키)"
+              onClick={openManual}
+            >
+              <span className="gb-help-q" aria-hidden="true">?</span>
+              <span className="gb-help-cap">조작</span>
+            </button>
           </div>
 
           {/* Screen bezel */}
@@ -457,6 +583,19 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
                 <div className="fx fx-glass" aria-hidden="true" />
                 <div className="fx fx-flicker" aria-hidden="true" />
                 <div className="fx fx-off" ref={fxOffRef} aria-hidden="true" />
+
+                {/* 전원 OFF 복구 안내 — 스위치를 못 찾아도 화면을 누르면 다시 켜진다 */}
+                <button
+                  type="button"
+                  className="lcd-off-prompt"
+                  aria-label="전원 켜기"
+                  tabIndex={powered ? -1 : 0}
+                  onClick={() => { if (!poweredRef.current && !bootingRef.current) powerOn(true); }}
+                >
+                  <span className="op-chev" aria-hidden="true">▲</span>
+                  <span className="op-title">전원 OFF</span>
+                  <span className="op-sub">{'스위치를 켜거나\n화면을 눌러 다시 켜기'}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -497,7 +636,7 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
 
             <div className="ab">
               <div className="ab-btn-wrap b">
-                <button className="ab-btn" ref={(el) => (btnRefs.current.b = el)} aria-label="B" onClick={() => { press('b'); if (poweredRef.current && !bootingRef.current) { moveCursor(currentIdx >= 0 ? currentIdx : cursorRef.current, false); SFX.current.back(); } }}>B</button>
+                <button className="ab-btn" ref={(el) => (btnRefs.current.b = el)} aria-label="B 뒤로가기" onClick={() => { press('b'); goBack(); }}>B</button>
                 <span className="ab-label">B</span>
               </div>
               <div className="ab-btn-wrap a">
@@ -551,6 +690,66 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
           </button>
         </div>
       </div>
+
+      {/* === 조작 설명서 (레트로 매뉴얼) === */}
+      {manualOpen && (
+        <div
+          className="gbsb gb-manual-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="조작 설명서"
+          onClick={closeManual}
+        >
+          <div className="gb-manual" onClick={(e) => e.stopPropagation()}>
+            <div className="gb-manual-bar">
+              <span className="gb-manual-led" aria-hidden="true" />
+              <span className="gb-manual-cap">INSTRUCTIONS · 조작 설명서</span>
+              <button type="button" className="gb-manual-x" aria-label="닫기" onClick={closeManual}>✕</button>
+            </div>
+            <div className="gb-manual-body">
+              <p className="gb-manual-lead">키보드나 콘솔 버튼으로 조작할 수 있어요.</p>
+              <ul className="gb-manual-list">
+                {MANUAL_ROWS.map((r) => (
+                  <li key={r.desc} className={r.fun ? 'is-fun' : undefined}>
+                    <span className="gb-keys">
+                      {r.keys.map((key) => <kbd key={key}>{key}</kbd>)}
+                    </span>
+                    <span className="gb-manual-desc">{r.desc}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* === 미저장 이탈 경고 === */}
+      {leaveWarn && (
+        <div
+          className="gbsb gb-guard-overlay"
+          data-pal={palette}
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="저장하지 않고 나가기 경고"
+          onClick={cancelLeave}
+        >
+          <div className="gb-guard" onClick={(e) => e.stopPropagation()}>
+            <div className="gb-guard-bar">
+              <span className="gb-guard-led" aria-hidden="true" />
+              <span className="gb-guard-cap">WARNING · 저장 안 됨</span>
+            </div>
+            <div className="gb-guard-body">
+              <div className="gb-guard-icon" aria-hidden="true">!</div>
+              <p className="gb-guard-title">저장하지 않고 나갈까요?</p>
+              <p className="gb-guard-msg">{leaveWarn}</p>
+              <div className="gb-guard-actions">
+                <button type="button" className="gb-guard-btn stay" onClick={cancelLeave}>머무르기</button>
+                <button type="button" className="gb-guard-btn leave" onClick={confirmLeave}>나가기</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

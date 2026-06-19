@@ -175,7 +175,7 @@ describe('로그인 API 연동', () => {
     await waitFor(() => expect(onAuth).toHaveBeenCalledWith(MOCK_USER));
   });
 
-  it('401 에러 시 비밀번호 오류 메시지가 표시된다', async () => {
+  it('401 에러 시 이메일/비밀번호 오류 메시지가 표시된다', async () => {
     const err = new Error('HTTP 401');
     err.status = 401;
     login.mockRejectedValue(err);
@@ -183,7 +183,7 @@ describe('로그인 API 연동', () => {
     render(<AuthScreen onAuth={vi.fn()} />);
     fillLoginForm();
     fireEvent.click(screen.getByRole('button', { name: /정원으로 들어가기/ }));
-    await waitFor(() => expect(screen.getByText('비밀번호가 올바르지 않습니다.')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('이메일 또는 비밀번호가 올바르지 않습니다.')).toBeInTheDocument());
   });
 
   it('404 에러 시 미등록 이메일 메시지가 표시된다', async () => {

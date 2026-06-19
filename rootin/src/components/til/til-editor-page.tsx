@@ -292,6 +292,10 @@ export function TilEditorPage({
       settledPotIdRef.current = selectedPotId
       return
     }
+    // 빈 글(제목·태그·본문 모두 없음)은 자동 임시저장하지 않는다.
+    // '새 TIL 작성'으로 에디터를 비웠을 때 빈 내용이 기존 임시저장본을 덮어써
+    // 저장해둔 글이 사라지는 것을 막는다.
+    if (!title.trim() && tags.length === 0 && !editor.getText().trim()) return
     const t = setTimeout(() => {
       saveDraft().then((ok) => {
         if (ok) setSaved(true)
@@ -328,18 +332,25 @@ export function TilEditorPage({
 
     setUpdating(true)
     try {
-      await updateTil(Number(editTilId), {
+      const result = await updateTil(Number(editTilId), {
         title,
         content: editor.getHTML(),
         tags,
       })
       setSaved(true)
       if (moveAfterSave) {
+        // 수정 완료 후 해당 TIL 상세 페이지로 이동한다.
+        const targetPotId = result?.potId ?? initialTil?.potId ?? selectedPotId
+        const targetTilId = result?.tilId ?? editTilId
         editor.commands.clearContent()
         setTitle('')
         setTags([])
         setSelectedPotId(null)
-        onNav?.('pot-detail')
+        if (targetPotId != null && targetTilId != null) {
+          onNav?.(`/garden/pots/${targetPotId}/tils/${targetTilId}`)
+        } else {
+          onNav?.('pot-detail')
+        }
       }
     } catch {
       window.alert('TIL 수정에 실패했습니다. 잠시 후 다시 시도해주세요.')
@@ -372,9 +383,17 @@ export function TilEditorPage({
       return
     }
     try {
-      await publish()
+      const result = await publish()
       onPublished?.(selectedPotId)
-      onNav?.(afterPublishScreen)
+      // 발행 후 방금 만든 TIL의 상세 페이지로 이동한다.
+      const created = result as { potId?: number | string; tilId?: number | string } | null | undefined
+      const targetPotId = created?.potId ?? selectedPotId
+      const targetTilId = created?.tilId
+      if (targetPotId != null && targetTilId != null) {
+        onNav?.(`/garden/pots/${targetPotId}/tils/${targetTilId}`)
+      } else {
+        onNav?.(afterPublishScreen)
+      }
     } catch {
       window.alert('발행에 실패했습니다. 잠시 후 다시 시도해주세요.')
     }
@@ -450,9 +469,10 @@ export function TilEditorPage({
         className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         <main
-          className="mx-auto w-full px-5 pb-40 pt-24 md:px-8"
+          className="mx-auto w-full pb-40 pt-24"
           style={{
             // 사이드바(좌 ~400px) 침범 없이 최대한 넓게, 그리고 뷰포트 중앙 고정
+            // 본문 폭은 TIL 상세(gb-til-col)와 동일하게 — 좌우 패딩 없이 max-width만 적용해 폭을 맞춘다.
             maxWidth: 'min(56rem, calc(100vw - 50rem))',
             transform: `translateX(${centerOffset}px)`,
           }}

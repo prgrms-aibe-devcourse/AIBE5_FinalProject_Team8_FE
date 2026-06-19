@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://rootin.duckdns.org/sitemap.xml

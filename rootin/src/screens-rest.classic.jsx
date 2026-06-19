@@ -1998,7 +1998,6 @@ function AuthScreen({ onAuth, onBackToLanding }) {
         callback: ({ credential }) => {
           googleCallbackRef.current?.(credential);
         },
-        use_fedcm_for_prompt: true,
       });
     };
 
@@ -2026,9 +2025,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
         window.google.accounts.id.prompt(notification => {
           if (
             notification.isNotDisplayed() ||
-            notification.isDismissedMoment() ||
-            notification.isTapOutsideMoment() ||
-            notification.isCancelMoment()
+            notification.isDismissedMoment()
           ) {
             googleCallbackRef.current = null;
             reject(new Error('Google 로그인 창을 열 수 없습니다.'));

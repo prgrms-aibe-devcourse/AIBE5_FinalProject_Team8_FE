@@ -21,8 +21,9 @@ export function setNavGuard(fn) {
 }
 
 export function clearNavGuard(fn) {
-  // 등록했던 함수와 동일할 때만 해제(다른 화면이 이미 덮어쓴 경우를 보호)
-  if (!fn || current === fn) { current = null; emit(); }
+  // 등록했던 함수와 동일할 때만 해제(다른 화면이 이미 덮어쓴 경우를 보호).
+  // 인자 없는 호출로 남의 가드까지 지우지 않도록 fn이 일치할 때만 해제한다.
+  if (current === fn) { current = null; emit(); }
 }
 
 // 가드가 바뀔 때(등록/해제·재등록) 알림을 받는다. 사이드바가 이를 구독해

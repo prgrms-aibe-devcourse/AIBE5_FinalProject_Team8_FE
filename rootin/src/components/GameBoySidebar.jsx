@@ -310,7 +310,10 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
   const leaveNow = useCallback(() => {
     bypassRef.current = true;
     armedRef.current = false;
-    if (window.history.state?.__gbTrap) window.history.go(-2);
+    // 트랩이 깔려 있으면 트랩+에디터 항목을 함께 건너뛴다. 단 새 탭/북마크로
+    // 에디터에 바로 진입한 경우(앞선 항목이 없음) go(-2)가 무반응이 되어 갇히므로
+    // 그때는 한 칸만 뒤로 보낸다.
+    if (window.history.state?.__gbTrap && window.history.length > 2) window.history.go(-2);
     else window.history.back();
   }, []);
 
@@ -339,8 +342,10 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
      pushState로 같은 URL 항목을 더하므로 주소·라우터 화면은 그대로다(보이지 않음). */
   useEffect(() => {
     const arm = () => {
-      if (!armedRef.current && checkNavGuard() != null) {
-        armedRef.current = true;
+      if (armedRef.current || checkNavGuard() == null) return;
+      armedRef.current = true;
+      // 이미 트랩 위에 있으면 다시 쌓지 않는다(중복 누적 방지).
+      if (!window.history.state?.__gbTrap) {
         window.history.pushState({ ...window.history.state, __gbTrap: 1 }, '');
       }
     };
@@ -348,9 +353,12 @@ export function GameBoySidebar({ current, onNav, onLogout, forceHidden = false }
       if (bypassRef.current) { bypassRef.current = false; return; }
       const warn = checkNavGuard();
       if (warn) {
-        // 미저장 → 떠나지 못하게 트랩을 다시 올리고 B와 동일한 경고 모달
+        // 미저장 → 떠나지 못하게 트랩을 다시 올리고 B와 동일한 경고 모달.
+        // 이미 트랩 위면 중복 누적을 막는다.
         armedRef.current = true;
-        window.history.pushState({ ...window.history.state, __gbTrap: 1 }, '');
+        if (!window.history.state?.__gbTrap) {
+          window.history.pushState({ ...window.history.state, __gbTrap: 1 }, '');
+        }
         SFX.current.deny();
         setLeaveWarn(warn);
       } else if (armedRef.current) {

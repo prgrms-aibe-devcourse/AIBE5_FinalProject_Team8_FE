@@ -1,9 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap.js';
 
 // 에디터에서 저장 안 된 변경을 잃을 수 있는 동작(새 TIL 시작 / 임시저장본 불러오기 / 다른 TIL 수정)을
 // 확인받는 공용 모달 (클래식 테마). LogoutConfirmModal.classic 과 동일한 카드 톤.
 export function EditorConfirmModal({ tag = '확인', title, description, confirmLabel = '확인', hideCancel = false, onConfirm, onClose }) {
+  const cardRef = useRef(null);
+  useDialogFocusTrap(cardRef);
+
   useEffect(() => {
     const handleEscape = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleEscape);
@@ -29,6 +33,7 @@ export function EditorConfirmModal({ tag = '확인', title, description, confirm
       onClick={onClose}
     >
       <div
+        ref={cardRef}
         onClick={e => e.stopPropagation()}
         style={{
           width: 400,

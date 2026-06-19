@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { RtIcon } from '../pixel-icons.jsx';
 import { playSfx } from '../lib/sfx.js';
+import { useDialogFocusTrap } from '../hooks/useDialogFocusTrap.js';
 
 // 에디터에서 저장 안 된 변경을 잃을 수 있는 동작(새 TIL 시작 / 임시저장본 불러오기 / 다른 TIL 수정)을
 // 확인받는 공용 모달 (게임보이 테마). 앱 셸 레벨로 포털해 사이드바 스태킹 컨텍스트 밖에서 렌더한다.
@@ -16,6 +17,9 @@ export function EditorConfirmModal({
   onConfirm,
   onClose,
 }) {
+  const cardRef = useRef(null);
+  useDialogFocusTrap(cardRef);
+
   useEffect(() => {
     const handleEscape = (e) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', handleEscape);
@@ -41,6 +45,7 @@ export function EditorConfirmModal({
       }}
     >
       <div
+        ref={cardRef}
         onClick={e => e.stopPropagation()}
         style={{
           width: 400, maxWidth: '100%',

@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type Dispatch,
   type ReactNode,
@@ -78,6 +79,7 @@ type TilEditorContextValue = {
   selectedPotDashboard: PotDashboard | null
   selectedPotDashboardLoading: boolean
   templates: Template[]
+  refreshTemplates: (force?: boolean) => Promise<void>
   applyTemplate: (content: string) => void
   saveCustomTemplate: (name: string) => Promise<void>
   deleteCustomTemplate: (id: number) => Promise<void>
@@ -115,6 +117,9 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
   const [selectedPotDashboard, setSelectedPotDashboard] = useState<PotDashboard | null>(null)
   const [selectedPotDashboardLoading, setSelectedPotDashboardLoading] = useState(false)
   const [templates, setTemplates] = useState<Template[]>([])
+  const templatesLoadedRef = useRef(false)
+  const templatesRequestRef = useRef<Promise<void> | null>(null)
+  const templatesRequestIdRef = useRef(0)
   const [draftSavedAt, setDraftSavedAt] = useState<number | null>(null)
   const [publishing, setPublishing] = useState(false)
   // 사이드바가 현재 편집 중인 TIL 강조 + 저장 안 된 변경 여부를 알 수 있도록 노출
@@ -160,25 +165,40 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedPotId])
 
-  // 진입 시 템플릿 목록 로딩 (사용자 + 기본 제공)
-  const refreshTemplates = useCallback(async () => {
-    try {
-      const list = await apiGetTemplates()
-      const normalized: Template[] = (Array.isArray(list) ? list : []).map((t: any) => ({
-        id: t.templateId,
-        name: t.title,
-        content: t.content,
-        isDefault: t.isDefault,
-      }))
-      setTemplates(normalized)
-    } catch {
-      setTemplates([])
-    }
-  }, [])
+  // 템플릿은 에디터 진입 시점에만 지연 로딩합니다.
+  const refreshTemplates = useCallback(async (force = false) => {
+    if (!force && templatesLoadedRef.current) return
+    if (!force && templatesRequestRef.current) return templatesRequestRef.current
 
-  useEffect(() => {
-    refreshTemplates()
-  }, [refreshTemplates])
+    const requestId = templatesRequestIdRef.current + 1
+    templatesRequestIdRef.current = requestId
+    const requestPromise = apiGetTemplates()
+      .then((list) => {
+        if (templatesRequestIdRef.current !== requestId) return
+        const normalized: Template[] = (Array.isArray(list) ? list : []).map((t: any) => ({
+          id: t.templateId,
+          name: t.title,
+          content: t.content,
+          isDefault: t.isDefault,
+        }))
+        setTemplates(normalized)
+        templatesLoadedRef.current = true
+      })
+      .catch((error) => {
+        if (templatesRequestIdRef.current !== requestId) return
+        console.error('템플릿 목록 조회 실패:', error)
+        setTemplates([])
+        templatesLoadedRef.current = false
+      })
+      .finally(() => {
+        if (templatesRequestIdRef.current === requestId) {
+          templatesRequestRef.current = null
+        }
+      })
+
+    templatesRequestRef.current = requestPromise
+    return requestPromise
+  }, [])
 
   const applyTemplate = useCallback(
     (content: string) => {
@@ -191,7 +211,7 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     async (name: string) => {
       if (!editor) return
       await apiCreateTemplate({ title: name, content: editor.getHTML() })
-      await refreshTemplates()
+      await refreshTemplates(true)
     },
     [editor, refreshTemplates],
   )
@@ -199,7 +219,7 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
   const deleteCustomTemplate = useCallback(
     async (id: number) => {
       await apiDeleteTemplate(id)
-      await refreshTemplates()
+      await refreshTemplates(true)
     },
     [refreshTemplates],
   )
@@ -296,6 +316,7 @@ export function TilEditorProvider({ children }: { children: ReactNode }) {
     selectedPotDashboard,
     selectedPotDashboardLoading,
     templates,
+    refreshTemplates,
     applyTemplate,
     saveCustomTemplate,
     deleteCustomTemplate,

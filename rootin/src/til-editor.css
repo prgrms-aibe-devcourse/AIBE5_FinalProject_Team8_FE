@@ -10,7 +10,7 @@
 /* 읽기 좋은 본문 글꼴 — 픽셀 폰트 상속을 끊는다.
    에디터는 풀스크린(베젤 없음) — .rt-app 기본 크림 배경을 그대로 사용. */
 .rt-app.rt-app-editor {
-  --til-read-font: 'Pretendard Variable', Pretendard, 'Noto Sans KR', system-ui, sans-serif;
+  --til-read-font: 'Pretendard Variable', Pretendard, system-ui, sans-serif;
 }
 
 /* 에디터 내부 카드도 대시보드처럼 또렷한 하드 픽셀 그림자로 */

@@ -88,7 +88,7 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
         overflow: 'hidden',
         opacity: providerOpen ? 1 : 0,
         pointerEvents: providerOpen ? 'auto' : 'none',
-        fontFamily: "'Noto Sans KR', sans-serif",
+        fontFamily: 'var(--font-body)',
         transition: 'width 0.42s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease',
       }}
     >
@@ -111,7 +111,7 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
           </svg>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, opacity: labelOpacity, transition: 'opacity 0.25s ease' }}>
-          <span style={{ fontFamily: "'Fredoka', 'Noto Sans KR', sans-serif", fontSize: 22, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.05, letterSpacing: '-0.015em' }}>Root<span style={{ position: 'relative' }}>ı<svg viewBox="0 0 30 20" style={{ width: '0.42em', height: '0.29em', position: 'absolute', left: '50%', bottom: '0.71em', transform: 'translateX(-50%)' }}><path d="M15 18 C9 18 5 15 4 8 C12 8 16 12 15 18 Z" fill="#2F8F54" /><path d="M15 16 C21 16 25 13 26 6 C18 6 14 10 15 16 Z" fill="#74C98C" /></svg></span>n</span>
+          <span style={{ fontFamily: "'Fredoka', var(--font-body)", fontSize: 22, fontWeight: 600, color: 'var(--ink)', lineHeight: 1.05, letterSpacing: '-0.015em' }}>Root<span style={{ position: 'relative' }}>ı<svg viewBox="0 0 30 20" style={{ width: '0.42em', height: '0.29em', position: 'absolute', left: '50%', bottom: '0.71em', transform: 'translateX(-50%)' }}><path d="M15 18 C9 18 5 15 4 8 C12 8 16 12 15 18 Z" fill="#2F8F54" /><path d="M15 16 C21 16 25 13 26 6 C18 6 14 10 15 16 Z" fill="#74C98C" /></svg></span>n</span>
           <span style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 3 }}>매일의 학습이 자라는 곳</span>
         </div>
       </div>
@@ -173,7 +173,7 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
             title={`연속 ${streak}일 · 최고 ${best}일`}
             style={{ margin: '0 auto', width: 46, height: 46, borderRadius: 13, background: 'color-mix(in oklch, var(--amber) 14%, var(--sidebar))', border: '1px solid color-mix(in oklch, var(--amber) 32%, transparent)', display: 'grid', placeItems: 'center' }}
           >
-            <span style={{ fontFamily: "'Fredoka', 'Noto Sans KR', sans-serif", fontSize: 18, fontWeight: 600, lineHeight: 1, color: streakAccent }}>{streak}</span>
+            <span style={{ fontFamily: "'Fredoka', var(--font-body)", fontSize: 18, fontWeight: 600, lineHeight: 1, color: streakAccent }}>{streak}</span>
           </div>
         ) : (
           <div style={{ padding: '12px 14px', borderRadius: 16, background: 'color-mix(in oklch, var(--sidebar) 92%, var(--ink))', whiteSpace: 'nowrap' }}>
@@ -182,7 +182,7 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
               <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--ink-3)' }}>최고 {best}일</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-              <span style={{ fontFamily: "'Fredoka', 'Noto Sans KR', sans-serif", fontSize: 28, fontWeight: 600, lineHeight: 1, color: streakAccent }}>{streak}</span>
+              <span style={{ fontFamily: "'Fredoka', var(--font-body)", fontSize: 28, fontWeight: 600, lineHeight: 1, color: streakAccent }}>{streak}</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-2)' }}>일째 달성 중</span>
             </div>
           </div>

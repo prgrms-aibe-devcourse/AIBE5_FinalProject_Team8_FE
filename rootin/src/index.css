@@ -977,21 +977,67 @@ html.lenis body {
 .rootin-site-navlink {
   font-size: 14px;
   font-weight: 700;
-  color: #5c6b60;
+  color: #6C6353;
   cursor: pointer;
   transition: color 0.2s ease;
 }
-.rootin-site-navlink:hover { color: #2f8f54; }
+.rootin-site-navlink:hover { color: #4F7C52; }
 
 .rootin-site-cta { transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease; }
 .rootin-site-cta:hover {
   transform: translateY(-2px);
-  filter: brightness(1.04);
-  box-shadow: 0 14px 30px rgba(34, 110, 64, 0.28);
+  filter: brightness(1.03);
+  box-shadow: 0 16px 34px rgba(56, 89, 59, 0.32);
+}
+
+/* 살아있는 줄기(스파인) 타임라인 — 좌측 줄기에서 마디(노드)가 잎처럼 펼쳐진다 */
+.rootin-site-spine-track { position: relative; }
+.rootin-site-feature {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: clamp(16px, 3vw, 40px);
+  align-items: stretch;
+  min-height: 56vh;
+}
+.rootin-site-spine { position: relative; width: 64px; }
+.rootin-site-stem {
+  position: absolute;
+  left: calc(50% - 1.5px);
+  top: 0;
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  transform-origin: top center;
+  background: linear-gradient(180deg, #6CA15C 0%, #4F7C52 60%, rgba(79, 124, 82, 0.32) 100%);
+}
+.rootin-site-node-anchor {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+.rootin-site-node {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+}
+.rootin-site-feature-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(24px, 5vw, 64px);
+  align-items: center;
+  padding: clamp(28px, 5vh, 56px) 0;
 }
 
 @media (max-width: 900px) {
-  .rootin-site-feature { grid-template-columns: 1fr !important; direction: ltr !important; }
+  .rootin-site-feature { grid-template-columns: 44px 1fr; min-height: 0; gap: 14px; }
+  .rootin-site-spine { width: 44px; }
+  .rootin-site-node { width: 40px; height: 40px; border-radius: 13px; }
+  .rootin-site-feature-body { grid-template-columns: 1fr !important; direction: ltr !important; gap: 22px; padding: 32px 0; }
 }
 @media (max-width: 600px) {
   .rootin-site-navlink { display: none; }

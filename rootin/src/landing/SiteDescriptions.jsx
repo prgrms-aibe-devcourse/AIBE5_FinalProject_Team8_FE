@@ -6,11 +6,12 @@ import { RootinWordmark } from './RootinWordmark.jsx';
 
 // ──────────────────────────────────────────────────────────────
 // 노트북(사파리)으로 접속한 rootin.app — 실제 제품 소개 화면.
-// 디자인: "하나의 살아있는 줄기". 흩어진 기록이 한 정원으로 자란다는
-// 메타포를, 위에서 아래로 자라는 한 줄기 식물(좌측 스파인)로 시각화한다.
-// 기능 4개는 줄기의 마디(노드)에서 잎처럼 펼쳐지고, 스크롤로 진입할 때마다
-// 줄기 마디가 자라난다. 색은 실제 제품 토큰(warm sage), 타이포는 Space Grotesk.
-// 구조(섹션·문구·앵커 id·onStart)는 그대로 유지 — MonitorSection 메뉴 스크롤 의존.
+// 한 화면에 하나의 장면. 스크롤하면 기능이 한 번에 하나씩 풀스크린으로 등장하고,
+// 끝에서 씨앗이 흙에서 자라 만개하며 시작 CTA로 이어진다.
+// 색은 실제 제품 토큰(warm sage), 타이포는 Space Grotesk. 배경은 레이어드
+// 그라데이션 + 그레인 + 은은히 흐르는 빛. 구조의 동사(쓰다·기르다·확인하다·복습하다)가
+// rootin의 하루 루프를 그대로 라벨링한다.
+// 앵커 id(#intro/#features/#feature-*)·onStart·PixelPlant는 유지 — 히어로 메뉴 스크롤 의존.
 // ──────────────────────────────────────────────────────────────
 
 // warm sage 디자인 토큰의 라이트 값(노트북 안 화면은 항상 정규 라이트 제품 화면)
@@ -23,6 +24,9 @@ const C = {
 };
 
 const EASE = [0.22, 1, 0.36, 1];
+
+// 종이 그레인 — 밋밋함을 없애는 미세 텍스처(데이터 URI, 외부 요청 없음)
+const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")";
 
 // 메인 로고 — 화분 마스코트
 const RootinMascot = ({ size = 36 }) => (
@@ -38,11 +42,11 @@ const RootinMascot = ({ size = 36 }) => (
   </svg>
 );
 
-const BrandLockup = ({ markSize = 30, fontSize = 21 }) => (
+const BrandLockup = ({ markSize = 30, fontSize = 21, dark = false }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
     <RootinMascot size={markSize} />
-    <span style={{ fontFamily: 'var(--font-display)', fontSize, fontWeight: 700, letterSpacing: '-0.02em', color: C.ink }}>
-      <RootinWordmark leaf1={C.moss} leaf2={C.sprout} animate={false} />
+    <span style={{ fontFamily: 'var(--font-display)', fontSize, fontWeight: 700, letterSpacing: '-0.02em', color: dark ? '#F6F2E7' : C.ink }}>
+      <RootinWordmark leaf1={dark ? C.sprout : C.moss} leaf2={dark ? C.leaf : C.sprout} animate={false} />
     </span>
   </div>
 );
@@ -88,23 +92,23 @@ function CountUp({ to, suffix = '', duration = 1.3 }) {
   return <span ref={ref}>{n}{suffix}</span>;
 }
 
-// ── 제품 화면 목업: 중첩 브라우저 크롬 없이, 따뜻한 카드 패널로 ──
+// ── 제품 화면 목업: 따뜻한 카드 패널 ──
 const Panel = ({ label, accent = C.moss, children }) => (
   <div
     style={{
       background: C.card,
       border: `1px solid ${C.rule}`,
-      borderRadius: 20,
-      boxShadow: '0 30px 60px -28px rgba(46,42,33,0.34), 0 2px 5px rgba(46,42,33,0.04), inset 0 1px 0 #fff',
+      borderRadius: 22,
+      boxShadow: '0 40px 80px -34px rgba(46,42,33,0.42), 0 4px 10px rgba(46,42,33,0.05), inset 0 1px 0 #fff',
       overflow: 'hidden',
     }}
   >
-    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '12px 16px', borderBottom: `1px solid ${C.paper2}`, background: `linear-gradient(${C.card}, #FBF6EA)` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '13px 17px', borderBottom: `1px solid ${C.paper2}`, background: `linear-gradient(${C.card}, #FBF6EA)` }}>
       <span style={{ width: 7, height: 7, borderRadius: 2, background: accent, transform: 'rotate(45deg)' }} />
       <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.02em', color: C.ink2 }}>{label}</span>
       <span style={{ marginLeft: 'auto', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.16em', color: C.ink3 }}>ROOTIN</span>
     </div>
-    <div style={{ padding: 18 }}>{children}</div>
+    <div style={{ padding: 20 }}>{children}</div>
   </div>
 );
 
@@ -237,259 +241,218 @@ const AiMock = () => (
   </Panel>
 );
 
+// rootin의 하루 루프 — 동사 아이브로우가 순서를 의미로 만든다(01/02 숫자 대신)
 const FEATURES = [
-  { n: '01', anchor: 'feature-til', icon: PenLine, title: 'TIL 기록', desc: '노션 스타일 에디터로 오늘 배운 것을 가볍게 적습니다. 템플릿·태그·임시저장으로 기록의 문턱을 낮췄어요.', Mock: EditorMock, accent: C.honey },
-  { n: '02', anchor: 'feature-garden', icon: Sprout, title: '식물 정원', desc: 'TIL을 쓰면 화분에 물이 차고 식물이 자랍니다. 씨앗부터 만개까지 키워 수확하고 도감을 채우세요.', Mock: GardenMock, accent: C.coral },
-  { n: '03', anchor: 'feature-dashboard', icon: LineChart, title: '성장 대시보드', desc: '잔디 그래프와 연속 기록(스트릭), 관심사 분포로 나의 꾸준함이 눈에 보이는 결과로 쌓입니다.', Mock: DashboardMock, accent: C.moss },
-  { n: '04', anchor: 'feature-ai', icon: Sparkles, title: 'AI 학습 도구', desc: '작성한 TIL을 AI가 요약하고 복습 문제를 만들어 줍니다. 흩어진 기록이 진짜 내 지식이 되도록.', Mock: AiMock, accent: C.moss2 },
+  { verb: '쓰다', anchor: 'feature-til', icon: PenLine, title: 'TIL 기록', desc: '노션 스타일 에디터로 오늘 배운 것을 가볍게 적습니다. 템플릿·태그·임시저장으로 기록의 문턱을 낮췄어요.', Mock: EditorMock, accent: C.honey },
+  { verb: '기르다', anchor: 'feature-garden', icon: Sprout, title: '식물 정원', desc: 'TIL을 쓰면 화분에 물이 차고 식물이 자랍니다. 씨앗부터 만개까지 키워 수확하고 도감을 채우세요.', Mock: GardenMock, accent: C.coral },
+  { verb: '확인하다', anchor: 'feature-dashboard', icon: LineChart, title: '성장 대시보드', desc: '잔디 그래프와 연속 기록(스트릭), 관심사 분포로 나의 꾸준함이 눈에 보이는 결과로 쌓입니다.', Mock: DashboardMock, accent: C.moss },
+  { verb: '복습하다', anchor: 'feature-ai', icon: Sparkles, title: 'AI 학습 도구', desc: '작성한 TIL을 AI가 요약하고 복습 문제를 만들어 줍니다. 흩어진 기록이 진짜 내 지식이 되도록.', Mock: AiMock, accent: C.moss2 },
 ];
 
 const STAGES = [
-  { stage: 'seed', label: '씨앗' },
-  { stage: 'sprout', label: '새싹' },
-  { stage: 'leaf', label: '잎' },
-  { stage: 'bloom', label: '개화' },
-  { stage: 'full', label: '만개' },
+  { stage: 'seed', label: '씨앗', size: 46 },
+  { stage: 'sprout', label: '새싹', size: 52 },
+  { stage: 'leaf', label: '잎', size: 60 },
+  { stage: 'bloom', label: '개화', size: 68 },
+  { stage: 'full', label: '만개', size: 78 },
 ];
 
-// 살아있는 줄기의 마디 — 잎이 펼쳐지듯 스프링으로 등장
-const SpineNode = ({ icon: Icon, accent }) => {
+// 은은히 흐르는 빛 — 밋밋함 대신 깊이감. reduce면 정지.
+const Glow = ({ color, top, left, size = 620, dur = 16, delay = 0 }) => {
   const reduce = useReducedMotion();
   return (
-    <div className="rootin-site-spine">
-      {/* 줄기(세로 그라데이션) — 인뷰에서 위→아래로 자라 내려온다 */}
-      <motion.span
-        className="rootin-site-stem"
-        initial={reduce ? false : { scaleY: 0 }}
-        whileInView={{ scaleY: 1 }}
-        viewport={{ once: true, amount: 0.3 }}
-        transition={{ duration: 0.8, ease: EASE }}
-      />
-      {/* 마디(노드) — 잎이 펼쳐지듯. 위치는 CSS 앵커가, 등장은 framer가 담당(transform 충돌 회피) */}
-      <span className="rootin-site-node-anchor">
-        <motion.span
-          className="rootin-site-node"
-          initial={reduce ? false : { scale: 0, rotate: -40 }}
-          whileInView={{ scale: 1, rotate: 0 }}
-          viewport={{ once: true, amount: 0.6 }}
-          transition={{ type: 'spring', stiffness: 240, damping: 16, delay: 0.18 }}
-          style={{ background: `linear-gradient(150deg, ${C.sprout}, ${accent})`, boxShadow: `0 10px 22px -7px ${accent}cc, inset 0 1px 0 rgba(255,255,255,0.5)` }}
-        >
-          <Icon size={22} strokeWidth={2.2} color="#fff" />
-        </motion.span>
-      </span>
-    </div>
+    <motion.div
+      aria-hidden="true"
+      style={{ position: 'absolute', top, left, width: size, height: size, borderRadius: '50%', background: `radial-gradient(circle, ${color} 0%, transparent 68%)`, filter: 'blur(8px)', pointerEvents: 'none', zIndex: 0 }}
+      animate={reduce ? {} : { x: [0, 40, -20, 0], y: [0, -30, 24, 0], scale: [1, 1.08, 0.96, 1] }}
+      transition={{ duration: dur, repeat: Infinity, ease: 'easeInOut', delay }}
+    />
+  );
+};
+
+// 한 기능 = 한 화면. 비대칭 스플릿, 좌우 교차.
+const FeatureScreen = ({ f, reverse }) => {
+  const reduce = useReducedMotion();
+  return (
+    <section id={f.anchor} className="rootin-site-screen">
+      <div className="rootin-site-screen-inner" style={{ direction: reverse ? 'rtl' : 'ltr' }}>
+        <Reveal y={44} amount={0.4} style={{ direction: 'ltr' }}>
+          <div className="rootin-site-eyebrow" style={{ color: f.accent }}>
+            <span className="rootin-site-eyebrow-mark" style={{ background: f.accent }}>
+              <f.icon size={15} strokeWidth={2.4} color="#fff" />
+            </span>
+            {f.verb}
+          </div>
+          <h3 className="rootin-site-feature-title">{f.title}</h3>
+          <p className="rootin-site-feature-desc">{f.desc}</p>
+        </Reveal>
+
+        <div style={{ direction: 'ltr', position: 'relative' }}>
+          {/* 목업 뒤 은은한 액센트 — 깊이감 */}
+          <div aria-hidden="true" style={{ position: 'absolute', inset: '-12% -8%', background: `radial-gradient(60% 60% at 50% 45%, ${f.accent}22, transparent 70%)`, filter: 'blur(20px)', zIndex: 0 }} />
+          <motion.div
+            initial={reduce ? false : { opacity: 0, y: 48, rotateX: 10 }}
+            whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.85, ease: EASE }}
+            whileHover={reduce ? {} : { y: -8 }}
+            style={{ position: 'relative', zIndex: 1, perspective: 1100, maxWidth: 500, margin: '0 auto' }}
+          >
+            <f.Mock />
+          </motion.div>
+        </div>
+      </div>
+    </section>
   );
 };
 
 export const SiteDescriptions = ({ onStart }) => {
   const reduce = useReducedMotion();
   return (
-    <div style={{ background: `radial-gradient(135% 70% at 78% -5%, #FFFDF7 0%, ${C.paper} 46%)`, color: C.ink, fontFamily: 'var(--font-body)' }}>
+    <div style={{ position: 'relative', background: `linear-gradient(180deg, #FBF7EE 0%, ${C.paper} 34%, ${C.paper2} 100%)`, color: C.ink, fontFamily: 'var(--font-body)', overflow: 'hidden' }}>
+      {/* 배경 — 흐르는 빛 + 종이 그레인 */}
+      <Glow color="rgba(230,177,78,0.16)" top="-6%" left="62%" size={680} dur={18} />
+      <Glow color="rgba(79,124,82,0.14)" top="38%" left="-10%" size={640} dur={22} delay={2} />
+      <Glow color="rgba(224,138,107,0.12)" top="74%" left="58%" size={600} dur={20} delay={1} />
+      <div aria-hidden="true" style={{ position: 'absolute', inset: 0, backgroundImage: GRAIN, backgroundSize: '160px 160px', opacity: 0.05, mixBlendMode: 'multiply', pointerEvents: 'none', zIndex: 0 }} />
 
-      {/* ── 사이트 헤더 ── */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px clamp(20px, 5vw, 64px)', background: 'rgba(247,242,231,0.72)', borderBottom: `1px solid ${C.rule}`, backdropFilter: 'blur(8px)' }}>
-        <BrandLockup />
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 'clamp(14px, 2.4vw, 30px)' }}>
-          <span className="rootin-site-navlink">기능</span>
-          <span className="rootin-site-navlink">정원</span>
-          <span className="rootin-site-navlink">통계</span>
-          <span className="rootin-site-navlink">AI</span>
-        </nav>
-      </header>
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {/* ── 사이트 헤더 ── */}
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px clamp(20px, 5vw, 64px)', background: 'rgba(247,242,231,0.7)', borderBottom: `1px solid ${C.rule}`, backdropFilter: 'blur(10px)', position: 'sticky', top: 0, zIndex: 20 }}>
+          <BrandLockup />
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 'clamp(14px, 2.4vw, 30px)' }}>
+            <span className="rootin-site-navlink">기능</span>
+            <span className="rootin-site-navlink">정원</span>
+            <span className="rootin-site-navlink">통계</span>
+            <span className="rootin-site-navlink">AI</span>
+          </nav>
+        </header>
 
-      {/* ── 히어로 ── */}
-      <section id="intro" style={{ minHeight: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: 'clamp(40px, 8vh, 90px) clamp(20px, 5vw, 64px)', position: 'relative', overflow: 'hidden' }}>
-        {/* 떠다니는 잎 — 은은한 앰비언트 */}
-        {!reduce && [{ x: '12%', y: '20%', s: 34, d: 0 }, { x: '84%', y: '28%', s: 26, d: 1.2 }, { x: '76%', y: '70%', s: 30, d: 0.6 }].map((l, i) => (
-          <motion.div
-            key={i}
-            aria-hidden="true"
-            style={{ position: 'absolute', left: l.x, top: l.y, opacity: 0.5 }}
-            animate={{ y: [0, -14, 0], rotate: [0, 8, 0] }}
-            transition={{ duration: 5 + i, repeat: Infinity, ease: 'easeInOut', delay: l.d }}
+        {/* ── 히어로 ── */}
+        <section id="intro" className="rootin-site-screen rootin-site-screen--center" style={{ textAlign: 'center' }}>
+          <motion.span
+            initial={reduce ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: EASE }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 999, background: C.leaf, color: C.moss2, fontSize: 13, fontWeight: 800, boxShadow: 'inset 0 1px 0 #fff, 0 2px 10px rgba(79,124,82,0.12)' }}
           >
-            <PixelPlant species="seed" stage="sprout" size={l.s} />
-          </motion.div>
-        ))}
+            <Sprout size={15} /> 매일의 TIL을 식물로
+          </motion.span>
 
-        <motion.span
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: EASE }}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 16px', borderRadius: 999, background: C.leaf, color: C.moss2, fontSize: 13, fontWeight: 800, boxShadow: 'inset 0 1px 0 #fff, 0 2px 10px rgba(79,124,82,0.12)' }}
-        >
-          <Sprout size={15} /> 매일의 TIL을 식물로
-        </motion.span>
-
-        <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.5rem, 6vw, 5rem)', fontWeight: 700, lineHeight: 1.06, letterSpacing: '-0.04em', margin: '26px 0 0' }}>
-          {['오늘 배운 것이', '뿌리 깊은 습관이 됩니다'].map((line, li) => (
-            <span key={li} style={{ display: 'block', overflow: 'hidden' }}>
-              <motion.span
-                style={{ display: 'inline-block' }}
-                initial={reduce ? false : { y: '110%' }}
-                animate={{ y: 0 }}
-                transition={{ duration: 0.9, delay: 0.15 + li * 0.12, ease: EASE }}
-              >
-                {li === 1 ? (<><span style={{ color: C.moss }}>뿌리</span> 깊은 습관이 됩니다</>) : line}
-              </motion.span>
-            </span>
-          ))}
-        </h1>
-
-        <motion.p
-          initial={reduce ? false : { opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, delay: 0.5, ease: EASE }}
-          style={{ margin: '24px auto 0', maxWidth: 560, fontSize: 'clamp(1.05rem, 1.6vw, 1.28rem)', lineHeight: 1.65, color: C.ink2 }}
-        >
-          Rootin은 매일의 학습 기록을 식물로 키우는 게임형 학습 습관 서비스입니다.
-          꾸준함이 정원이 되어 눈에 보이는 성장으로 남습니다.
-        </motion.p>
-
-        {/* 씨앗 — 줄기가 자라기 시작하는 곳 */}
-        <motion.div
-          initial={reduce ? false : { opacity: 0, scale: 0.7 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.7, ease: [0.34, 1.56, 0.64, 1] }}
-          style={{ marginTop: 38, filter: 'drop-shadow(0 8px 10px rgba(46,42,33,0.18))' }}
-        >
-          <motion.div animate={reduce ? {} : { y: [0, -6, 0] }} transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}>
-            <PixelPlant species="seed" stage="sprout" size={64} />
-          </motion.div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1, duration: 0.8 }}
-          style={{ position: 'absolute', bottom: 'clamp(18px, 4vh, 40px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: C.ink3 }}
-        >
-          <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase' }}>스크롤</span>
-          <motion.div animate={reduce ? {} : { y: [0, 7, 0] }} transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}>
-            <ChevronDown size={20} />
-          </motion.div>
-        </motion.div>
-      </section>
-
-      {/* ── 기능 (살아있는 줄기 위의 마디들) ── */}
-      <section id="features" style={{ maxWidth: 1120, margin: '0 auto', padding: '0 clamp(20px, 5vw, 64px)' }}>
-        <Reveal style={{ textAlign: 'center', padding: 'clamp(20px,4vh,44px) 0 clamp(16px,3vh,32px)' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 12.5, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: C.moss, marginBottom: 12 }}>왜 Rootin인가</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.8rem, 3.6vw, 2.9rem)', fontWeight: 700, letterSpacing: '-0.03em', margin: 0, lineHeight: 1.12 }}>기록이 성장이 되는 네 가지 방법</h2>
-        </Reveal>
-
-        <div className="rootin-site-spine-track">
-          {FEATURES.map((f, i) => {
-            const mockLeft = i % 2 === 1;
-            return (
-              <article key={f.title} id={f.anchor} className="rootin-site-feature">
-                <SpineNode icon={f.icon} accent={f.accent} />
-
-                <div className="rootin-site-feature-body" style={{ direction: mockLeft ? 'rtl' : 'ltr' }}>
-                  <Reveal y={36} amount={0.4} style={{ direction: 'ltr' }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 14 }}>
-                      <span style={{ fontFamily: 'var(--font-display)', fontSize: 14, fontWeight: 800, letterSpacing: '0.06em', color: f.accent }}>{f.n}</span>
-                      <span style={{ height: 1, flex: '0 0 28px', background: C.rule2 }} />
-                    </div>
-                    <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.55rem, 2.6vw, 2.1rem)', fontWeight: 700, letterSpacing: '-0.025em', margin: '0 0 14px', lineHeight: 1.15 }}>{f.title}</h3>
-                    <p style={{ fontSize: 'clamp(1rem, 1.4vw, 1.12rem)', lineHeight: 1.75, color: C.ink2, margin: 0, maxWidth: 440 }}>{f.desc}</p>
-                  </Reveal>
-
-                  <motion.div
-                    initial={reduce ? false : { opacity: 0, y: 40, rotateX: 10 }}
-                    whileInView={{ opacity: 1, y: 0, rotateX: 0 }}
-                    viewport={{ once: true, amount: 0.35 }}
-                    transition={{ duration: 0.8, ease: EASE }}
-                    whileHover={reduce ? {} : { y: -6 }}
-                    style={{ direction: 'ltr', perspective: 1000 }}
-                  >
-                    <f.Mock />
-                  </motion.div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ── 성장 단계 (도트 식물) ── */}
-      <section style={{ background: `linear-gradient(180deg, ${C.paper} 0%, ${C.paper2} 100%)`, padding: 'clamp(56px, 9vh, 110px) clamp(20px, 5vw, 64px)', marginTop: 'clamp(30px,6vh,70px)' }}>
-        <Reveal style={{ maxWidth: 1120, margin: '0 auto', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'var(--font-display)', fontSize: 12.5, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase', color: C.ink3, marginBottom: 10 }}>하나의 TIL이 자라나는 길</div>
-          <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.5rem, 3vw, 2.3rem)', fontWeight: 700, letterSpacing: '-0.03em', margin: '0 0 clamp(32px,5vh,56px)' }}>씨앗에서 만개까지</h2>
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 'clamp(4px, 1.2vw, 16px)', flexWrap: 'wrap' }}>
-            {STAGES.map((s, i) => (
-              <div key={s.label} style={{ display: 'flex', alignItems: 'flex-end', gap: 'clamp(4px, 1.2vw, 16px)' }}>
-                <motion.div
-                  initial={reduce ? false : { opacity: 0, y: 26, scale: 0.8 }}
-                  whileInView={{ opacity: 1, y: 0, scale: 1 }}
-                  viewport={{ once: true, amount: 0.6 }}
-                  transition={{ duration: 0.5, delay: i * 0.13, ease: [0.34, 1.56, 0.64, 1] }}
-                  style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, padding: '18px 16px 14px', borderRadius: 18, background: 'linear-gradient(180deg,#fff,#FBF6EA)', border: `1px solid ${C.rule}`, minWidth: 92, boxShadow: '0 14px 30px -16px rgba(46,42,33,0.3), inset 0 1px 0 #fff' }}
+          <h1 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.6rem, 6.2vw, 5.2rem)', fontWeight: 700, lineHeight: 1.05, letterSpacing: '-0.04em', margin: '26px 0 0' }}>
+            {['오늘 배운 것이', '뿌리 깊은 습관이 됩니다'].map((line, li) => (
+              <span key={li} style={{ display: 'block', overflow: 'hidden', paddingBottom: '0.04em' }}>
+                <motion.span
+                  style={{ display: 'inline-block' }}
+                  initial={reduce ? false : { y: '110%' }}
+                  animate={{ y: 0 }}
+                  transition={{ duration: 0.9, delay: 0.15 + li * 0.12, ease: EASE }}
                 >
-                  <div style={{ filter: 'drop-shadow(0 5px 6px rgba(46,42,33,0.2))' }}>
-                    <PixelPlant species="seed" stage={s.stage} size={54} />
-                  </div>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: C.ink2 }}>{s.label}</span>
+                  {li === 1 ? (<><span style={{ color: C.moss }}>뿌리</span> 깊은 습관이 됩니다</>) : line}
+                </motion.span>
+              </span>
+            ))}
+          </h1>
+
+          <motion.p
+            initial={reduce ? false : { opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.5, ease: EASE }}
+            style={{ margin: '24px auto 0', maxWidth: 560, fontSize: 'clamp(1.05rem, 1.6vw, 1.28rem)', lineHeight: 1.65, color: C.ink2 }}
+          >
+            Rootin은 매일의 학습 기록을 식물로 키우는 게임형 학습 습관 서비스입니다.
+            꾸준함이 정원이 되어 눈에 보이는 성장으로 남습니다.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1, duration: 0.8 }}
+            style={{ position: 'absolute', bottom: 'clamp(18px, 4vh, 40px)', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: C.ink3 }}
+          >
+            <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase' }}>스크롤</span>
+            <motion.div animate={reduce ? {} : { y: [0, 7, 0] }} transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}>
+              <ChevronDown size={20} />
+            </motion.div>
+          </motion.div>
+        </section>
+
+        {/* ── 기능 (한 화면에 하나씩) ── */}
+        <div id="features">
+          {FEATURES.map((f, i) => (
+            <FeatureScreen key={f.anchor} f={f} reverse={i % 2 === 1} />
+          ))}
+        </div>
+
+        {/* ── 피날레: 흙에서 자라는 성장 단계 ── */}
+        <section className="rootin-site-screen rootin-site-screen--center" style={{ textAlign: 'center' }}>
+          <Reveal amount={0.4}>
+            <div className="rootin-site-eyebrow rootin-site-eyebrow--muted">하나의 TIL이 자라나는 길</div>
+            <h2 className="rootin-site-section-title">씨앗에서 만개까지</h2>
+          </Reveal>
+          <div className="rootin-site-stages">
+            {STAGES.map((s, i) => (
+              <div key={s.label} className="rootin-site-stage">
+                <motion.div
+                  initial={reduce ? false : { scaleY: 0, opacity: 0 }}
+                  whileInView={{ scaleY: 1, opacity: 1 }}
+                  viewport={{ once: true, amount: 0.6 }}
+                  transition={{ duration: 0.6, delay: i * 0.14, ease: [0.34, 1.4, 0.64, 1] }}
+                  style={{ transformOrigin: 'bottom center', filter: 'drop-shadow(0 6px 7px rgba(46,42,33,0.22))' }}
+                >
+                  <PixelPlant species="seed" stage={s.stage} size={s.size} />
                 </motion.div>
-                {i < STAGES.length - 1 && <ArrowRight size={18} color={C.sprout} strokeWidth={2.6} style={{ marginBottom: 28 }} />}
+                <span className="rootin-site-stage-label">{s.label}</span>
               </div>
             ))}
+            <div className="rootin-site-soil" aria-hidden="true" />
           </div>
-        </Reveal>
-      </section>
+        </section>
 
-      {/* ── 최종 CTA (시작 버튼은 여기 한 곳) ── */}
-      <section style={{ padding: 'clamp(64px, 11vh, 150px) clamp(20px, 5vw, 64px)' }}>
-        <Reveal style={{ maxWidth: 920, margin: '0 auto' }}>
-          <motion.div
-            animate={reduce ? {} : { y: [0, -8, 0] }}
-            transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-            style={{
-              position: 'relative',
-              overflow: 'hidden',
-              borderRadius: 32,
-              background: `linear-gradient(150deg, ${C.moss} 0%, ${C.moss2} 100%)`,
-              color: '#F6F2E7',
-              padding: 'clamp(44px, 7vw, 84px) clamp(28px, 5vw, 72px)',
-              textAlign: 'center',
-              boxShadow: `0 40px 80px -28px ${C.moss2}, inset 0 1px 0 rgba(255,255,255,0.18)`,
-            }}
-          >
-            <div style={{ position: 'absolute', top: -40, right: -10, opacity: 0.16 }}>
-              <PixelPlant species="seed" stage="full" size={150} />
-            </div>
-            <div style={{ position: 'relative' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18, filter: 'drop-shadow(0 6px 10px rgba(0,0,0,0.25))' }}>
-                <RootinMascot size={56} />
-              </div>
-              <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(1.9rem, 3.6vw, 3rem)', fontWeight: 700, letterSpacing: '-0.03em', margin: 0, lineHeight: 1.16 }}>
-                오늘, 첫 씨앗을 심어보세요
-              </h2>
-              <p style={{ margin: '16px auto 0', maxWidth: 480, fontSize: 'clamp(1rem,1.5vw,1.15rem)', lineHeight: 1.6, opacity: 0.9 }}>
-                1분이면 충분합니다. 매일의 작은 기록이 모여 당신만의 정원으로 자라납니다.
-              </p>
-              <button
-                type="button"
-                onClick={onStart}
-                className="rootin-site-cta"
-                style={{ marginTop: 36, display: 'inline-flex', alignItems: 'center', gap: 10, padding: '17px 40px', borderRadius: 999, background: '#FBF7EE', color: C.moss2, fontSize: 17, fontWeight: 800, border: 'none', cursor: 'pointer' }}
+        {/* ── 피날레: 시작 CTA (풀블리드 다크 모스) ── */}
+        <section className="rootin-site-cta-screen">
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, backgroundImage: GRAIN, backgroundSize: '160px 160px', opacity: 0.08, mixBlendMode: 'overlay', pointerEvents: 'none' }} />
+          <div aria-hidden="true" style={{ position: 'absolute', top: '-10%', left: '50%', transform: 'translateX(-50%)', width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(circle, rgba(124,170,128,0.35), transparent 65%)', filter: 'blur(10px)', pointerEvents: 'none' }} />
+
+          <div className="rootin-site-cta-inner">
+            {/* 줄기가 자라 만개하는 마지막 한 컷 */}
+            <div style={{ position: 'relative', width: 120, height: 132, margin: '0 auto 8px' }}>
+              <svg viewBox="0 0 120 132" width="120" height="132" style={{ position: 'absolute', inset: 0 }} aria-hidden="true">
+                <motion.path
+                  d="M60 130 C60 104 50 92 50 74 C50 60 60 54 60 40"
+                  fill="none" stroke={C.sprout} strokeWidth="3.4" strokeLinecap="round"
+                  initial={reduce ? false : { pathLength: 0 }}
+                  whileInView={{ pathLength: 1 }}
+                  viewport={{ once: true, amount: 0.6 }}
+                  transition={{ duration: 1.1, ease: EASE }}
+                />
+              </svg>
+              <motion.div
+                initial={reduce ? false : { scale: 0, opacity: 0 }}
+                whileInView={{ scale: 1, opacity: 1 }}
+                viewport={{ once: true, amount: 0.6 }}
+                transition={{ type: 'spring', stiffness: 200, damping: 14, delay: 0.9 }}
+                style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', filter: 'drop-shadow(0 8px 12px rgba(0,0,0,0.3))' }}
               >
+                <PixelPlant species="seed" stage="full" size={86} />
+              </motion.div>
+            </div>
+
+            <Reveal y={28} amount={0.5}>
+              <h2 className="rootin-site-cta-title">오늘, 첫 씨앗을 심어보세요</h2>
+              <p className="rootin-site-cta-desc">1분이면 충분합니다. 매일의 작은 기록이 모여 당신만의 정원으로 자라납니다.</p>
+              <button type="button" onClick={onStart} className="rootin-site-cta">
                 무료로 시작하기 <ArrowRight size={19} strokeWidth={2.6} />
               </button>
-            </div>
-          </motion.div>
-        </Reveal>
-      </section>
+            </Reveal>
+          </div>
 
-      {/* ── 푸터 ── */}
-      <footer style={{ borderTop: `1px solid ${C.rule}`, padding: '32px clamp(20px, 5vw, 64px)', background: C.paper2 }}>
-        <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
-          <BrandLockup markSize={26} fontSize={17} />
-          <div style={{ fontSize: 13, color: C.ink3 }}>© {new Date().getFullYear()} Rootin · 뿌리 깊은 학습 루틴</div>
-        </div>
-      </footer>
+          <footer className="rootin-site-footer">
+            <BrandLockup markSize={26} fontSize={17} dark />
+            <div style={{ fontSize: 13, color: 'rgba(246,242,231,0.6)' }}>© {new Date().getFullYear()} Rootin · 뿌리 깊은 학습 루틴</div>
+          </footer>
+        </section>
+      </div>
     </div>
   );
 };

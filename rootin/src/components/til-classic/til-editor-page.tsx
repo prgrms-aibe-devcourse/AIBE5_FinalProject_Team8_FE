@@ -23,7 +23,6 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
-import { createLowlight, common } from 'lowlight'
 
 import { FileClock, Minimize2 } from 'lucide-react'
 
@@ -49,8 +48,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-
-const lowlight = createLowlight(common)
 
 export function TilEditorPage({
   onNav,
@@ -143,7 +140,7 @@ export function TilEditorPage({
       TaskItem.configure({ nested: true }),
       Subscript,
       Superscript,
-      createCodeBlock(lowlight),
+      createCodeBlock(),
       Callout,
       Mathematics,
       ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),

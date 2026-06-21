@@ -16,15 +16,12 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
-import { createLowlight, common } from 'lowlight'
 
 import { createCodeBlock } from './extensions/code-block'
 import { FontSize } from './extensions/font-size'
 import { Callout } from './extensions/callout'
 import { TrailingNode } from './extensions/trailing-node'
 import { ResizableImage } from './extensions/resizable-image'
-
-const lowlight = createLowlight(common)
 
 const PLACEHOLDER_TEXT =
   '오늘 배운 것을 자유롭게 기록해보세요. “/” 없이 위 도구 모음을 사용하세요…'
@@ -51,7 +48,7 @@ export function createTilExtensions({ editing = true }: { editing?: boolean } = 
     TaskItem.configure({ nested: true }),
     Subscript,
     Superscript,
-    createCodeBlock(lowlight),
+    createCodeBlock(),
     Callout,
     Mathematics,
     ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),

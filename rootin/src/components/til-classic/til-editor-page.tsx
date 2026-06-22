@@ -2,7 +2,7 @@
 
 import 'katex/dist/katex.min.css'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion, useScroll, useSpring } from 'framer-motion'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -350,6 +350,10 @@ export function TilEditorPage({
       settledPotIdRef.current = selectedPotId
       return
     }
+    // 빈 글(제목·태그·본문 모두 없음)은 자동 임시저장하지 않는다.
+    // '새 TIL 작성'으로 에디터를 비웠을 때 빈 내용이 기존 임시저장본을 덮어써
+    // 저장해둔 글이 사라지는 것을 막는다.
+    if (!title.trim() && tags.length === 0 && !editor.getText().trim()) return
     const t = setTimeout(() => {
       saveDraft().then((ok) => {
         if (ok) setSaved(true)
@@ -386,18 +390,25 @@ export function TilEditorPage({
 
     setUpdating(true)
     try {
-      await updateTil(Number(editTilId), {
+      const result = await updateTil(Number(editTilId), {
         title,
         content: editor.getHTML(),
         tags,
       })
       setSaved(true)
       if (moveAfterSave) {
+        // 수정 완료 후 해당 TIL 상세 페이지로 이동한다.
+        const targetPotId = result?.potId ?? initialTil?.potId ?? selectedPotId
+        const targetTilId = result?.tilId ?? editTilId
         editor.commands.clearContent()
         setTitle('')
         setTags([])
         setSelectedPotId(null)
-        onNav?.('pot-detail')
+        if (targetPotId != null && targetTilId != null) {
+          onNav?.(`/garden/pots/${targetPotId}/tils/${targetTilId}`)
+        } else {
+          onNav?.('pot-detail')
+        }
       }
     } catch {
       window.alert('TIL 수정에 실패했습니다. 잠시 후 다시 시도해주세요.')
@@ -430,9 +441,17 @@ export function TilEditorPage({
       return
     }
     try {
-      await publish()
+      const result = await publish()
       onPublished?.(selectedPotId)
-      onNav?.(afterPublishScreen)
+      // 발행 후 방금 만든 TIL의 상세 페이지로 이동한다.
+      const created = result as { potId?: number | string; tilId?: number | string } | null | undefined
+      const targetPotId = created?.potId ?? selectedPotId
+      const targetTilId = created?.tilId
+      if (targetPotId != null && targetTilId != null) {
+        onNav?.(`/garden/pots/${targetPotId}/tils/${targetTilId}`)
+      } else {
+        onNav?.(afterPublishScreen)
+      }
     } catch {
       window.alert('발행에 실패했습니다. 잠시 후 다시 시도해주세요.')
     }
@@ -455,11 +474,45 @@ export function TilEditorPage({
 
   // 본문 스크롤 진행도 → 하단 게이지 (스프링으로 부드럽게 차오름)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ container: scrollRef })
   const scrollFill = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 })
 
+  // 본문 컬럼을 항상 "뷰포트 중앙"에 고정.
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    const main = mainRef.current
+    if (!el || !main) return
+    let prev: number | null = null
+    let frame: number
+
+    const recompute = () => {
+      const rect = el.getBoundingClientRect()
+      // 서브픽셀까지 정확히 계산해 Math.round로 인한 1px 떨림(Jitter) 제거
+      const next = (window.innerWidth / 2) - (rect.left + rect.width / 2)
+      if (prev !== null && Math.abs(prev - next) < 0.1) return
+      prev = next
+      main.style.transform = `translateX(${next}px)`
+    }
+    
+    recompute()
+    const ro = new ResizeObserver(() => {
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(recompute)
+    })
+    ro.observe(el)
+    window.addEventListener('resize', recompute)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', recompute)
+      cancelAnimationFrame(frame)
+    }
+  }, [])
+
   return (
-    <div className="relative flex h-screen flex-col overflow-hidden bg-background">
+    <div 
+      className="relative flex h-screen flex-col overflow-hidden bg-background"
+    >
       {/* 떠있는 툴바 아일랜드 (집중 모드에선 숨김) */}
       {!focusMode && editor ? (
         <EditorToolbarIsland editor={editor} onToggleFocus={onToggleFocus} />
@@ -481,15 +534,12 @@ export function TilEditorPage({
       <div
         ref={scrollRef}
         className="min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{
-          // 좌측/우측 사이드바를 접어 줄어든 만큼 좌우 패딩으로 보정 → 본문이 제자리에 머문다.
-          // 사이드바 width 애니메이션과 동일한 커브/시간으로 맞춰 매 프레임 위치가 고정된다.
-          paddingLeft: focusMode ? 0 : contentShift,
-          paddingRight: focusMode ? 0 : rightContentShift,
-          transition: 'padding-left 0.42s cubic-bezier(0.4, 0, 0.2, 1), padding-right 0.42s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}
       >
-        <main className="mx-auto w-full max-w-3xl px-5 pb-40 pt-24 md:px-6">
+        <main
+          ref={mainRef}
+          className="mx-auto w-full pb-40 pt-24"
+          style={{ maxWidth: 'min(56rem, calc(100vw - 50rem))' }}
+        >
           <div className="guide-editor-meta">
             <TilMeta />
           </div>

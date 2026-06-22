@@ -11,9 +11,11 @@ import { RtIcon } from './pixel-icons.jsx';
 import { RootinWordmark } from './landing/RootinWordmark.jsx';
 import { PixelPals } from './auth-pixel-pals.jsx';
 import { playSfx } from './lib/sfx.js';
+import { setNavGuard, clearNavGuard } from './lib/navGuard.js';
 import { useUser } from './context/UserContext.jsx';
 import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
+import { useDeferredLoading } from './hooks/useDeferredLoading.js';
 import './dex.css';
 import './ai.css';
 import './profile.css';
@@ -261,6 +263,8 @@ function CollectionScreen() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedNum, setSelectedNum] = useState(null);
+  // 로딩 안내는 200ms 이상 걸릴 때만 노출 — 빠른 환경의 깜빡임 방지
+  const showLoading = useDeferredLoading(loading);
 
   useEffect(() => {
     getPlants()
@@ -388,9 +392,9 @@ function CollectionScreen() {
           </div>
         </div>
 
-        {loading ? (
+        {showLoading ? (
           <div className="gb-dex-loading">도감을 불러오는 중…</div>
-        ) : (
+        ) : loading ? null : (
           <div className="gb-dex-main">
             {/* 좌측 뷰어 */}
             <DexViewer data={selected} onSelect={selectNum} />
@@ -840,6 +844,24 @@ function AIScreen({ onOpenGuide }) {
       clearTimeout(savedTimerRef.current);
     }
   }, []);
+
+  // 생성했지만 보관함에 저장하지 않은 결과가 있으면 이탈 가드 등록
+  // → 사이드바 뒤로가기(B) 시 경고 모달. (saved는 2초 피드백이라 못 쓰고,
+  //   현재 결과가 보관함 목록에 들어갔는지로 "저장됨"을 판정한다)
+  useEffect(() => {
+    const fn = () => {
+      const unsaved =
+        generated &&
+        !!aiResult &&
+        !aiResult.isGuideMock &&
+        !savedResults.some((r) => r.content === aiResult);
+      return unsaved
+        ? '생성한 AI 학습 결과를 아직 저장하지 않았어요.\n나가면 결과가 사라져요.'
+        : null;
+    };
+    setNavGuard(fn);
+    return () => clearNavGuard(fn);
+  }, [generated, aiResult, savedResults]);
 
   // 이용 가이드 투어가 AI 화면 단계(.guide-ai-*)를 지날 때 화면 상태를 자동 제어한다.
   // (classic AI 화면과 동일한 rootin-guide-step 프로토콜 공유)
@@ -1924,7 +1946,7 @@ function validate({ mode, email, password, nickname }) {
 
 // API 에러 → 사용자 메시지 변환
 function parseApiError(err) {
-  if (err?.status === 401) return '비밀번호가 올바르지 않습니다.';
+  if (err?.status === 401) return '이메일 또는 비밀번호가 올바르지 않습니다.';
   if (err?.status === 409) return '이미 사용 중인 이메일입니다.';
   if (err?.status === 404) return '등록되지 않은 이메일입니다.';
   return err?.body?.message ?? '오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
@@ -2041,8 +2063,10 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [focusField, setFocusField] = useState(null);
+  const googleCallbackRef = useRef(null);
+  const googleLoginInFlightRef = useRef(false);
 
-  // Google SDK 초기화
+  // Google SDK 스크립트 로드 (페이지 로드 시 1회)
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
     const scriptId = 'google-gsi-script';
@@ -2056,18 +2080,28 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   }, []);
 
   async function handleGoogleLogin() {
-    if (!GOOGLE_CLIENT_ID || !window.google) return;
+    if (!GOOGLE_CLIENT_ID || !window.google || googleLoginInFlightRef.current) return;
+    googleLoginInFlightRef.current = true;
     setError(null);
     setLoading(true);
     try {
       const idToken = await new Promise((resolve, reject) => {
+        // initialize()를 매 호출마다 재실행하여 취소 후 재시도 시 suppression 상태 리셋
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
-          callback: ({ credential }) => resolve(credential),
-          error_callback: reject,
+          callback: ({ credential }) => {
+            googleCallbackRef.current?.(credential);
+          },
         });
+        googleCallbackRef.current = resolve;
         window.google.accounts.id.prompt(notification => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          const isDismissed = notification.isDismissedMoment?.();
+          const dismissedReason = isDismissed ? notification.getDismissedReason?.() : null;
+          if (
+            notification.isNotDisplayed?.() ||
+            (isDismissed && dismissedReason !== 'credential_returned')
+          ) {
+            googleCallbackRef.current = null;
             reject(new Error('Google 로그인 창을 열 수 없습니다.'));
           }
         });
@@ -2080,7 +2114,9 @@ function AuthScreen({ onAuth, onBackToLanding }) {
     } catch (err) {
       setError(err?.message ?? parseApiError(err));
     } finally {
+      googleLoginInFlightRef.current = false;
       setLoading(false);
+      googleCallbackRef.current = null;
     }
   }
 

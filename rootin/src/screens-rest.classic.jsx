@@ -1868,7 +1868,7 @@ function validate({ mode, email, password, nickname }) {
 
 // API 에러 → 사용자 메시지 변환
 function parseApiError(err) {
-  if (err?.status === 401) return '비밀번호가 올바르지 않습니다.';
+  if (err?.status === 401) return '이메일 또는 비밀번호가 올바르지 않습니다.';
   if (err?.status === 409) return '이미 사용 중인 이메일입니다.';
   if (err?.status === 404) return '등록되지 않은 이메일입니다.';
   return err?.body?.message ?? '오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
@@ -1985,8 +1985,10 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [focusField, setFocusField] = useState(null);
+  const googleCallbackRef = useRef(null);
+  const googleLoginInFlightRef = useRef(false);
 
-  // Google SDK 초기화
+  // Google SDK 스크립트 로드 (페이지 로드 시 1회)
   useEffect(() => {
     if (!GOOGLE_CLIENT_ID) return;
     const scriptId = 'google-gsi-script';
@@ -2000,18 +2002,28 @@ function AuthScreen({ onAuth, onBackToLanding }) {
   }, []);
 
   async function handleGoogleLogin() {
-    if (!GOOGLE_CLIENT_ID || !window.google) return;
+    if (!GOOGLE_CLIENT_ID || !window.google || googleLoginInFlightRef.current) return;
+    googleLoginInFlightRef.current = true;
     setError(null);
     setLoading(true);
     try {
       const idToken = await new Promise((resolve, reject) => {
+        // initialize()를 매 호출마다 재실행하여 취소 후 재시도 시 suppression 상태 리셋
         window.google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
-          callback: ({ credential }) => resolve(credential),
-          error_callback: reject,
+          callback: ({ credential }) => {
+            googleCallbackRef.current?.(credential);
+          },
         });
+        googleCallbackRef.current = resolve;
         window.google.accounts.id.prompt(notification => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          const isDismissed = notification.isDismissedMoment?.();
+          const dismissedReason = isDismissed ? notification.getDismissedReason?.() : null;
+          if (
+            notification.isNotDisplayed?.() ||
+            (isDismissed && dismissedReason !== 'credential_returned')
+          ) {
+            googleCallbackRef.current = null;
             reject(new Error('Google 로그인 창을 열 수 없습니다.'));
           }
         });
@@ -2024,7 +2036,9 @@ function AuthScreen({ onAuth, onBackToLanding }) {
     } catch (err) {
       setError(err?.message ?? parseApiError(err));
     } finally {
+      googleLoginInFlightRef.current = false;
       setLoading(false);
+      googleCallbackRef.current = null;
     }
   }
 

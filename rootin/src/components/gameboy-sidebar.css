@@ -465,6 +465,196 @@
   100% { opacity:0;  transform: scaleY(.012) scaleX(.0);  background:#fff; }
 }
 
+/* power-off 복구 안내 — 꺼진 화면을 눌러도 다시 켜진다 */
+.gbsb .lcd-off-prompt {
+  position: absolute; inset: 0; z-index: 15;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 5px;
+  border: 0; background: transparent;
+  color: #1c2118;
+  font-family: "Galmuri11", "DungGeunMo", monospace;
+  text-align: center; cursor: pointer;
+  opacity: 0; pointer-events: none;
+  transition: opacity .25s ease .12s;
+}
+.gbsb .console[data-power="off"] .lcd-off-prompt { opacity: .92; pointer-events: auto; }
+.gbsb .lcd-off-prompt .op-chev {
+  font-size: 15px; line-height: 1;
+  animation: gbsb-offchev 1.2s ease-in-out infinite;
+}
+@keyframes gbsb-offchev {
+  0%,100% { transform: translateY(2px); opacity: .45; }
+  50%     { transform: translateY(-3px); opacity: 1; }
+}
+.gbsb .lcd-off-prompt .op-title { font-size: 16px; letter-spacing: 3px; }
+.gbsb .lcd-off-prompt .op-sub { font-size: 10px; line-height: 1.5; opacity: .82; white-space: pre-line; }
+
+/* OFF 상태에서 전원 스위치가 은은히 깜빡여 시선을 끈다(honey 글로우) */
+.gbsb .console[data-power="off"] .power-switch { animation: gbsb-powerwait 1.4s ease-in-out infinite; }
+@keyframes gbsb-powerwait {
+  0%,100% { box-shadow: inset 0 2px 4px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.25); }
+  50%     { box-shadow: inset 0 2px 4px rgba(0,0,0,.45), inset 0 -1px 0 rgba(255,255,255,.25),
+                        0 0 0 2px rgba(230,177,78,.55), 0 0 8px 2px rgba(230,177,78,.55); }
+}
+
+/* =================== 조작 설명서 (HELP / MANUAL) =================== */
+.gbsb .gb-help {
+  margin-left: auto;
+  display: inline-flex; align-items: center; gap: 4px;
+  border: 0; cursor: pointer;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: linear-gradient(#e7e1d4, #cfc8b8);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(0,0,0,.3);
+  font-family: "Galmuri9", "Galmuri11", monospace;
+  color: #4f4b3f;
+  transition: transform .08s ease, filter .12s ease;
+}
+.gbsb .gb-help:hover { filter: brightness(1.05); }
+.gbsb .gb-help:active { transform: translateY(1px); }
+.gbsb .gb-help .gb-help-q {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #4f4b3f; color: #f3f1ea;
+  font-size: 9px; font-weight: 700;
+}
+.gbsb .gb-help .gb-help-cap { font-size: 8px; letter-spacing: 1px; }
+.gbsb .gb-help.pulse { animation: gbsb-helppulse 1.6s ease-in-out infinite; }
+@keyframes gbsb-helppulse {
+  0%,100% { box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(0,0,0,.3); }
+  50%     { box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 1px 2px rgba(0,0,0,.3),
+                        0 0 0 2px rgba(230,177,78,.55), 0 0 7px 1px rgba(230,177,78,.5); }
+}
+
+/* manual overlay + card (게임보이 가이드와 같은 픽셀 종이 룩) */
+.gbsb.gb-manual-overlay {
+  position: fixed; inset: 0; z-index: 9998;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20,28,16,.55);
+  padding: 24px;
+  animation: gbsb-mfade .16s ease;
+}
+@keyframes gbsb-mfade { from { opacity: 0; } to { opacity: 1; } }
+.gbsb .gb-manual {
+  width: 324px; max-width: 100%;
+  background: #f8f2e3;
+  border: 2px solid #33402a;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.55), 6px 6px 0 0 #33402a;
+  color: #33402a;
+  overflow: hidden;
+  animation: gbsb-mpop .18s cubic-bezier(.5,1.6,.5,1);
+}
+@keyframes gbsb-mpop { from { transform: translateY(8px) scale(.96); } to { transform: none; } }
+.gbsb .gb-manual-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: #33402a; color: #f8f2e3;
+  padding: 7px 10px;
+  font-family: "Galmuri9", "Galmuri11", monospace;
+  font-size: 10px; letter-spacing: 1px;
+}
+.gbsb .gb-manual-led {
+  width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+  background: radial-gradient(circle at 35% 30%, #ff9a8f, #d11d1d 60%);
+  box-shadow: 0 0 6px 1px rgba(235,40,40,.7);
+}
+.gbsb .gb-manual-cap { flex: 1; }
+.gbsb .gb-manual-x {
+  border: 0; background: transparent; color: #f8f2e3;
+  cursor: pointer; font-size: 12px; line-height: 1; padding: 2px 4px;
+}
+.gbsb .gb-manual-x:hover { color: #c85d83; }
+.gbsb .gb-manual-body { padding: 14px 16px 16px; }
+.gbsb .gb-manual-lead {
+  font-size: 11px; color: #5f7048; margin: 0 0 12px; line-height: 1.5;
+}
+.gbsb .gb-manual-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 9px;
+}
+.gbsb .gb-manual-list li {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 12px; line-height: 1.45;
+}
+.gbsb .gb-keys { flex: 0 0 96px; display: flex; flex-wrap: wrap; gap: 3px; }
+.gbsb .gb-keys kbd {
+  font-family: "Galmuri9", "Galmuri11", monospace;
+  font-size: 9px; line-height: 1;
+  padding: 3px 5px;
+  background: #fff; color: #33402a;
+  border: 1.5px solid #33402a; border-radius: 4px;
+  box-shadow: 1.5px 1.5px 0 0 #5f7048;
+}
+.gbsb .gb-manual-desc { flex: 1; padding-top: 2px; }
+.gbsb .gb-manual-list li.is-fun {
+  margin-top: 4px; padding-top: 10px;
+  border-top: 1.5px dashed #c0b89f;
+}
+.gbsb .gb-manual-list li.is-fun .gb-manual-desc { color: #c85d83; }
+
+/* =================== 미저장 이탈 경고 (LEAVE GUARD) =================== */
+.gbsb.gb-guard-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20,28,16,.6);
+  padding: 24px;
+  animation: gbsb-mfade .14s ease;
+}
+.gbsb .gb-guard {
+  width: 300px; max-width: 100%;
+  background: #f8f2e3;
+  border: 2px solid #33402a;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.55), 6px 6px 0 0 #33402a;
+  color: #33402a;
+  overflow: hidden;
+  animation: gbsb-mpop .18s cubic-bezier(.5,1.6,.5,1);
+}
+.gbsb .gb-guard-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: #7e2d2d; color: #f8f2e3;
+  padding: 7px 10px;
+  font-family: "Galmuri9", "Galmuri11", monospace;
+  font-size: 10px; letter-spacing: 1px;
+}
+.gbsb .gb-guard-led {
+  width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto;
+  background: radial-gradient(circle at 35% 30%, #ffd27a, #e6b14e 60%);
+  box-shadow: 0 0 6px 1px rgba(230,177,78,.8);
+  animation: gbsb-ledpulse 1s ease-in-out infinite;
+}
+.gbsb .gb-guard-body { padding: 16px 16px 16px; text-align: center; }
+.gbsb .gb-guard-icon {
+  width: 30px; height: 30px; margin: 2px auto 10px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid #7e2d2d; border-radius: 50%;
+  color: #7e2d2d; font-size: 18px; font-weight: 700; line-height: 1;
+}
+.gbsb .gb-guard-title { margin: 0 0 8px; font-size: 14px; letter-spacing: .5px; }
+.gbsb .gb-guard-msg {
+  margin: 0 0 16px; font-size: 11px; line-height: 1.55;
+  color: #5f6b4a; white-space: pre-line;
+}
+.gbsb .gb-guard-actions { display: flex; gap: 8px; }
+.gbsb .gb-guard-btn {
+  flex: 1; cursor: pointer;
+  padding: 9px 10px;
+  font-family: "Galmuri11", "DungGeunMo", monospace;
+  font-size: 12px; letter-spacing: .5px;
+  border: 2px solid #33402a; border-radius: 6px;
+  transition: transform .07s ease, filter .12s ease;
+}
+.gbsb .gb-guard-btn:active { transform: translateY(1px); }
+.gbsb .gb-guard-btn.stay {
+  background: #f8f2e3; color: #33402a;
+  box-shadow: 2px 2px 0 0 #5f7048;
+}
+.gbsb .gb-guard-btn.leave {
+  background: #7e2d2d; color: #f8f2e3; border-color: #7e2d2d;
+  box-shadow: 2px 2px 0 0 #33402a;
+}
+.gbsb .gb-guard-btn:hover { filter: brightness(1.05); }
+
 /* =================== DEVICE BRAND =================== */
 .gbsb .brand {
   display: flex; align-items: baseline; gap: 9px;

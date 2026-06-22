@@ -34,6 +34,7 @@ const DashboardClassic = lazyNamed(() => import('./screens-dashboard.classic.jsx
 const EditorClassic = lazyNamed(() => import('./screens-editor.classic.jsx'), 'EditorScreen');
 const GardenClassic = lazyNamed(() => import('./screens-garden.classic.jsx'), 'GardenScreen');
 const PotDetailClassic = lazyNamed(() => import('./screens-garden.classic.jsx'), 'PotDetailScreen');
+const TilDetailClassic = lazyNamed(() => import('./screens-garden.classic.jsx'), 'TilDetailScreen');
 const RootinSidebarRightClassic = lazyNamed(() => import('./components/RootinSidebarRight.classic.jsx'), 'RootinSidebarRight');
 const CollectionClassic = lazyNamed(() => import('./screens-rest.classic.jsx'), 'CollectionScreen');
 const AIClassic = lazyNamed(() => import('./screens-rest.classic.jsx'), 'AIScreen');
@@ -379,6 +380,7 @@ function AppShell() {
               )} />
               <Route path="/garden/pots/:potId/tils/:tilId" element={(
                 <TilDetailRoute
+                  theme={isClassic ? 'classic' : 'gameboy'}
                   onBack={(potId) => navigate(`/garden/pots/${potId}`)}
                   onEdit={openEditorForTil}
                   onDeleted={(potId) => {

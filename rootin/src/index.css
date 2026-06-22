@@ -935,22 +935,388 @@ body[data-theme="classic"] .til-prose .ProseMirror code {
 .rootin-site-navlink {
   font-size: 14px;
   font-weight: 700;
-  color: #5c6b60;
+  color: #6C6353;
   cursor: pointer;
   transition: color 0.2s ease;
 }
-.rootin-site-navlink:hover { color: #2f8f54; }
+.rootin-site-navlink:hover { color: #4F7C52; }
 
 .rootin-site-cta { transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease; }
 .rootin-site-cta:hover {
   transform: translateY(-2px);
-  filter: brightness(1.04);
-  box-shadow: 0 14px 30px rgba(34, 110, 64, 0.28);
+  filter: brightness(1.03);
+  box-shadow: 0 16px 34px rgba(56, 89, 59, 0.32);
+}
+
+/* 한 화면에 하나의 장면 — 풀스크린 섹션 */
+.rootin-site-screen {
+  min-height: calc(100vh - 60px);
+  display: flex;
+  align-items: center;
+  padding: clamp(48px, 9vh, 96px) clamp(20px, 5vw, 72px);
+  position: relative;
+}
+.rootin-site-screen--center { flex-direction: column; justify-content: center; }
+.rootin-site-screen-inner {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(36px, 6vw, 88px);
+  align-items: center;
+}
+
+/* 동사 아이브로우 — 하루 루프(쓰다·기르다·확인하다·복습하다) */
+.rootin-site-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin-bottom: 18px;
+}
+.rootin-site-eyebrow--muted { color: #9A9082; margin-bottom: 12px; letter-spacing: 0.16em; font-size: 12.5px; text-transform: uppercase; }
+.rootin-site-eyebrow-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.rootin-site-feature-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  margin: 0 0 18px;
+  color: #2E2A21;
+}
+.rootin-site-feature-desc {
+  font-size: clamp(1.02rem, 1.5vw, 1.2rem);
+  line-height: 1.75;
+  color: #6C6353;
+  margin: 0;
+  max-width: 460px;
+}
+.rootin-site-section-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 3.4vw, 2.8rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  margin: 0 0 clamp(40px, 6vh, 72px);
+  color: #2E2A21;
+}
+
+/* 성장 단계 — 흙에서 자라나는 식물들 */
+.rootin-site-stages {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(14px, 4vw, 56px);
+  padding-bottom: 26px;
+  width: 100%;
+  max-width: 760px;
+}
+.rootin-site-stage { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.rootin-site-stage-label { font-size: 13px; font-weight: 700; color: #6C6353; }
+.rootin-site-soil {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #C9A26F, #9A7748);
+  box-shadow: 0 8px 22px -8px rgba(122, 86, 30, 0.5);
+  z-index: 0;
+}
+
+/* 시작 CTA — 풀블리드 다크 모스 피날레 */
+.rootin-site-cta-screen {
+  position: relative;
+  min-height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: clamp(56px, 9vh, 110px) clamp(20px, 5vw, 64px) 0;
+  background: radial-gradient(120% 90% at 50% 0%, #4F7C52 0%, #38593B 46%, #243D27 100%);
+  color: #F6F2E7;
+}
+.rootin-site-cta-inner { position: relative; z-index: 2; max-width: 560px; text-align: center; }
+.rootin-site-cta-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 4vw, 3.2rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.14;
+  margin: 0;
+}
+.rootin-site-cta-desc { margin: 16px auto 0; max-width: 460px; font-size: clamp(1rem, 1.5vw, 1.15rem); line-height: 1.65; color: rgba(246, 242, 231, 0.82); }
+.rootin-site-cta {
+  margin-top: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 17px 40px;
+  border-radius: 999px;
+  background: #FBF7EE;
+  color: #38593B;
+  font-size: 17px;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+}
+.rootin-site-cta:hover { transform: translateY(-2px); filter: brightness(1.02); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28); }
+.rootin-site-footer {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1120px;
+  margin: clamp(56px, 9vh, 104px) auto 0;
+  padding: 26px 4px 30px;
+  border-top: 1px solid rgba(246, 242, 231, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+/* 프리미엄 쇼케이스 — 무대 위에 떠 있는 제품샷 + 따뜻한 유리 뱃지 */
+.rootin-showcase { position: relative; }
+.rootin-stage-shadow {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: -20px;
+  height: 44px;
+  border-radius: 999px;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(46, 42, 33, 0.30), transparent 72%);
+  filter: blur(14px);
+  z-index: 0;
+}
+.rootin-glass-badge {
+  background: linear-gradient(135deg, rgba(255, 253, 247, 0.94), rgba(247, 242, 231, 0.72));
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 15px;
+  padding: 10px 13px;
+  box-shadow:
+    0 20px 38px -16px rgba(46, 42, 33, 0.36),
+    0 3px 8px rgba(46, 42, 33, 0.08),
+    inset 0 1px 0 #fff;
+}
+.rootin-glass-badge-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 @media (max-width: 900px) {
-  .rootin-site-feature { grid-template-columns: 1fr !important; direction: ltr !important; }
+  .rootin-site-screen { min-height: 0; padding: clamp(56px, 10vh, 88px) clamp(20px, 5vw, 48px); }
+  .rootin-site-screen-inner { grid-template-columns: 1fr !important; direction: ltr !important; gap: 36px; }
+  .rootin-site-cta-screen { min-height: 0; }
+}
+@media (max-width: 640px) {
+  /* 단일 컬럼에서 뱃지는 화면을 벗어나 잘리므로 숨긴다(본질 정보는 패널에 있음) */
+  .rootin-showcase .rootin-glass-badge { display: none; }
 }
 @media (max-width: 600px) {
   .rootin-site-navlink { display: none; }
+}
+
+/* ================================================================ */
+/* 랜딩 — 모니터 속 맥OS 데스크톱: Dock에서 앱이 켜지며 설명 (landing/SiteDescriptions.jsx) */
+/* ================================================================ */
+.rootin-os {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-body);
+  color: #2E2A21;
+}
+
+/* 상단 메뉴바 — 얇은 글래스 바(노치 좌우로 항목 분리) */
+.rootin-os-menubar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 50;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2E2A21;
+  background: rgba(247, 242, 231, 0.55);
+  -webkit-backdrop-filter: saturate(150%) blur(18px);
+  backdrop-filter: saturate(150%) blur(18px);
+  box-shadow: inset 0 -1px 0 rgba(46, 42, 33, 0.08);
+}
+.rootin-os-menu { color: #4A4337; opacity: 0.82; }
+
+/* 앱 윈도우 — 맥OS 창(신호등 + 타이틀 + [설명 | 제품샷]) */
+.rootin-os-window {
+  position: absolute;
+  border-radius: 16px;
+  background: #FFFDF7;
+  border: 1px solid rgba(46, 42, 33, 0.10);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.rootin-os-window-bar {
+  flex-shrink: 0;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 15px;
+  background: linear-gradient(#FCF8EE, #F4EEDF);
+  border-bottom: 1px solid rgba(46, 42, 33, 0.08);
+}
+.rootin-os-traffic { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.12); }
+.rootin-os-window-title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #6C6353;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.rootin-os-window-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
+
+/* 좌: 설명 패널 / 우: 제품샷 */
+.rootin-os-win-explain {
+  flex: 0 0 41%;
+  display: flex;
+  flex-direction: column;
+  padding: 26px 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(247, 242, 231, 0.35));
+  border-right: 1px solid rgba(46, 42, 33, 0.07);
+}
+.rootin-os-win-mock {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 22px;
+  overflow: hidden;
+}
+.rootin-os-win-mock > * { width: 100%; }
+.rootin-os-window.is-compact .rootin-os-window-body { flex-direction: column; }
+.rootin-os-window.is-compact .rootin-os-win-explain {
+  flex: 0 0 auto;
+  border-right: none;
+  border-bottom: 1px solid rgba(46, 42, 33, 0.07);
+  padding: 18px 20px;
+}
+.rootin-os-window.is-compact .rootin-os-win-mock { padding: 16px 20px 20px; }
+
+/* Dock — 하단 글래스 바 */
+.rootin-os-dock {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 22px;
+  background: rgba(255, 253, 247, 0.5);
+  -webkit-backdrop-filter: saturate(160%) blur(22px);
+  backdrop-filter: saturate(160%) blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 22px 50px -16px rgba(28, 24, 16, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+.rootin-os-dock-sep { width: 1px; align-self: stretch; margin: 4px 2px; background: rgba(46, 42, 33, 0.14); }
+.rootin-os-app {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: default;
+}
+.rootin-os-app-tile {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -3px 6px rgba(0, 0, 0, 0.12),
+    0 4px 10px -3px rgba(28, 24, 16, 0.35);
+}
+.rootin-os-app-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: #4A4337;
+  margin-top: 3px;
+}
+
+/* 피날레 — 스포트라이트 CTA 카드(Launchpad 느낌) */
+.rootin-os-spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(120% 120% at 50% 40%, rgba(36, 61, 39, 0.42), rgba(36, 61, 39, 0.62));
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  padding: 24px;
+}
+.rootin-os-cta {
+  margin-top: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 34px;
+  border-radius: 999px;
+  background: #FBF7EE;
+  color: #38593B;
+  font-size: 16px;
+  font-weight: 800;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+}
+.rootin-os-cta:hover { transform: translateY(-2px); filter: brightness(1.02); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.32); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rootin-os-menubar, .rootin-os-dock { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }

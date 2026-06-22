@@ -66,8 +66,11 @@ export const MonitorSection = ({ onStart, scrollToRef }) => {
   const [wakeState, setWakeState] = useState('off');
   useMotionValueEvent(scrollYProgress, 'change', (v) => {
     const wakeAt = pRise * 0.55;
-    if (v > wakeAt && wakeState === 'off') setWakeState('waking');
-    else if (v < wakeAt * 0.7 && wakeState !== 'off') setWakeState('off');
+    setWakeState((prev) => {
+      if (v > wakeAt && prev === 'off') return 'waking';
+      if (v < wakeAt * 0.7 && prev !== 'off') return 'off';
+      return prev;
+    });
   });
   useEffect(() => {
     let timer;

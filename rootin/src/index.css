@@ -1311,6 +1311,7 @@ html.lenis body {
   cursor: default;
 }
 .rootin-os-app-tile {
+  position: relative;
   width: 46px;
   height: 46px;
   border-radius: 12px;

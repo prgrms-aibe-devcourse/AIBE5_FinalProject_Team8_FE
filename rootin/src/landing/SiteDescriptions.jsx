@@ -1,5 +1,5 @@
 import { motion, AnimatePresence, useInView, useReducedMotion, useMotionValue, useMotionValueEvent, useAnimationControls } from 'framer-motion';
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { PenLine, Sprout, LineChart, Sparkles, ArrowRight, Check, Trophy, Folder, Trash2, Wifi, BatteryFull } from 'lucide-react';
 import { PixelPlant } from '../pixel-plants.jsx';
 import { RootinWordmark } from './RootinWordmark.jsx';
@@ -301,7 +301,7 @@ const Glow = ({ color, top, left, size = 620, dur = 16, delay = 0 }) => {
   return (
     <motion.div
       aria-hidden="true"
-      style={{ position: 'absolute', top, left, width: size, height: size, borderRadius: '50%', background: `radial-gradient(circle, ${color} 0%, transparent 68%)`, pointerEvents: 'none', willChange: 'transform' }}
+      style={{ position: 'absolute', top, left, width: size, height: size, borderRadius: '50%', background: `radial-gradient(circle, ${color} 0%, transparent 68%)`, pointerEvents: 'none', willChange: reduce ? 'auto' : 'transform' }}
       animate={reduce ? {} : { x: [0, 40, -20, 0], y: [0, -30, 24, 0], scale: [1, 1.08, 0.96, 1] }}
       transition={{ duration: dur, repeat: Infinity, ease: 'easeInOut', delay }}
     />
@@ -349,7 +349,7 @@ const MenuBar = ({ activeApp }) => (
 
 // ── Dock 아이콘 타일 ──
 const AppTile = ({ Icon, accent, size = 46 }) => (
-  <span className="rootin-os-app-tile" style={{ width: size, height: size, background: `linear-gradient(155deg, ${accent}, ${accent})` }}>
+  <span className="rootin-os-app-tile" style={{ width: size, height: size, background: `linear-gradient(155deg, color-mix(in srgb, ${accent}, #fff 16%), color-mix(in srgb, ${accent}, #000 12%))` }}>
     <span style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'linear-gradient(180deg, rgba(255,255,255,0.35), transparent 55%)' }} />
     <Icon size={size * 0.5} color="#fff" strokeWidth={2.2} style={{ position: 'relative' }} />
   </span>
@@ -448,7 +448,7 @@ const AppWindow = ({ app, geo, rel, z, isActive, compact, reduce }) => {
       <div className="rootin-os-window-body">
         {/* 좌: 설명 패널 */}
         <div className="rootin-os-win-explain">
-          <span style={{ width: 44, height: 44, borderRadius: 13, background: `linear-gradient(155deg, ${app.accent}, ${app.accent})`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative', boxShadow: `inset 0 1px 0 rgba(255,255,255,0.45), 0 6px 16px -6px ${app.accent}99` }}>
+          <span style={{ width: 44, height: 44, borderRadius: 13, background: `linear-gradient(155deg, color-mix(in srgb, ${app.accent}, #fff 16%), color-mix(in srgb, ${app.accent}, #000 12%))`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative', boxShadow: `inset 0 1px 0 rgba(255,255,255,0.45), 0 6px 16px -6px ${app.accent}99` }}>
             <span style={{ position: 'absolute', inset: 0, borderRadius: 'inherit', background: 'linear-gradient(180deg, rgba(255,255,255,0.35), transparent 55%)' }} />
             <Icon size={22} color="#fff" strokeWidth={2.3} style={{ position: 'relative' }} />
           </span>
@@ -555,19 +555,13 @@ export const SiteDescriptions = ({ onStart, launchProgress }) => {
     return () => ro.disconnect();
   }, []);
 
-  const apply = (v) => {
+  const apply = useCallback((v) => {
     let n = 0;
     for (const t of APP_OPEN_AT) if (v >= t) n++;
     setOpenCount(n);
     setFinale(v >= FINALE_AT);
-  };
-  useEffect(() => {
-    const v = lp.get();
-    let n = 0;
-    for (const t of APP_OPEN_AT) if (v >= t) n++;
-    setOpenCount(n);
-    setFinale(v >= FINALE_AT);
-  }, [lp]);
+  }, []);
+  useEffect(() => { apply(lp.get()); }, [lp, apply]);
   useMotionValueEvent(lp, 'change', apply);
 
   const activeIndex = openCount - 1;

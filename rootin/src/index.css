@@ -69,6 +69,15 @@ html.lenis body {
   --primary-weak2: #EFF4E9;
   --on-primary: #FBF8EF;
 
+  /* 데이터 비주얼 — 잔디 히트맵 5단계(라이트→다크 초록), 포인트 금색 텍스트 */
+  --grass-0: #ECE4D2;
+  --grass-1: #CFE2BC;
+  --grass-2: #A2C885;
+  --grass-3: #6CA15C;
+  --grass-4: #3E6F3A;
+  --gold-ink: #8A6310;
+  --danger-weak: #FFF3F5;  /* 삭제/위험 옅은 분홍 표면 */
+
   /* shadcn semantic tokens mapped to Rootin design tokens */
   --background: var(--paper);
   --foreground: var(--ink);
@@ -128,49 +137,84 @@ html.lenis body {
 }
 
 .dark {
-  /* Rootin Design System Dark Theme (theme-night) */
-  /* Rootin tokens overridden for dark so brand utilities stay coherent */
-  --paper: oklch(0.20 0.012 150);
-  --paper-2: oklch(0.255 0.014 150);
-  --ink: oklch(0.95 0.01 100);
-  --ink-2: oklch(0.78 0.01 100);
-  --ink-3: oklch(0.62 0.02 140);
-  --moss: oklch(0.78 0.10 145);
-  --moss-2: oklch(0.88 0.08 145);
-  --sprout: oklch(0.72 0.13 135);
-  --leaf: oklch(0.30 0.05 145);
-  --rule: oklch(0.32 0.012 150);
-  --rule-2: oklch(0.36 0.015 150);
+  /* Rootin 다크 팔레트 — "야간 정원": 클래식 sage를 유지한 따뜻한 그린-차콜(순흑·순백 회피).
+     :root와 같은 토큰 이름을 다크 값으로 덮어 클래식 컴포넌트가 색만 바꿔 렌더된다.
+     honey/honey-weak/primary-weak 및 그라데이션·글로우·링 토큰은 var() 참조라 자동 적응(재정의 불필요). */
 
-  /* shadcn semantic tokens */
+  /* 표면 — 다크에선 base(paper)가 가장 어둡고 card가 더 밝아 떠 보인다(라이트의 위계 역전) */
+  --paper: #181C17;     /* base 배경 */
+  --paper-2: #20251E;   /* 밴드/푸터/muted */
+  --paper-3: #1D2219;   /* inset/track */
+
+  /* 텍스트 — 순백 대신 따뜻한 오프화이트, 단계적 저대비 */
+  --ink: #ECEFE6;
+  --ink-2: #AEB6A6;
+  --ink-3: #7C8475;
+
+  /* 브랜드 — 어두운 배경에서 읽히도록 sage 명도 상향 */
+  --moss: #8FBF86;
+  --moss-2: #ABD4A1;    /* 밝은 강조 / 그라데이션 끝 */
+  --sprout: #9ECB80;
+  --leaf: #2A3727;      /* 연녹 강조배경 → 어두운 녹색 표면 */
+
+  /* 강조 — hue 유지, 명도↑로 글로우 없이 또렷하게 */
+  --amber: #EBBA5C;
+  --amber-soft: #38301E;   /* 밝은 표면 → 깊은 앰버 표면 */
+  --coral: #E89A7C;
+  --coral-weak: #38271F;
+  --danger: #E27D64;
+
+  /* 경계선 */
+  --rule: #313829;
+  --rule-2: #3C4434;
+
+  /* 기타 raw 토큰 */
+  --primary-weak2: #222B20;
+  --on-primary: #181C17;   /* moss가 밝아져 그 위 글자는 어둡게 */
+
+  /* 데이터 비주얼 — 잔디는 어두운 표면→밝은 초록 램프, 포인트 금색은 밝게 */
+  --grass-0: #222A20;
+  --grass-1: #34502E;
+  --grass-2: #4F7E45;
+  --grass-3: #6FA85C;
+  --grass-4: #8FC877;
+  --gold-ink: #E6C36A;
+  --danger-weak: #3A2426;  /* 삭제/위험 깊은 적갈 표면 */
+
+  /* 그림자 — 다크에선 갈색 그림자가 안 보여 검정 기반으로 더 깊게 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.40);
+  --shadow-md: 0 2px 6px rgba(0,0,0,.40), 0 10px 24px rgba(0,0,0,.45);
+  --shadow-lg: 0 6px 14px rgba(0,0,0,.50), 0 18px 40px rgba(0,0,0,.55);
+
+  /* shadcn semantic tokens — 대부분 위 Rootin 토큰을 var()로 참조해 자동 정렬 */
   --background: var(--paper);
   --foreground: var(--ink);
-  --card: oklch(0.255 0.014 150);
+  --card: #252B23;          /* elevated — base보다 밝게 */
   --card-foreground: var(--ink);
-  --popover: oklch(0.255 0.014 150);
+  --popover: #252B23;
   --popover-foreground: var(--ink);
   --primary: var(--moss);
-  --primary-foreground: oklch(0.20 0.012 150);
-  --secondary: oklch(0.28 0.04 145);
+  --primary-foreground: var(--on-primary);
+  --secondary: #2A3326;
   --secondary-foreground: var(--moss-2);
   --muted: var(--paper-2);
   --muted-foreground: var(--ink-3);
   --accent: var(--leaf);
   --accent-foreground: var(--moss-2);
-  --destructive: oklch(0.70 0.19 25);
-  --destructive-foreground: oklch(0.95 0.01 100);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--ink);
   --border: var(--rule);
   --input: var(--rule-2);
   --ring: var(--moss);
   --chart-1: var(--moss);
   --chart-2: var(--sprout);
-  --chart-3: oklch(0.80 0.13 75);
-  --chart-4: oklch(0.55 0.09 145);
-  --chart-5: oklch(0.65 0.10 160);
-  --sidebar: oklch(0.225 0.013 150);
+  --chart-3: var(--amber);
+  --chart-4: #5A8B57;
+  --chart-5: #6FB08C;
+  --sidebar: #1C211A;
   --sidebar-foreground: var(--ink);
   --sidebar-primary: var(--moss);
-  --sidebar-primary-foreground: oklch(0.20 0.012 150);
+  --sidebar-primary-foreground: var(--on-primary);
   --sidebar-accent: var(--leaf);
   --sidebar-accent-foreground: var(--moss-2);
   --sidebar-border: var(--rule);

@@ -16,10 +16,12 @@ import { SPECIES_TO_PIXEL, STAGE_KEYS, GROWTH_STAGE_TO_STAGE, TIL_MODAL_PAGE_SIZ
 
 // Collection (식물도감), AI, Profile, Auth screens
 
-// 화면 테마 보관함 — 원본(classic) / 게임보이(gameboy) 전환
+// 화면 테마 보관함 — 원본(classic) / 게임보이(gameboy) / 다크(dark) 전환
+// 다크는 원본과 같은 화면을 색만 바꿔 보여주는 야간 모드다.
 const THEME_OPTIONS = [
   { id: 'classic', emoji: '🌿', name: '원본', desc: '깔끔한 식물 테마' },
   { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔' },
+  { id: 'dark', emoji: '🌙', name: '다크', desc: '눈이 편한 야간 정원' },
 ];
 
 // BE speciesKey → PixelPlant species 키 매핑
@@ -480,7 +482,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
         ref={dialogRef}
         tabIndex={-1}
         style={{
-          background: '#fff', borderRadius: 16, padding: 24,
+          background: 'var(--card)', borderRadius: 16, padding: 24,
           width: 560, maxHeight: '80vh',
           display: 'flex', flexDirection: 'column', gap: 16,
           boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
@@ -504,7 +506,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               title="이 모달의 이용 가이드 보기"
               style={{
                 width: 28, height: 28, borderRadius: 7,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
+                border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                 fontSize: 13, fontWeight: 'bold', color: 'var(--ink-2)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
@@ -514,7 +516,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               onClick={onClose}
               style={{
                 width: 28, height: 28, borderRadius: 7,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
+                border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                 fontSize: 14, color: 'var(--ink-2)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
@@ -643,7 +645,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               aria-label="이전 페이지"
               style={{
                 padding: '5px 12px', borderRadius: 7, fontSize: 12,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
+                border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                 color: currentPage === 0 ? 'var(--ink-3)' : 'var(--ink)',
                 cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
               }}
@@ -655,7 +657,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               aria-label="다음 페이지"
               style={{
                 padding: '5px 12px', borderRadius: 7, fontSize: 12,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
+                border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                 color: currentPage === totalPages - 1 ? 'var(--ink-3)' : 'var(--ink)',
                 cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
               }}
@@ -1033,7 +1035,7 @@ function AIScreen({ onOpenGuide }) {
                     onClick={() => setQuizCount(c => Math.max(1, c - 1))}
                     style={{
                       width: 28, height: 28, borderRadius: 7,
-                      border: '0.5px solid var(--rule-2)', background: '#fff',
+                      border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                       fontSize: 15, color: 'var(--ink-2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
@@ -1046,7 +1048,7 @@ function AIScreen({ onOpenGuide }) {
                     onClick={() => setQuizCount(c => Math.min(10, c + 1))}
                     style={{
                       width: 28, height: 28, borderRadius: 7,
-                      border: '0.5px solid var(--rule-2)', background: '#fff',
+                      border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                       fontSize: 15, color: 'var(--ink-2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
@@ -1104,7 +1106,7 @@ function AIScreen({ onOpenGuide }) {
           {error && (
             <div style={{
               marginTop: 8, padding: '10px 14px', borderRadius: 8,
-              background: '#fff3f5', border: '0.5px solid #f7c1c1',
+              background: 'var(--danger-weak)', border: '0.5px solid #f7c1c1',
               fontSize: 12, color: '#b8536a', textAlign: 'center',
             }}>
               {error}
@@ -1147,7 +1149,7 @@ function AIScreen({ onOpenGuide }) {
                           aria-label="삭제"
                           style={{
                             width: 20, height: 20, borderRadius: 5,
-                            border: '0.5px solid var(--rule-2)', background: '#fff',
+                            border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                             fontSize: 11, color: 'var(--ink-3)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             cursor: 'pointer',
@@ -1560,7 +1562,7 @@ function ProfileScreen() {
                   style={{
                     position: 'absolute', bottom: -2, right: -2,
                     width: 26, height: 26, borderRadius: '50%',
-                    background: '#fff', border: '1px solid var(--rule-2)',
+                    background: 'var(--card)', border: '1px solid var(--rule-2)',
                     fontSize: 12, cursor: imageUploading ? 'not-allowed' : 'pointer',
                     opacity: imageUploading ? 0.5 : 1,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1757,7 +1759,7 @@ function ProfileScreen() {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              width: 420, background: '#fff', borderRadius: 18,
+              width: 420, background: 'var(--card)', borderRadius: 18,
               padding: '32px 28px', boxShadow: 'var(--shadow-lg)',
             }}
           >
@@ -1801,7 +1803,7 @@ function ProfileScreen() {
                 {pwError && (
                   <div style={{
                     marginTop: 12, padding: '9px 13px', borderRadius: 8,
-                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
+                    background: 'var(--danger-weak)', border: '0.5px solid #f7c1c1',
                     fontSize: 12.5, color: '#b8536a',
                   }}>
                     {pwError}
@@ -1830,7 +1832,7 @@ function ProfileScreen() {
                 {pwError && (
                   <div style={{
                     marginBottom: 14, padding: '9px 13px', borderRadius: 8,
-                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
+                    background: 'var(--danger-weak)', border: '0.5px solid #f7c1c1',
                     fontSize: 12.5, color: '#b8536a',
                   }}>
                     {pwError}
@@ -1920,7 +1922,7 @@ function AuthField({ icon: IconC, type = 'text', placeholder, value, onChange, d
           width: '100%', boxSizing: 'border-box',
           padding: '13px 40px',
           borderRadius: 12, fontSize: 14, outline: 'none',
-          background: '#fff', color: 'var(--ink)',
+          background: 'var(--card)', color: 'var(--ink)',
           border: `1px solid ${focused ? accent : (showValid && valid ? '#9CC7AB' : 'var(--rule-2)')}`,
           boxShadow: focused ? '0 0 0 3px rgba(47,143,84,0.12)' : 'none',
           transition: 'border-color 0.18s, box-shadow 0.18s',
@@ -2127,7 +2129,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
             <button
               type="button"
               onClick={onBackToLanding}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 26, padding: '7px 14px 7px 11px', borderRadius: 999, background: '#fff', border: '1px solid var(--rule-2)', color: 'var(--ink-2)', fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--font-display)', boxShadow: '0 1px 2px rgba(46,42,33,0.05)', cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 26, padding: '7px 14px 7px 11px', borderRadius: 999, background: 'var(--card)', border: '1px solid var(--rule-2)', color: 'var(--ink-2)', fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--font-display)', boxShadow: '0 1px 2px rgba(46,42,33,0.05)', cursor: 'pointer' }}
             >
               <ArrowLeft size={15} strokeWidth={2.5} /> 처음으로
             </button>
@@ -2149,7 +2151,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
               width: '100%', marginTop: 26, padding: '12px 16px', borderRadius: 12,
-              background: '#fff', border: '1px solid var(--rule-2)',
+              background: 'var(--card)', border: '1px solid var(--rule-2)',
               fontSize: 13.5, fontWeight: 500, color: 'var(--ink)',
               opacity: (!GOOGLE_CLIENT_ID || loading) ? 0.5 : 1,
               cursor: (!GOOGLE_CLIENT_ID || loading) ? 'not-allowed' : 'pointer',
@@ -2214,7 +2216,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
                 transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                 style={{ overflow: 'hidden' }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12, padding: '13px 15px', borderRadius: 12, background: '#fff', border: '1px solid var(--rule-2)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12, padding: '13px 15px', borderRadius: 12, background: 'var(--card)', border: '1px solid var(--rule-2)' }}>
                   <ReqItem ok={emailValid} label="올바른 이메일 형식" />
                   <ReqItem ok={pc.checks.length} label="비밀번호 8자 이상 (필수)" />
                   <div style={{ height: 1, background: 'var(--rule-2)', margin: '2px 0' }} />

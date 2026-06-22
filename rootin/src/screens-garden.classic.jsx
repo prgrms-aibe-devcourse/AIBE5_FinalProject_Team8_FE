@@ -310,7 +310,7 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
           ].map((s, i) => (
             <div key={i} style={{
               position: 'absolute', left: s.l, top: s.t,
-              width: 2, height: 2, background: '#fff',
+              width: 2, height: 2, background: 'var(--card)',
               boxShadow: '0 0 4px #fff',
             }} />
           ))}
@@ -452,7 +452,7 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
                   position: 'absolute',
                   top: -12, right: -12,
                   width: 28, height: 28, borderRadius: '50%',
-                  background: '#fff',
+                  background: 'var(--card)',
                   border: '1px solid rgba(184, 83, 106, 0.32)',
                   color: '#b8536a',
                   fontSize: 16, fontWeight: 700,
@@ -859,7 +859,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
       {/* Hero with scene */}
       <Card padding={0} style={{
         overflow: 'hidden',
-        background: '#fff',
+        background: 'var(--card)',
         border: '0.5px solid var(--rule)',
         marginBottom: 24,
       }}>
@@ -997,7 +997,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
                   )}
                 </div>
                 {selectedPotAvailableHarvestedPlants.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '12px 14px', background: '#fff', border: '0.5px dashed var(--rule-2)', borderRadius: 8 }}>
+                  <div style={{ fontSize: 12, color: 'var(--ink-3)', padding: '12px 14px', background: 'var(--card)', border: '0.5px dashed var(--rule-2)', borderRadius: 8 }}>
                     {selectedGardenPot
                       ? '이 화분에서 수확한 식물이 없거나 이미 적용했어요. 해당 화분의 식물을 만개까지 키워 수확하면 여기에 추가됩니다.'
                       : '먼저 화분을 선택해 주세요.'}
@@ -1017,7 +1017,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
                             display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
                             padding: '10px 10px 8px',
                             borderRadius: 10,
-                            background: '#fff',
+                            background: 'var(--card)',
                             border: '0.5px solid ' + (isRare ? '#ccc9f0' : 'var(--rule-2)'),
                             cursor: selectedGardenPot ? 'pointer' : 'not-allowed',
                             position: 'relative',
@@ -1062,7 +1062,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
                               display: 'flex', alignItems: 'center', gap: 8,
                               padding: '6px 12px 6px 6px',
                               borderRadius: 10,
-                              background: '#fff',
+                              background: 'var(--card)',
                               border: '0.5px dashed var(--rule-2)',
                               cursor: 'pointer',
                             }}
@@ -1128,7 +1128,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         }}>
           <div style={{
             width: 56, height: 56, borderRadius: '50%',
-            background: '#fff', border: '0.5px dashed var(--leaf)',
+            background: 'var(--card)', border: '0.5px dashed var(--leaf)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--moss)',
           }}>{Icon.plus}</div>
@@ -1142,7 +1142,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
       {!potsLoading && !potsError && pots.length > 0 && (
         <div style={{
           marginTop: 28, padding: '16px 22px',
-          background: '#fff', border: '0.5px solid var(--rule)',
+          background: 'var(--card)', border: '0.5px solid var(--rule)',
           borderRadius: 12,
           display: 'flex', alignItems: 'center', gap: 18,
         }}>
@@ -1234,7 +1234,7 @@ function CreatePotModal({ userId, onClose, onCreated }) {
     }} onClick={loading ? undefined : onClose}>
       <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()} style={{
         width: 460,
-        background: '#fff',
+        background: 'var(--card)',
         borderRadius: 18,
         padding: '28px 28px 24px',
         boxShadow: 'var(--shadow-lg)',
@@ -1322,7 +1322,7 @@ function CreatePotModal({ userId, onClose, onCreated }) {
             marginTop: 16,
             padding: '10px 12px',
             borderRadius: 9,
-            background: '#fff3f5',
+            background: 'var(--danger-weak)',
             border: '0.5px solid #f7c1c1',
             fontSize: 12.5,
             color: '#b8536a',
@@ -1360,7 +1360,7 @@ function PotDetailBackButton({ onBack, style }) {
         padding: '8px 12px',
         borderRadius: 999,
         border: '0.5px solid #c9dccd',
-        background: '#fff',
+        background: 'var(--card)',
         color: 'var(--moss-2)',
         fontSize: 12.5,
         fontWeight: 700,
@@ -1399,7 +1399,7 @@ function TilPagination({ tilPage, tilTotalPages, onPageChange }) {
 
   const arrowStyle = (disabled) => ({
     width: 38, height: 38, borderRadius: 9,
-    border: '0.5px solid var(--rule-2)', background: '#fff',
+    border: '0.5px solid var(--rule-2)', background: 'var(--card)',
     color: disabled ? 'var(--ink-3)' : 'var(--ink)',
     opacity: disabled ? 0.35 : 1,
     cursor: disabled ? 'not-allowed' : 'pointer',
@@ -1547,7 +1547,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
                     color: 'var(--ink-3)',
                     fontSize: 11,
                     fontFamily: 'var(--font-display)',
-                    background: '#fff',
+                    background: 'var(--card)',
                   }}
                 >
                   화분 수정
@@ -1569,7 +1569,7 @@ function PotDetailSidebar({ pot, stage, dashboard, onBack, onStartTil, onShowHar
           </div>
           <div style={{
             marginTop: 18,
-            background: '#fff',
+            background: 'var(--card)',
             border: '0.5px solid var(--rule)',
             borderRadius: 12,
             overflow: 'hidden',
@@ -1923,7 +1923,7 @@ function PotDetailScreen({ potId, refreshKey = 0, onBack, onStartTil, onOpenTil 
                     height: 40,
                     borderRadius: 10,
                     border: '0.5px solid var(--rule-2)',
-                    background: '#fff',
+                    background: 'var(--card)',
                     padding: tilSearchQuery ? '0 38px 0 34px' : '0 12px 0 34px',
                     fontSize: 12.5,
                     color: 'var(--ink)',
@@ -2239,7 +2239,7 @@ function TilDetailScreen({ tilId, onBack, onEdit, onDeleted }) {
             padding: '8px 12px',
             borderRadius: 999,
             border: '0.5px solid #c9dccd',
-            background: '#fff',
+            background: 'var(--card)',
             color: 'var(--moss-2)',
             fontSize: 12.5,
             fontWeight: 700,
@@ -2392,7 +2392,7 @@ function DeletePotModal({ pot, onClose, onDeleted }) {
     }} onClick={loading ? undefined : onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         width: 460,
-        background: '#fff',
+        background: 'var(--card)',
         borderRadius: 18,
         padding: '28px 28px 24px',
         boxShadow: 'var(--shadow-lg)',
@@ -2419,7 +2419,7 @@ function DeletePotModal({ pot, onClose, onDeleted }) {
             justifyContent: 'center',
             flexShrink: 0,
             opacity: loading ? 0.5 : 1,
-            background: '#fff',
+            background: 'var(--card)',
           }}>
             {Icon.close}
           </button>
@@ -2429,7 +2429,7 @@ function DeletePotModal({ pot, onClose, onDeleted }) {
           marginTop: 20,
           padding: '14px 16px',
           borderRadius: 12,
-          background: '#fff3f5',
+          background: 'var(--danger-weak)',
           border: '0.5px solid #f7c1c1',
           color: '#9f4055',
           fontSize: 12.5,
@@ -2443,7 +2443,7 @@ function DeletePotModal({ pot, onClose, onDeleted }) {
             marginTop: 14,
             padding: '10px 12px',
             borderRadius: 9,
-            background: '#fff3f5',
+            background: 'var(--danger-weak)',
             border: '0.5px solid #f7c1c1',
             fontSize: 12.5,
             color: '#b8536a',
@@ -2524,7 +2524,7 @@ function EditPotModal({ pot, onClose, onUpdated, onDeleteRequest }) {
     }} onClick={loading ? undefined : onClose}>
       <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()} style={{
         width: 460,
-        background: '#fff',
+        background: 'var(--card)',
         borderRadius: 18,
         padding: '28px 28px 24px',
         boxShadow: 'var(--shadow-lg)',
@@ -2610,7 +2610,7 @@ function EditPotModal({ pot, onClose, onUpdated, onDeleteRequest }) {
             marginTop: 16,
             padding: '10px 12px',
             borderRadius: 9,
-            background: '#fff3f5',
+            background: 'var(--danger-weak)',
             border: '0.5px solid #f7c1c1',
             fontSize: 12.5,
             color: '#b8536a',
@@ -2711,7 +2711,7 @@ function HarvestModal({ pot, onClose, onHarvested }) {
       backdropFilter: 'blur(4px)',
     }} onClick={result ? undefined : onClose}>
       <div onClick={e => e.stopPropagation()} style={{
-        width: 480, background: '#fff', borderRadius: 18,
+        width: 480, background: 'var(--card)', borderRadius: 18,
         padding: '32px 28px', boxShadow: 'var(--shadow-lg)',
         textAlign: 'center',
       }}>
@@ -2744,7 +2744,7 @@ function HarvestModal({ pot, onClose, onHarvested }) {
             {error && (
               <div style={{
                 marginBottom: 14, padding: '10px 14px', borderRadius: 8,
-                background: '#fff3f5', border: '0.5px solid #f7c1c1',
+                background: 'var(--danger-weak)', border: '0.5px solid #f7c1c1',
                 fontSize: 12.5, color: '#b8536a',
               }}>
                 {error}

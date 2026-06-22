@@ -1488,6 +1488,7 @@ function SummaryResult({ pot, summary, keyPoints }) {
 const THEME_OPTIONS = [
   { id: 'classic', emoji: '🌿', name: '원본', desc: '깔끔한 식물 테마' },
   { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔' },
+  { id: 'dark', emoji: '🌙', name: '다크', desc: '눈이 편한 야간 정원' },
 ];
 
 function ProfileScreen() {

@@ -21,7 +21,7 @@ const CARD_SHEEN = { background: 'var(--grad-sheen)', boxShadow: 'var(--shadow-m
 // ─── 컴포넌트 ──────────────────────────────────────────────────
 
 function GrassGraph({ data, startDate }) {
-  const colors = ['#ECE4D2', '#CFE2BC', '#A2C885', '#6CA15C', '#3E6F3A'];
+  const colors = ['var(--grass-0)', 'var(--grass-1)', 'var(--grass-2)', 'var(--grass-3)', 'var(--grass-4)'];
   const weekDays = ['', '월', '', '수', '', '금', ''];
   const weeks = data.length || GRASS_WEEKS;
 
@@ -93,7 +93,7 @@ function StreakActivityChart({ days }) {
       marginTop: 14,
       padding: '13px 12px 9px',
       borderRadius: 16,
-      background: 'linear-gradient(180deg, #fbfaf6 0%, #f4f7f0 100%)',
+      background: 'var(--grad-sheen)',
       border: '0.5px solid var(--rule)',
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
@@ -120,7 +120,7 @@ function StreakActivityChart({ days }) {
                 borderRadius: day.active ? '5px 5px 2px 2px' : 3,
                 background: day.active ? 'linear-gradient(180deg, var(--moss), var(--moss-2))' : 'var(--rule)',
                 opacity: day.active ? 1 : 0.65,
-                outline: isToday && day.active ? '1px solid rgba(46, 107, 72, 0.28)' : 'none',
+                outline: isToday && day.active ? '1px solid color-mix(in oklch, var(--moss) 35%, transparent)' : 'none',
                 outlineOffset: 2,
               }}
             />
@@ -175,7 +175,7 @@ function PotDistribution({ distribution }) {
       textAlign: 'center',
       border: '0.5px dashed var(--rule-2)',
       borderRadius: 14,
-      background: 'linear-gradient(180deg, #fbfaf6 0%, #f6f4ed 100%)',
+      background: 'var(--grad-sheen)',
       color: 'var(--ink-3)',
       padding: '22px 18px',
     }}>
@@ -307,7 +307,7 @@ function InterestStackedAreaChart({ interests }) {
       minHeight: 278,
       border: '1px solid var(--line)',
       borderRadius: 8,
-      background: 'linear-gradient(180deg, rgba(233, 245, 235, 0.8), rgba(255, 255, 255, 0.9))',
+      background: 'var(--grad-sheen)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -698,9 +698,9 @@ function GoalRow({ goal }) {
     }}>
       <div style={{
         width: 22, height: 22, borderRadius: 7,
-        background: goal.done ? 'var(--moss)' : '#fff',
+        background: goal.done ? 'var(--moss)' : 'var(--card)',
         border: goal.done ? 'none' : '1px solid var(--rule-2)',
-        color: '#fff',
+        color: 'var(--on-primary)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
         {goal.done && Icon.check}
@@ -708,7 +708,7 @@ function GoalRow({ goal }) {
       <div style={{ flex: 1, fontSize: 13.5, color: 'var(--ink)', textDecoration: goal.done ? 'line-through' : 'none', opacity: goal.done ? 0.6 : 1 }}>
         {goal.label}
       </div>
-      <div style={{ fontFamily: 'var(--font-display)', fontSize: 11.5, fontWeight: 700, color: goal.done ? 'var(--moss-2)' : '#8a6310' }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 11.5, fontWeight: 700, color: goal.done ? 'var(--moss-2)' : 'var(--gold-ink)' }}>
         +{goal.point}P
       </div>
     </div>
@@ -874,7 +874,7 @@ function DashboardScreen({ onNav }) {
               title="오늘의 목표"
               accent="var(--amber)"
               action={
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 11.5, color: '#8a6310', fontWeight: 700 }}>
+                <span style={{ fontFamily: 'var(--font-display)', fontSize: 11.5, color: 'var(--gold-ink)', fontWeight: 700 }}>
                   {earnedToday} / {totalToday}P
                 </span>
               }

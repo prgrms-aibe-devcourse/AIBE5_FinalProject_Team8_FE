@@ -197,17 +197,20 @@ export function RootinSidebarRight({ onEditTil, onResumeDraft, onNewTil, open = 
     setDraftResumed(false);
   };
 
-  // "새 TIL 작성" → 작성 중 내용이 있으면 확인 모달, 없으면 바로 시작.
+  // "새 TIL 작성" → 작성 중 내용이 있거나 이 화분에 임시저장본이 있으면 확인 모달, 없으면 바로 시작.
   const handleNewTil = () => {
     const hasContent = (editor?.getText().trim().length ?? 0) > 0;
-    // 임시저장 글도 보호한다. 작성 모드(currentTilId == null)에서 내용이 있으면,
-    // 자동저장으로 dirty=false 여도 새 TIL로 넘어가 한 글자만 입력하면 그 임시저장본이
-    // 덮어써져 사라진다. 그래서 '저장 안 됨'뿐 아니라 작성 모드에 내용이 있으면 항상 경고한다.
-    if (hasContent && (dirty || currentTilId == null)) {
+    // 이 화분에 임시저장본이 있으면, 에디터가 비어 있어도 새 TIL을 시작해 한 글자라도 쓰면
+    // 그 임시저장본이 덮어써져 사라질 수 있다. 그래서 임시저장본이 있으면 항상 경고한다.
+    // (작성 모드에서 내용이 있을 때도 동일하게 보호한다.)
+    const hasDraft = draft != null;
+    if (hasDraft || (hasContent && (dirty || currentTilId == null))) {
       setConfirmAction({
         tag: '새 TIL',
-        title: '작성 중인 글을 비울까요?',
-        description: <>지금 작성 중인 글이 사라져요.<br />새 TIL을 시작할까요?</>,
+        title: hasDraft ? '임시저장된 글이 있어요' : '작성 중인 글을 비울까요?',
+        description: hasDraft
+          ? <>이 화분에 임시저장된 글이 있어요.<br />새 TIL을 시작하면 덮어쓸 수 있어요.</>
+          : <>지금 작성 중인 글이 사라져요.<br />새 TIL을 시작할까요?</>,
         confirmLabel: '새로 작성',
         onConfirm: proceedNewTil,
       });

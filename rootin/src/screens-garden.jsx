@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { Suspense, lazy, useState, useEffect, useRef, useCallback } from 'react';
 import { POTS, GARDEN_THEMES, DEFAULT_GARDEN_LAYOUT, TILS } from './data.jsx';
 import { harvestPot, getGardenState, updateGardenTheme, updateGardenLayout } from './api/garden.js';
 import { createPot, deletePot, getGardenDashboard, getPots, updatePot } from './api/pot.js';
@@ -9,11 +9,14 @@ import { playSfx } from './lib/sfx.js';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
 import { tilCountToStage, STAGE_META } from './plants.jsx';
 import { inferSpecies } from './utils/plant.js';
-import { TilContentView } from './components/til/til-content-view';
 import './garden.css';
 import './pot-detail.css';
 import { useDeferredLoading } from './hooks/useDeferredLoading.js';
 import { POT_TITLE_MAX_LENGTH, POT_DESCRIPTION_MAX_LENGTH, EMPTY_POT_INTRO, POT_TITLE_PREVIEW_STYLE, POT_DESCRIPTION_PREVIEW_STYLE, getPotTier, formatPotExperience, formatPlantGrowthPercent, getPlantStageStatus, getHarvestStatus, toGardenPot, toDashboardPot, formatDateTime, getKstDateString, getMsUntilKstMidnight, formatTilDateTime, toTilListItem, getLayoutSlot, findNearestVisiblePotId, getPottedPlantAlignment } from './screens-garden.logic.js';
+
+const TilContentView = lazy(() =>
+  import('./components/til/til-content-view').then((module) => ({ default: module.TilContentView }))
+);
 
 function PottedPlant({ species, stage, size = 64, locked = false, glow = false, potLevel = 1 }) {
   const tier = getPotTier(potLevel);
@@ -2060,7 +2063,9 @@ export function TilDetailScreen({ tilId, onBack, onEdit, onDeleted }) {
         ) : error ? (
           <div className="gb-note gb-note--error">{error}</div>
         ) : contentHtml ? (
-          <TilContentView content={contentHtml} />
+          <Suspense fallback={<div style={{ color: 'var(--muted)', fontSize: 14 }}>TIL 본문을 준비하고 있어요.</div>}>
+            <TilContentView content={contentHtml} />
+          </Suspense>
         ) : til ? (
           <div style={{ color: 'var(--muted)' }}>{til.excerpt}</div>
         ) : null}

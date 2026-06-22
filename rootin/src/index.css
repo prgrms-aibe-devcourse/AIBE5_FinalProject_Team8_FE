@@ -105,9 +105,9 @@ html.lenis body {
   --sidebar-ring: var(--moss);
 
   /* Restored missing legacy variables for other pages */
-  --font-display: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
-  --font-serif: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
-  --font-body: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
+  --font-display: 'Space Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
+  --font-serif: 'Space Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
+  --font-body: 'Space Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --r-sm: 8px;
   --r-md: 12px;
@@ -178,7 +178,7 @@ html.lenis body {
 }
 
 @theme inline {
-  --font-sans: 'Space Grotesk', 'Pretendard Variable', 'Noto Sans KR', sans-serif;
+  --font-sans: 'Space Grotesk', 'Pretendard Variable', Pretendard, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
   --font-serif: 'Gowun Batang', 'Nanum Myeongjo', 'Noto Serif KR', serif;
   
@@ -1362,5 +1362,3 @@ html.lenis body {
 @media (prefers-reduced-motion: reduce) {
   .rootin-os-menubar, .rootin-os-dock { -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
-
-

@@ -1,34 +1,64 @@
-import { useState, useEffect, useCallback } from 'react';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Suspense, lazy, useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { DashboardScreen } from './screens-dashboard.jsx';
-import { EditorScreen } from './screens-editor.jsx';
-import { GardenScreen, PotDetailScreen, TilDetailScreen } from './screens-garden.jsx';
-import { CollectionScreen, AIScreen, ProfileScreen, AuthScreen } from './screens-rest.jsx';
-import { LandingScreen } from './screens-landing.jsx';
-import { NotFoundScreen } from './screens-error.jsx';
 import { UserProvider, useUser } from './context/UserContext.jsx';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { GameBoySidebar } from '@/components/GameBoySidebar.jsx';
 import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
-import { RootinSidebarRight } from '@/components/RootinSidebarRight.jsx';
-import { GuideOverlay } from './components/GuideOverlay.jsx';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
-import { DashboardScreen as DashboardClassic } from './screens-dashboard.classic.jsx';
-import { GardenScreen as GardenClassic, PotDetailScreen as PotDetailClassic, TilDetailScreen as TilDetailClassic } from './screens-garden.classic.jsx';
-import { CollectionScreen as CollectionClassic, AIScreen as AIClassic, ProfileScreen as ProfileClassic } from './screens-rest.classic.jsx';
-import { LogoutConfirmModal as LogoutConfirmModalClassic } from '@/components/LogoutConfirmModal.classic.jsx';
-import { EditorScreen as EditorClassic } from './screens-editor.classic.jsx';
-import { RootinSidebarRight as RootinSidebarRightClassic } from '@/components/RootinSidebarRight.classic.jsx';
 import { TilEditorProvider as TilEditorProviderClassic } from '@/components/til-classic/til-editor-context';
 import { TilEditorProvider } from '@/components/til/til-editor-context';
-import { LogoutConfirmModal } from '@/components/LogoutConfirmModal.jsx';
 import { logout, clearTokens } from './api/auth.js';
 import { useSmoothScroll } from './hooks/useSmoothScroll.js';
+import { NotFoundScreen } from './screens-error.jsx';
 
 // App shell — sidebar + topbar + route-based screen routing
 
 // Old custom Sidebar and TopBar removed and replaced by Shadcn UI
+
+const lazyNamed = (loader, exportName) =>
+  lazy(() => loader().then((module) => ({ default: module[exportName] })));
+
+const DashboardScreen = lazyNamed(() => import('./screens-dashboard.jsx'), 'DashboardScreen');
+const EditorScreen = lazyNamed(() => import('./screens-editor.jsx'), 'EditorScreen');
+const GardenScreen = lazyNamed(() => import('./screens-garden.jsx'), 'GardenScreen');
+const PotDetailScreen = lazyNamed(() => import('./screens-garden.jsx'), 'PotDetailScreen');
+const TilDetailScreen = lazyNamed(() => import('./screens-garden.jsx'), 'TilDetailScreen');
+const RootinSidebarRight = lazyNamed(() => import('./components/RootinSidebarRight.jsx'), 'RootinSidebarRight');
+const CollectionScreen = lazyNamed(() => import('./screens-rest.jsx'), 'CollectionScreen');
+const AIScreen = lazyNamed(() => import('./screens-rest.jsx'), 'AIScreen');
+const ProfileScreen = lazyNamed(() => import('./screens-rest.jsx'), 'ProfileScreen');
+const AuthScreen = lazyNamed(() => import('./screens-rest.jsx'), 'AuthScreen');
+const LandingScreen = lazyNamed(() => import('./screens-landing.jsx'), 'LandingScreen');
+
+const DashboardClassic = lazyNamed(() => import('./screens-dashboard.classic.jsx'), 'DashboardScreen');
+const EditorClassic = lazyNamed(() => import('./screens-editor.classic.jsx'), 'EditorScreen');
+const GardenClassic = lazyNamed(() => import('./screens-garden.classic.jsx'), 'GardenScreen');
+const PotDetailClassic = lazyNamed(() => import('./screens-garden.classic.jsx'), 'PotDetailScreen');
+const RootinSidebarRightClassic = lazyNamed(() => import('./components/RootinSidebarRight.classic.jsx'), 'RootinSidebarRight');
+const CollectionClassic = lazyNamed(() => import('./screens-rest.classic.jsx'), 'CollectionScreen');
+const AIClassic = lazyNamed(() => import('./screens-rest.classic.jsx'), 'AIScreen');
+const ProfileClassic = lazyNamed(() => import('./screens-rest.classic.jsx'), 'ProfileScreen');
+const GuideOverlay = lazyNamed(() => import('./components/GuideOverlay.jsx'), 'GuideOverlay');
+const LogoutConfirmModal = lazyNamed(() => import('./components/LogoutConfirmModal.jsx'), 'LogoutConfirmModal');
+const LogoutConfirmModalClassic = lazyNamed(() => import('./components/LogoutConfirmModal.classic.jsx'), 'LogoutConfirmModal');
+
+function RouteFallback() {
+  return (
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: 'var(--ink-2)',
+        background: 'var(--paper)',
+        fontSize: 14,
+      }}
+    >
+      화면을 불러오고 있어요.
+    </div>
+  );
+}
 
 // 사용자 이용 가이드 단계 정의 — 화면 요소를 .guide-* 클래스로 가리키며 안내한다.
 // classic·gameboy 두 테마 모두 동일한 .guide-* 타겟을 두므로 같은 단계 정의를 공유한다.
@@ -153,7 +183,6 @@ function AppShell() {
   const TilProvider = isClassic ? TilEditorProviderClassic : TilEditorProvider;
   const EditorComp = isClassic ? EditorClassic : EditorScreen;
   const RightPanel = isClassic ? RootinSidebarRightClassic : RootinSidebarRight;
-  const reduceMotion = useReducedMotion();
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
@@ -258,20 +287,22 @@ function AppShell() {
 
   if (!authed) {
     return (
-      <Routes>
-        <Route path="/landing" element={<LandingScreen onStart={() => navigate('/login')} />} />
-        <Route path="/login" element={(
-          <AuthScreen
-            onBackToLanding={() => navigate('/landing')}
-            onAuth={(userData) => {
-              setUserFromApi(userData);
-              setAuthed(true);
-              navigate('/dashboard', { replace: true });
-            }}
-          />
-        )} />
-        <Route path="*" element={<Navigate to="/landing" replace />} />
-      </Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/landing" element={<LandingScreen onStart={() => navigate('/login')} />} />
+          <Route path="/login" element={(
+            <AuthScreen
+              onBackToLanding={() => navigate('/landing')}
+              onAuth={(userData) => {
+                setUserFromApi(userData);
+                setAuthed(true);
+                navigate('/dashboard', { replace: true });
+              }}
+            />
+          )} />
+          <Route path="*" element={<Navigate to="/landing" replace />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -306,95 +337,93 @@ function AppShell() {
       )}
       <SidebarInset style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, padding: 0, margin: 0, background: 'transparent' }}>
         <div className="scrollbar" style={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={theme === 'classic' ? <DashboardClassic onNav={handleNav} /> : <DashboardScreen onNav={handleNav} />} />
-            <Route path="/editor" element={(
-              <EditorComp
-                onNav={handleNav}
-                initialSelectedPotId={activeEditorPotId}
-                initialTil={editorInitialTil}
-                afterPublishScreen={editorReturnScreen ?? (activeEditorPotId ? `/garden/pots/${activeEditorPotId}` : '/dashboard')}
-                onPublished={handleTilPublished}
-                onSelectedPotChange={syncEditorPotQuery}
-                focusMode={focusMode}
-                onToggleFocus={toggleFocusMode}
-              />
-            )} />
-            <Route path="/garden" element={theme === 'classic'
-              ? <GardenClassic refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />
-              : <GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
-            <Route path="/garden/pots/:potId" element={(
-              <PotDetailRoute
-                theme={theme}
-                refreshKey={potDetailRefreshKey}
-                celebratePotId={growthCelebratePotId}
-                onCelebrated={() => setGrowthCelebratePotId(null)}
-                onBack={() => navigate('/garden')}
-                onStartTil={openEditorForPot}
-                onOpenTil={(potId, tilId) => navigate(`/garden/pots/${potId}/tils/${tilId}`)}
-              />
-            )} />
-            <Route path="/garden/pots/:potId/tils/:tilId" element={(
-              <TilDetailRoute
-                theme={theme}
-                onBack={(potId) => navigate(`/garden/pots/${potId}`)}
-                onEdit={openEditorForTil}
-                onDeleted={(potId) => {
-                  setPotDetailRefreshKey(key => key + 1);
-                  navigate(`/garden/pots/${potId}`);
-                }}
-              />
-            )} />
-            <Route path="/collection" element={theme === 'classic' ? <CollectionClassic /> : <CollectionScreen />} />
-            <Route path="/ai" element={theme === 'classic' ? <AIClassic onOpenGuide={() => setGuideOpen(true)} /> : <AIScreen />} />
-            <Route path="/profile" element={theme === 'classic' ? <ProfileClassic /> : <ProfileScreen />} />
-            <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/landing" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<NotFoundScreen />} />
-          </Routes>
+          <Suspense fallback={<RouteFallback />}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={theme === 'classic' ? <DashboardClassic onNav={handleNav} /> : <DashboardScreen onNav={handleNav} />} />
+              <Route path="/editor" element={(
+                <EditorComp
+                  onNav={handleNav}
+                  initialSelectedPotId={activeEditorPotId}
+                  initialTil={editorInitialTil}
+                  afterPublishScreen={editorReturnScreen ?? (activeEditorPotId ? `/garden/pots/${activeEditorPotId}` : '/dashboard')}
+                  onPublished={handleTilPublished}
+                  onSelectedPotChange={syncEditorPotQuery}
+                  focusMode={focusMode}
+                  onToggleFocus={toggleFocusMode}
+                />
+              )} />
+              <Route path="/garden" element={theme === 'classic'
+                ? <GardenClassic refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />
+                : <GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
+              <Route path="/garden/pots/:potId" element={(
+                <PotDetailRoute
+                  theme={theme}
+                  refreshKey={potDetailRefreshKey}
+                  celebratePotId={growthCelebratePotId}
+                  onCelebrated={() => setGrowthCelebratePotId(null)}
+                  onBack={() => navigate('/garden')}
+                  onStartTil={openEditorForPot}
+                  onEditTil={openEditorForTil}
+                  onOpenTil={(potId, tilId) => navigate(`/garden/pots/${potId}/tils/${tilId}`)}
+                />
+              )} />
+              <Route path="/garden/pots/:potId/tils/:tilId" element={(
+                <TilDetailRoute
+                  onBack={(potId) => navigate(`/garden/pots/${potId}`)}
+                  onEdit={openEditorForTil}
+                  onDeleted={(potId) => {
+                    setPotDetailRefreshKey(key => key + 1);
+                    navigate(`/garden/pots/${potId}`);
+                  }}
+                />
+              )} />
+              <Route path="/collection" element={theme === 'classic' ? <CollectionClassic /> : <CollectionScreen />} />
+              <Route path="/ai" element={theme === 'classic' ? <AIClassic onOpenGuide={() => setGuideOpen(true)} /> : <AIScreen />} />
+              <Route path="/profile" element={theme === 'classic' ? <ProfileClassic /> : <ProfileScreen />} />
+              <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/landing" element={<Navigate to="/dashboard" replace />} />
+              <Route path="*" element={<NotFoundScreen />} />
+            </Routes>
+          </Suspense>
+
         </div>
       </SidebarInset>
       {screen === 'editor' && !focusMode && (
-        <RightPanel
-          onEditTil={openEditorForTil}
-          onResumeDraft={resumeEditorDraft}
-          onNewTil={startNewEditorTil}
-          open={rightOpen}
-          onToggle={toggleRightPanel}
-        />
+        <Suspense fallback={null}>
+          <RightPanel
+            onEditTil={openEditorForTil}
+            onResumeDraft={resumeEditorDraft}
+            onNewTil={startNewEditorTil}
+            open={rightOpen}
+            onToggle={toggleRightPanel}
+          />
+        </Suspense>
       )}
-      {/* 모니터 베젤 — 화면 전환 시 부드럽게 등장/소멸.
-          에디터 진입(framed→false): 베젤이 확대되며 페이드아웃 → 모니터 속으로 빨려들어가는 느낌.
-          에디터 이탈(false→framed): 베젤이 제자리로 모이며 페이드인. */}
-      <AnimatePresence initial={false}>
-        {framed && (
-          <motion.div
-            key="vision-frame"
-            className="rt-vision-frame"
-            aria-hidden="true"
-            initial={reduceMotion ? false : { opacity: 0, scale: 1.12 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.18 }}
-            transition={{ duration: reduceMotion ? 0.12 : 0.55, ease: [0.4, 0, 0.7, 1] }}
-          >
-            <span className="vf-label">ROOTIN VISION-DISPLAY · 16:9 DOT MATRIX</span>
-            <div className="vf-brand">
-              <span className="vf-led" /><span>POWER</span>
-              <span className="vf-word">Rootin</span>
-              <span>DOT-MATRIX VISION DISPLAY™ · MODEL RT-9</span>
-            </div>
-            <div className="vf-grille"><i /><i /><i /><i /><i /><span className="vf-knob" /></div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* 모니터 베젤 — 대시보드/정원/도감 등 framed 화면에서만 표시한다. */}
+      {framed && (
+        <div
+          className="rt-vision-frame"
+          aria-hidden="true"
+        >
+          <span className="vf-label">ROOTIN VISION-DISPLAY · 16:9 DOT MATRIX</span>
+          <div className="vf-brand">
+            <span className="vf-led" /><span>POWER</span>
+            <span className="vf-word">Rootin</span>
+            <span>DOT-MATRIX VISION DISPLAY™ · MODEL RT-9</span>
+          </div>
+          <div className="vf-grille"><i /><i /><i /><i /><i /><span className="vf-knob" /></div>
+        </div>
+      )}
       {guideEnabled && guideOpen && (
-        <GuideOverlay
-          isOpen={guideOpen}
-          onClose={closeGuide}
-          steps={GUIDE_STEPS[screen]}
-          theme={isClassic ? 'classic' : 'gameboy'}
-        />
+        <Suspense fallback={null}>
+          <GuideOverlay
+            isOpen={guideOpen}
+            onClose={closeGuide}
+            steps={GUIDE_STEPS[screen]}
+            theme={isClassic ? 'classic' : 'gameboy'}
+          />
+        </Suspense>
       )}
       {guideEnabled && !focusMode && (
         <button
@@ -423,9 +452,12 @@ function AppShell() {
         </button>
       )}
     </SidebarProvider>
-    {logoutModalOpen && (theme === 'classic'
-      ? <LogoutConfirmModalClassic onConfirm={confirmLogout} onClose={closeLogoutModal} />
-      : <LogoutConfirmModal onConfirm={confirmLogout} onClose={closeLogoutModal} />
+    {logoutModalOpen && (
+      <Suspense fallback={null}>
+        {theme === 'classic'
+          ? <LogoutConfirmModalClassic onConfirm={confirmLogout} onClose={closeLogoutModal} />
+          : <LogoutConfirmModal onConfirm={confirmLogout} onClose={closeLogoutModal} />}
+      </Suspense>
     )}
     </TilProvider>
   );

@@ -98,6 +98,7 @@ export function TilEditorPage({
     setTags,
     setSelectedPotId,
     refreshPots,
+    refreshTemplates,
     saveDraft,
     loadDraft,
     resumeDraft,
@@ -173,6 +174,10 @@ export function TilEditorPage({
     setEditor(editor)
     return () => setEditor(null)
   }, [editor, setEditor])
+
+  useEffect(() => {
+    refreshTemplates()
+  }, [refreshTemplates])
 
   // 사이드바가 현재 편집 중인 TIL을 알 수 있도록 context에 동기화 (신규 작성 시 null)
   // 수정 모드를 벗어나면(임시저장 이어쓰기/신규 전환) 하이드레이션 가드를 풀어,

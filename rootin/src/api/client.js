@@ -57,7 +57,8 @@ export async function request(path, options = {}, retry = true) {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      // FormData 전송 시 브라우저가 boundary를 포함한 Content-Type을 자동 설정하므로 생략한다.
+      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...options.headers,
       // 로컬 스토리지에 로그인 토큰(accessToken)이 있다면 Bearer 헤더를 자동으로 주입합니다.
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

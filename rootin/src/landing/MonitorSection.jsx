@@ -118,12 +118,14 @@ export const MonitorSection = ({ onStart, scrollToRef }) => {
     return () => clearTimeout(timer);
   }, [wakeState]);
 
+  // 트랙(z-20)은 스크롤 시 히어로(z-0) 위로 겹쳐 빈 영역이 히어로 CTA 클릭을 가로챈다.
+  // 트랙 전체를 pointer-events-none 로 두어 빈 영역은 클릭을 통과시키고, 실제 모니터에만 auto 를 준다.
   return (
-    <div ref={trackRef} className="relative z-20 w-full" style={{ height: trackH }}>
+    <div ref={trackRef} className="relative z-20 w-full pointer-events-none" style={{ height: trackH }}>
       <div className="sticky top-0 h-screen w-full overflow-hidden flex justify-center">
         <motion.div
           style={{ width, y: riseY, borderRadius: bezelRadius, paddingTop: bezelPad, paddingLeft: bezelPad, paddingRight: bezelPad, paddingBottom: bezelPad }}
-          className="relative h-full flex bg-gradient-to-b from-[#3a3a3d] via-[#1c1c1f] to-[#0d0d0f] shadow-[0_40px_90px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.12)]"
+          className="relative h-full flex bg-gradient-to-b from-[#3a3a3d] via-[#1c1c1f] to-[#0d0d0f] shadow-[0_40px_90px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.12)] pointer-events-auto"
         >
           <motion.div
             style={{ borderRadius: screenRadius }}
@@ -181,23 +183,23 @@ export const MonitorSection = ({ onStart, scrollToRef }) => {
                 className="shrink-0 flex items-end gap-3 pb-2 px-4 bg-[#eceae6] border-b border-[#dcdad4]"
                 style={{ height: CHROME_H }}
               >
-                <div className="flex gap-2 w-20 shrink-0 items-center pb-0.5">
-                  <span className="w-3 h-3 rounded-full bg-[#ed6a5e] border border-black/10" />
-                  <span className="w-3 h-3 rounded-full bg-[#f4bf4f] border border-black/10" />
-                  <span className="w-3 h-3 rounded-full bg-[#61c554] border border-black/10" />
-                </div>
-                <div className="hidden sm:flex items-center gap-3 text-gray-400 shrink-0 pb-0.5">
-                  <ArrowLeft className="w-4 h-4" />
-                  <ArrowRight className="w-4 h-4 opacity-40" />
-                  <RotateCw className="w-3.5 h-3.5" />
-                </div>
-                <div className="flex-1 flex justify-center">
-                  <div className="flex items-center gap-2 bg-white px-10 sm:px-28 py-1.5 rounded-lg shadow-sm border border-black/5 text-[12px] text-gray-600 font-medium tracking-wide max-w-full truncate">
-                    <Lock className="w-3 h-3 text-gray-400 shrink-0" />
-                    rootin.app
+                <div className="flex-1 flex items-center gap-3 pb-0.5 min-w-0">
+                  <div className="flex gap-2 shrink-0 items-center">
+                    <span className="w-3 h-3 rounded-full bg-[#ed6a5e] border border-black/10" />
+                    <span className="w-3 h-3 rounded-full bg-[#f4bf4f] border border-black/10" />
+                    <span className="w-3 h-3 rounded-full bg-[#61c554] border border-black/10" />
+                  </div>
+                  <div className="hidden sm:flex items-center gap-3 text-gray-400 shrink-0">
+                    <ArrowLeft className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 opacity-40" />
+                    <RotateCw className="w-3.5 h-3.5" />
                   </div>
                 </div>
-                <div className="w-20 shrink-0 flex justify-end items-center gap-3 text-gray-400 pb-0.5">
+                <div className="flex items-center gap-2 shrink-0 bg-white px-10 sm:px-28 py-1.5 rounded-lg shadow-sm border border-black/5 text-[12px] text-gray-600 font-medium tracking-wide max-w-full truncate">
+                  <Lock className="w-3 h-3 text-gray-400 shrink-0" />
+                  rootin.app
+                </div>
+                <div className="flex-1 flex justify-end items-center gap-3 text-gray-400 pb-0.5">
                   <Plus className="w-4 h-4" />
                   <Menu className="w-4 h-4" />
                 </div>

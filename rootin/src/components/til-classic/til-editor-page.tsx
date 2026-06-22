@@ -23,7 +23,6 @@ import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
-import { createLowlight, common } from 'lowlight'
 
 import { FileClock, Minimize2 } from 'lucide-react'
 
@@ -49,8 +48,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-
-const lowlight = createLowlight(common)
 
 export function TilEditorPage({
   onNav,
@@ -144,7 +141,7 @@ export function TilEditorPage({
       TaskItem.configure({ nested: true }),
       Subscript,
       Superscript,
-      createCodeBlock(lowlight),
+      createCodeBlock(),
       Callout,
       Mathematics,
       ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),
@@ -412,7 +409,9 @@ export function TilEditorPage({
         if (targetPotId != null && targetTilId != null) {
           onNav?.(`/garden/pots/${targetPotId}/tils/${targetTilId}`)
         } else {
-          onNav?.('pot-detail')
+          // 화분/TIL 식별자를 못 얻은 예외 상황의 안전 폴백(정상 흐름에선 도달하지 않음).
+          // 'pot-detail'은 potFocus가 없으면 '/garden'으로 풀려 모호하므로 대시보드로 명시.
+          onNav?.('dashboard')
         }
       }
     } catch {

@@ -2308,9 +2308,9 @@ function TilDetailScreen({ tilId, onBack, onEdit, onDeleted }) {
             )}
           </div>
 
-          {/* 수정 / 삭제 액션 — 삭제 확인도 이 안에서 인라인으로 처리 */}
+          {/* 수정 / 삭제 액션 — 제목 컨테이너 우측 하단 (삭제 확인도 이 안에서 인라인으로 처리) */}
           {til && !error && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0, alignSelf: 'flex-end' }}>
               {confirmDelete ? (
                 <>
                   <span style={{ fontSize: 12.5, color: '#b8536a', fontWeight: 600, whiteSpace: 'nowrap' }}>삭제할까요?</span>

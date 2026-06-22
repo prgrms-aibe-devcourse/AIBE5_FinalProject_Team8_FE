@@ -78,12 +78,14 @@ export const MonitorSection = ({ onStart, scrollToRef }) => {
     return () => clearTimeout(timer);
   }, [wakeState]);
 
+  // 트랙(z-20)은 스크롤 시 히어로(z-0) 위로 겹쳐 빈 영역이 히어로 CTA 클릭을 가로챈다.
+  // 트랙 전체를 pointer-events-none 로 두어 빈 영역은 클릭을 통과시키고, 실제 모니터에만 auto 를 준다.
   return (
-    <div ref={trackRef} className="relative z-20 w-full" style={{ height: trackH }}>
+    <div ref={trackRef} className="relative z-20 w-full pointer-events-none" style={{ height: trackH }}>
       <div className="sticky top-0 h-screen w-full overflow-hidden flex justify-center">
         <motion.div
           style={{ width, y: riseY, borderRadius: bezelRadius, paddingTop: bezelPad, paddingLeft: bezelPad, paddingRight: bezelPad, paddingBottom: bezelPad }}
-          className="relative h-full flex bg-gradient-to-b from-[#3a3a3d] via-[#1c1c1f] to-[#0d0d0f] shadow-[0_40px_90px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.12)]"
+          className="relative h-full flex bg-gradient-to-b from-[#3a3a3d] via-[#1c1c1f] to-[#0d0d0f] shadow-[0_40px_90px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(255,255,255,0.12)] pointer-events-auto"
         >
           <motion.div
             style={{ borderRadius: screenRadius }}

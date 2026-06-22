@@ -569,6 +569,11 @@ html.lenis body {
   border: 1px solid var(--border);
 }
 
+/* 클래식 테마: 기본 인라인 코드색(연한 노랑)이 종이 배경과 대비가 낮아 잘 안 보임 → 브랜드 진녹색으로 가독성 확보 */
+body[data-theme="classic"] .til-prose .ProseMirror code {
+  color: var(--moss-2);
+}
+
 /* Links */
 .til-prose .ProseMirror a {
   color: var(--primary);
@@ -581,8 +586,9 @@ html.lenis body {
 /* Code block body — 프레임(테두리/라운드/그림자)은 .til-code-block 컨테이너가 담당 */
 .til-prose .ProseMirror pre {
   font-family: var(--font-mono);
-  background: oklch(0.16 0.006 75);
-  color: oklch(0.9 0.012 95);
+  /* 배경/기본 글자색은 shiki(github-dark)가 노드에 심는 변수를 그대로 쓴다(테두리 카드가 배경 담당). */
+  background: transparent;
+  color: var(--prosemirror-highlight, #e1e4e8);
   border: 0;
   border-radius: 0;
   margin: 0;
@@ -629,51 +635,7 @@ html.lenis body {
   border: 1px solid var(--border);
 }
 
-/* ---------------------------------------------------------------- */
-/* Syntax highlighting (lowlight / highlight.js token classes)      */
-/* ---------------------------------------------------------------- */
-.til-prose .ProseMirror pre .hljs-comment,
-.til-prose .ProseMirror pre .hljs-quote {
-  color: oklch(0.6 0.012 75);
-  font-style: italic;
-}
-.til-prose .ProseMirror pre .hljs-keyword,
-.til-prose .ProseMirror pre .hljs-selector-tag,
-.til-prose .ProseMirror pre .hljs-literal,
-.til-prose .ProseMirror pre .hljs-section {
-  color: oklch(0.72 0.16 350);
-}
-.til-prose .ProseMirror pre .hljs-string,
-.til-prose .ProseMirror pre .hljs-attr,
-.til-prose .ProseMirror pre .hljs-meta .hljs-string {
-  color: oklch(0.78 0.14 145);
-}
-.til-prose .ProseMirror pre .hljs-number,
-.til-prose .ProseMirror pre .hljs-built_in,
-.til-prose .ProseMirror pre .hljs-class .hljs-title {
-  color: oklch(0.8 0.13 75);
-}
-.til-prose .ProseMirror pre .hljs-title,
-.til-prose .ProseMirror pre .hljs-function .hljs-title,
-.til-prose .ProseMirror pre .hljs-name {
-  color: oklch(0.78 0.12 230);
-}
-.til-prose .ProseMirror pre .hljs-attribute,
-.til-prose .ProseMirror pre .hljs-variable,
-.til-prose .ProseMirror pre .hljs-template-variable {
-  color: oklch(0.8 0.12 50);
-}
-.til-prose .ProseMirror pre .hljs-symbol,
-.til-prose .ProseMirror pre .hljs-bullet,
-.til-prose .ProseMirror pre .hljs-regexp {
-  color: oklch(0.75 0.12 190);
-}
-.til-prose .ProseMirror pre .hljs-emphasis {
-  font-style: italic;
-}
-.til-prose .ProseMirror pre .hljs-strong {
-  font-weight: 700;
-}
+/* 코드블럭 신택스 색은 shiki(github-dark)가 토큰별 인라인 스타일로 입힌다(.shiki). */
 
 /* ---------------------------------------------------------------- */
 /* 좌측 사이드바 — Claude Design "사이드바 컴포넌트 제작" 디자인 적용  */
@@ -899,67 +861,63 @@ html.lenis body {
 .til-prose .ProseMirror .til-callout[data-callout='warning'] .til-callout-icon { color: var(--amber); }
 
 /* ---------------------------------------------------------------- */
-/* 코드블럭 노드뷰 — macOS 윈도우풍 헤더(트래픽 라이트·언어·복사)     */
+/* 코드블럭 노드뷰 — prompt-kit 스타일 클린 카드(언어 라벨·복사, 다크)   */
 /* ---------------------------------------------------------------- */
 .til-prose .ProseMirror .til-code-block {
   position: relative;
   margin: 1.2em 0;
-  border-radius: var(--r-lg);
+  border-radius: 12px;
   overflow: hidden;
-  border: 1px solid oklch(0.3 0.012 75);
+  border: 1px solid #30363d;
   box-shadow: var(--shadow-md);
-  background: oklch(0.16 0.006 75);
+  /* github-dark editor.background — shiki가 심는 변수 우선, 폴백 동일색 */
+  background: var(--prosemirror-highlight-bg, #24292e);
 }
 .til-code-block .til-code-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75em;
-  padding: 0.5em 0.75em;
-  background: oklch(0.21 0.009 75);
-  border-bottom: 1px solid oklch(0.3 0.012 75);
+  padding: 0.5em 0.6em 0.5em 0.75em;
+  background: rgba(255, 255, 255, 0.025);
+  border-bottom: 1px solid #30363d;
   user-select: none;
 }
-.til-code-block .til-code-dots {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45em;
-}
-.til-code-block .til-code-dots > span {
-  display: block;
-  width: 0.72em;
-  height: 0.72em;
-  border-radius: 9999px;
-}
-.til-code-block .til-code-dots > span:nth-child(1) { background: #ff5f57; }
-.til-code-block .til-code-dots > span:nth-child(2) { background: #febc2e; }
-.til-code-block .til-code-dots > span:nth-child(3) { background: #28c840; }
-.til-code-block .til-code-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4em;
-}
-.til-code-block .til-code-lang,
-.til-code-block .til-code-copy {
+/* 언어: 좌측 배지(pill) — github-dark 헤더 톤 */
+.til-code-block .til-code-lang {
   appearance: none;
   -webkit-appearance: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3em;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: oklch(0.8 0.012 90);
-  background: color-mix(in oklch, white 8%, transparent);
-  border: 1px solid color-mix(in oklch, white 14%, transparent);
+  font-weight: 600;
+  text-transform: capitalize;
+  color: #e6edf3;
+  background: #373e47;
+  border: 0;
   border-radius: 6px;
-  padding: 3px 8px;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.til-code-block .til-code-lang:hover {
+  background: #424a53;
+}
+/* 복사: 우측 아이콘 전용 버튼(muted → hover 밝게) */
+.til-code-block .til-code-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #768390;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 5px;
   cursor: pointer;
   transition: color 150ms ease, background 150ms ease;
 }
-.til-code-block .til-code-lang:hover,
 .til-code-block .til-code-copy:hover {
-  color: oklch(0.96 0.01 100);
-  background: color-mix(in oklch, white 16%, transparent);
+  color: #e6edf3;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 @media (prefers-reduced-motion: reduce) {

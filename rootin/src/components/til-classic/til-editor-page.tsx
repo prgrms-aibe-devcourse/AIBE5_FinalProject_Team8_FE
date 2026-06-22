@@ -404,7 +404,9 @@ export function TilEditorPage({
         if (targetPotId != null && targetTilId != null) {
           onNav?.(`/garden/pots/${targetPotId}/tils/${targetTilId}`)
         } else {
-          onNav?.('pot-detail')
+          // 화분/TIL 식별자를 못 얻은 예외 상황의 안전 폴백(정상 흐름에선 도달하지 않음).
+          // 'pot-detail'은 potFocus가 없으면 '/garden'으로 풀려 모호하므로 대시보드로 명시.
+          onNav?.('dashboard')
         }
       }
     } catch {

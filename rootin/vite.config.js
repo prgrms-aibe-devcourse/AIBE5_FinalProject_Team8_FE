@@ -6,23 +6,21 @@ import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEFAULT_SITE_URL = 'https://rootin.duckdns.org'
-// 인증 뒤의 앱 화면은 검색 노출 대상이 아니므로 공개 진입 페이지만 sitemap에 포함한다.
+// SPA canonical을 루트로 고정하므로 sitemap도 검색 진입점인 루트만 노출한다.
 const SITEMAP_ROUTES = [
   { path: '/', changefreq: 'weekly', priority: '1.0' },
-  { path: '/landing', changefreq: 'weekly', priority: '0.8' },
 ]
 
 function normalizeSiteUrl(value) {
   return (value || DEFAULT_SITE_URL).replace(/\/+$/, '')
 }
 
-function createSitemap(siteUrl, lastmod) {
+function createSitemap(siteUrl) {
   const urls = SITEMAP_ROUTES.map(({ path: routePath, changefreq, priority }) => {
     const loc = routePath === '/' ? `${siteUrl}/` : `${siteUrl}${routePath}`
     return [
       '  <url>',
       `    <loc>${loc}</loc>`,
-      `    <lastmod>${lastmod}</lastmod>`,
       `    <changefreq>${changefreq}</changefreq>`,
       `    <priority>${priority}</priority>`,
       '  </url>',
@@ -49,7 +47,7 @@ function createRobotsTxt(siteUrl) {
 
 function rootinSeoPlugin(siteUrl) {
   const robotsTxt = createRobotsTxt(siteUrl)
-  const sitemapXml = createSitemap(siteUrl, new Date().toISOString().split('T')[0])
+  const sitemapXml = createSitemap(siteUrl)
 
   return {
     name: 'rootin-seo',
@@ -94,8 +92,8 @@ function getConfigValue(env, key, fallback) {
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '')
-  const siteUrl = normalizeSiteUrl(getConfigValue(env, 'VITE_SITE_URL'))
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
+  const siteUrl = normalizeSiteUrl(getConfigValue(env, 'VITE_SITE_URL', DEFAULT_SITE_URL))
 
   return {
     plugins: [

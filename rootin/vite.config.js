@@ -20,7 +20,7 @@ function createSitemap(siteUrl) {
     const loc = routePath === '/' ? `${siteUrl}/` : `${siteUrl}${routePath}`
     return [
       '  <url>',
-      `    <loc>${loc}</loc>`,
+      `    <loc>${loc.replace(/&/g, '&amp;')}</loc>`,
       `    <changefreq>${changefreq}</changefreq>`,
       `    <priority>${priority}</priority>`,
       '  </url>',

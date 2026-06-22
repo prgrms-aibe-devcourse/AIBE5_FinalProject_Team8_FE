@@ -16,12 +16,13 @@ function normalizeSiteUrl(value) {
   return (value || DEFAULT_SITE_URL).replace(/\/+$/, '')
 }
 
-function createSitemap(siteUrl) {
+function createSitemap(siteUrl, lastmod) {
   const urls = SITEMAP_ROUTES.map(({ path: routePath, changefreq, priority }) => {
     const loc = routePath === '/' ? `${siteUrl}/` : `${siteUrl}${routePath}`
     return [
       '  <url>',
       `    <loc>${loc}</loc>`,
+      `    <lastmod>${lastmod}</lastmod>`,
       `    <changefreq>${changefreq}</changefreq>`,
       `    <priority>${priority}</priority>`,
       '  </url>',
@@ -40,7 +41,6 @@ function createSitemap(siteUrl) {
 function createRobotsTxt(siteUrl) {
   return [
     'User-agent: *',
-    'Allow: /',
     '',
     `Sitemap: ${siteUrl}/sitemap.xml`,
     '',
@@ -49,7 +49,7 @@ function createRobotsTxt(siteUrl) {
 
 function rootinSeoPlugin(siteUrl) {
   const robotsTxt = createRobotsTxt(siteUrl)
-  const sitemapXml = createSitemap(siteUrl)
+  const sitemapXml = createSitemap(siteUrl, new Date().toISOString().split('T')[0])
 
   return {
     name: 'rootin-seo',
@@ -87,10 +87,15 @@ function rootinSeoPlugin(siteUrl) {
   }
 }
 
+function getConfigValue(env, key, fallback) {
+  // loadEnv는 .env 파일을 읽고, process.env fallback은 CI/CD 주입 값을 지원한다.
+  return env[key] ?? process.env[key] ?? fallback
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const siteUrl = normalizeSiteUrl(env.VITE_SITE_URL ?? process.env.VITE_SITE_URL)
+  const siteUrl = normalizeSiteUrl(getConfigValue(env, 'VITE_SITE_URL'))
 
   return {
     plugins: [
@@ -106,7 +111,7 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: {
         '/api': {
-          target: env.VITE_API_PROXY_TARGET ?? process.env.VITE_API_PROXY_TARGET ?? 'http://localhost:8080',
+          target: getConfigValue(env, 'VITE_API_PROXY_TARGET', 'http://localhost:8080'),
           changeOrigin: true,
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq) => {

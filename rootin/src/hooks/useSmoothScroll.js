@@ -1,12 +1,11 @@
 import { useEffect } from 'react';
 import Lenis from 'lenis';
-import { frame, cancelFrame } from 'framer-motion';
 
 // 가볍고 부드러운 스크롤 공통 설정.
 // - lerp 0.12: 휠을 굴릴 땐 부드럽게 따라오되, 멈추면 빠르게 정착해 "둥둥 뜨는" 관성은 최소화.
 // - allowNestedScroll: 에디터 본문/AI 결과·모달/도감 리스트 등 자체 스크롤 영역은 네이티브로 두어
 //   window 스무스 스크롤과 충돌하지 않게 자동 처리.
-// - autoRaf:false: framer-motion 프레임 루프로 구동해 useScroll(랜딩 스크롤잭 등)과 같은 프레임에서 동기화.
+// - autoRaf:false: 직접 requestAnimationFrame 루프로 구동해 Lenis 업데이트 타이밍을 명시적으로 관리.
 const OPTIONS = {
   lerp: 0.12,
   smoothWheel: true,
@@ -31,11 +30,15 @@ export function useSmoothScroll({ enabled = true, resetKey } = {}) {
     const lenis = new Lenis(OPTIONS);
     activeLenis = lenis;
 
-    const update = (data) => lenis.raf(data.timestamp);
-    frame.update(update, true);
+    let rafId = 0;
+    const update = (time) => {
+      lenis.raf(time);
+      rafId = requestAnimationFrame(update);
+    };
+    rafId = requestAnimationFrame(update);
 
     return () => {
-      cancelFrame(update);
+      cancelAnimationFrame(rafId);
       lenis.destroy();
       if (activeLenis === lenis) activeLenis = null;
     };

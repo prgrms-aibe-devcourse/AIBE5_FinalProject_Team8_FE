@@ -1,12 +1,11 @@
 import { Component } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { PixelPlant } from './pixel-plants.jsx';
 
 // 404 / 500 오류 화면 — rootin 토큰 팔레트에 8비트 레트로 게임 스킨.
 // 식물 도감 픽셀 캐릭터를 주인공으로 사용한다.
 
-const PIXEL_FONT = "'Press Start 2P', 'JetBrains Mono', monospace";
+const PIXEL_FONT = "'Galmuri11', 'JetBrains Mono', monospace";
 
 // 8비트 픽셀 버튼 — 샤프 모서리 + 하드 그림자 + 눌림 애니메이션
 function PixelButton({ children, variant = 'primary', onClick }) {
@@ -82,10 +81,7 @@ function ErrorArcade({ code, codeColor, statusBar, species, stage, glow, heading
         }}
       />
 
-      <motion.div
-        initial={{ y: 12, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.35, ease: 'easeOut' }}
+      <div
         style={{
           position: 'relative',
           width: 'min(480px, 92vw)',
@@ -115,13 +111,9 @@ function ErrorArcade({ code, codeColor, statusBar, species, stage, glow, heading
         {/* 본문 */}
         <div style={{ padding: '32px 28px 30px', textAlign: 'center', position: 'relative' }}>
           {/* 캐릭터 — 위아래로 둥실 */}
-          <motion.div
-            animate={{ y: [0, -6, 0] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-            style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}
-          >
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
             <PixelPlant species={species} stage={stage} size={132} glow={glow} />
-          </motion.div>
+          </div>
 
           {/* 큰 픽셀 코드 */}
           <div
@@ -146,9 +138,7 @@ function ErrorArcade({ code, codeColor, statusBar, species, stage, glow, heading
           </p>
 
           {/* 점멸 안내 */}
-          <motion.div
-            animate={{ opacity: [1, 1, 0, 0] }}
-            transition={{ duration: 1, repeat: Infinity, times: [0, 0.5, 0.5, 1] }}
+          <div
             style={{
               fontFamily: PIXEL_FONT,
               fontSize: 8,
@@ -158,7 +148,7 @@ function ErrorArcade({ code, codeColor, statusBar, species, stage, glow, heading
             }}
           >
             ▶ PRESS START
-          </motion.div>
+          </div>
 
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
             {actions}
@@ -175,7 +165,7 @@ function ErrorArcade({ code, codeColor, statusBar, species, stage, glow, heading
             }}
           />
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

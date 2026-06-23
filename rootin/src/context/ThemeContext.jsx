@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 
-// 사이트 디자인 테마 — 'gameboy'(현재 라이브) / 'classic'(원본 디자인) / 'dark'(클래식 다크 변형)
+// 사이트 디자인 테마 — 'classic'(기본) / 'gameboy' / 'dark'(클래식 다크 변형)
 // 'dark'는 클래식과 동일한 컴포넌트를 그대로 쓰고 색 토큰만 다크로 덮는 팔레트 변형이다.
 // 버튼/보관함으로 전환하며 localStorage에 보존한다.
 const ThemeContext = createContext(null);
@@ -10,9 +10,9 @@ const VALID_THEMES = ['classic', 'gameboy', 'dark'];
 function readInitialTheme() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return VALID_THEMES.includes(saved) ? saved : 'gameboy';
+    return VALID_THEMES.includes(saved) ? saved : 'classic';
   } catch {
-    return 'gameboy';
+    return 'classic';
   }
 }
 

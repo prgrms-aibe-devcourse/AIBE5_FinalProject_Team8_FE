@@ -327,40 +327,51 @@ describe('ProfileScreen — 비밀번호 변경 폼', () => {
 // ─── 회원 탈퇴 ──────────────────────────────────────────────────────────────
 
 describe('ProfileScreen — 회원 탈퇴', () => {
-  it('confirm 취소 시 deleteUserMe가 호출되지 않는다', async () => {
+  it('모달 취소 시 deleteUserMe가 호출되지 않는다', async () => {
     const { deleteUserMe } = await import('../api/user.js');
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
 
     renderProfile();
     fireEvent.click(screen.getByText('회원 탈퇴'));
+
+    await waitFor(() => {
+      expect(screen.getByText('탈퇴하기')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('취소'));
 
     expect(deleteUserMe).not.toHaveBeenCalled();
   });
 
-  it('confirm 확인 시 deleteUserMe가 호출된다', async () => {
+  it('모달 확인 시 deleteUserMe가 호출된다', async () => {
     const { deleteUserMe } = await import('../api/user.js');
     deleteUserMe.mockResolvedValue();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
 
     renderProfile();
     fireEvent.click(screen.getByText('회원 탈퇴'));
+
+    await waitFor(() => {
+      expect(screen.getByText('탈퇴하기')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('탈퇴하기'));
 
     await waitFor(() => {
       expect(deleteUserMe).toHaveBeenCalled();
     });
   });
 
-  it('탈퇴 API 실패 시 alert가 표시된다', async () => {
+  it('탈퇴 API 실패 시 모달에 에러 메시지가 표시된다', async () => {
     const { deleteUserMe } = await import('../api/user.js');
     deleteUserMe.mockRejectedValue(new Error('server error'));
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    vi.spyOn(window, 'alert').mockImplementation(() => {});
 
     renderProfile();
     fireEvent.click(screen.getByText('회원 탈퇴'));
 
     await waitFor(() => {
-      expect(window.alert).toHaveBeenCalledWith('회원 탈퇴에 실패했습니다. 다시 시도해주세요.');
+      expect(screen.getByText('탈퇴하기')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText('탈퇴하기'));
+
+    await waitFor(() => {
+      expect(screen.getByText('회원 탈퇴에 실패했어요. 다시 시도해 주세요.')).toBeInTheDocument();
     });
   });
 });

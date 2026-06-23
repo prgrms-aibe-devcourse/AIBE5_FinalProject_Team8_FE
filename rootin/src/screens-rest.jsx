@@ -409,7 +409,17 @@ function CollectionScreen() {
               </div>
               <div className="gb-dex-list scrollbar">
                 {filteredSections.length === 0 ? (
-                  <div className="gb-dex-empty">해당 조건의 식물이 없어요.</div>
+                  <div className="gb-dex-empty">
+                    해당 조건의 식물이 없어요.
+                    <button
+                      type="button"
+                      className="gb-key gb-key--dark"
+                      style={{ display: 'block', margin: '12px auto 0' }}
+                      onClick={() => { playSfx('toggle'); setFilter('all'); }}
+                    >
+                      필터 초기화
+                    </button>
+                  </div>
                 ) : filteredSections.map(s => (
                   <div key={s.speciesKey} className="gb-dex-group">
                     <div className="gb-dex-group-head">
@@ -1329,7 +1339,17 @@ function AIScreen({ onOpenGuide }) {
             <span className="gb-ai-vault-count">{savedResults.length}개</span>
           </div>
           {savedResults.length === 0 ? (
-            <div className="gb-ai-vault-empty">아직 저장한 자료가 없어요. 결과를 만들고 저장해 보세요.</div>
+            <div className="gb-ai-vault-empty">
+              아직 저장한 자료가 없어요. 결과를 만들고 저장해 보세요.
+              <button
+                type="button"
+                className="gb-key gb-key--lcd"
+                style={{ display: 'block', margin: '12px auto 0' }}
+                onClick={() => document.querySelector('.gb-ai-quest')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                퀴즈/요약 만들러 가기
+              </button>
+            </div>
           ) : (
             <div className="gb-ai-vault-grid">
               {savedResults.map(item => {

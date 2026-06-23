@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Card, Pill, Btn, StatTile, SectionHeader, ProgressBar, Icon } from './ui.jsx';
 import { Plant } from './plants.jsx';
-import { getSummary, getGrass, getWeekly, getDistribution, getInterests, getQuests } from './api/dashboard.js';
+import { getSummary, getGrass, getQuests } from './api/dashboard.js';
 import { getPointSummary } from './api/points.js';
-import { GRASS_WEEKS, STREAK_CHAR_COUNT_CAP, DAY_LABELS, formatDateKey, formatShortDate, getGrassStartDate, buildGrassState, buildRecentStreakDays, calculateCurrentStreakFromCells, transformWeekly } from './screens-dashboard.logic.js';
+import { useDeferredDashboardAnalytics } from './hooks/useDeferredDashboardAnalytics.js';
+import { GRASS_WEEKS, STREAK_CHAR_COUNT_CAP, DAY_LABELS, formatDateKey, formatShortDate, getGrassStartDate, buildGrassState, buildRecentStreakDays, calculateCurrentStreakFromCells } from './screens-dashboard.logic.js';
 
 // ─── 변환 유틸 ────────────────────────────────────────────────
 
@@ -715,16 +716,39 @@ function GoalRow({ goal }) {
   );
 }
 
+function AnalyticsLoadingState() {
+  return (
+    <div style={{
+      minHeight: 150,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      border: '0.5px dashed var(--rule-2)',
+      borderRadius: 14,
+      background: 'linear-gradient(180deg, #fbfaf6 0%, #f6f4ed 100%)',
+      color: 'var(--ink-3)',
+      padding: '22px 18px',
+      fontSize: 12.5,
+      lineHeight: 1.6,
+    }}>
+      분석 데이터를 불러오는 중이에요.
+    </div>
+  );
+}
+
 function DashboardScreen({ onNav }) {
   const [summary, setSummary]           = useState(null);
   const [grassState, setGrassState]     = useState(() => buildGrassState([]));
   const [grassCells, setGrassCells]     = useState([]);
-  const [weekly, setWeekly]             = useState([]);
-  const [distribution, setDistribution] = useState([]);
-  const [interests, setInterests]           = useState([]);
   const [interestMonths, setInterestMonths] = useState(6);
   const [quests, setQuests]                 = useState(null);
   const [currentPoint, setCurrentPoint]     = useState(0);
+  const [coreDashboardReady, setCoreDashboardReady] = useState(false);
+  const { overviewLoading, interestsLoading, weekly, distribution, interests } = useDeferredDashboardAnalytics({
+    enabled: coreDashboardReady,
+    interestMonths,
+  });
 
   // 잔디 — 항상 1년치 데이터
   useEffect(() => {
@@ -740,55 +764,37 @@ function DashboardScreen({ onNav }) {
     return () => { active = false; };
   }, []);
 
-  // 관심사 기간 변경 시 재요청
   useEffect(() => {
-    let active = true;
-    getInterests(interestMonths).then(data => {
-      if (!active) return;
-      setInterests(data?.interests ?? []);
-    }).catch(error => {
-      console.error('시기별 학습 주제 흐름 조회 중 오류 발생:', error);
-    });
-    return () => { active = false; };
-  }, [interestMonths]);
-
-  useEffect(() => {
-    // getQuests()는 포인트 적립을 수행하므로, 완료 후 포인트를 재조회한다 (성공/실패 무관)
     let active = true;
     const questsP = getQuests();
-
-    Promise.allSettled([
-      getSummary(),
-      getWeekly(),
-      getDistribution(),
-      questsP,
-    ]).then(([sumRes, weekRes, distRes, questRes]) => {
-      if (!active) return;
-      if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
-      if (weekRes.status === 'fulfilled')  setWeekly(transformWeekly(weekRes.value?.weeklyData ?? []));
-      if (distRes.status === 'fulfilled')  setDistribution(distRes.value?.distribution ?? []);
-      if (questRes.status === 'fulfilled') setQuests(questRes.value);
-    // allSettled 자체는 reject되지 않음. then() 내부 동기 오류만 여기서 잡힘
-    }).catch(error => {
-      console.error('상태 업데이트 중 오류:', error);
-    });
-
-    // 퀘스트 완료 여부와 무관하게 포인트 잔액 갱신
-    questsP
+    const summaryP = getSummary();
+    const pointP = questsP
       .catch(error => {
         console.error('퀘스트 조회 중 오류 발생:', error);
         return null;
       })
-      .finally(() => {
-        if (!active) return;
-        getPointSummary()
-          .then(pointRes => {
-            if (active && pointRes != null) setCurrentPoint(pointRes.currentPoint ?? 0);
-          })
-          .catch(error => {
-            console.error('포인트 조회 중 오류 발생:', error);
-          });
+      .then(() => getPointSummary())
+      .then(pointRes => {
+        if (active && pointRes != null) setCurrentPoint(pointRes.currentPoint ?? 0);
+      })
+      .catch(error => {
+        console.error('포인트 조회 중 오류 발생:', error);
       });
+
+    Promise.allSettled([
+      summaryP,
+      questsP,
+    ]).then(([sumRes, questRes]) => {
+      if (!active) return;
+      if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
+      if (questRes.status === 'fulfilled') setQuests(questRes.value);
+      return pointP;
+    // allSettled 자체는 reject되지 않음. then() 내부 동기 오류만 여기서 잡힘
+    }).catch(error => {
+      console.error('상태 업데이트 중 오류:', error);
+    }).finally(() => {
+      if (active) setCoreDashboardReady(true);
+    });
 
     return () => { active = false; };
   }, []);
@@ -907,12 +913,12 @@ function DashboardScreen({ onNav }) {
 
           <Card className="guide-dashboard-distribution" padding={22} style={CARD_SHEEN}>
             <SectionHeader eyebrow="화분별 분포" title="주제 비율" accent="var(--moss)" />
-            <PotDistribution distribution={distribution} />
+            {overviewLoading ? <AnalyticsLoadingState /> : <PotDistribution distribution={distribution} />}
           </Card>
 
           <Card className="guide-dashboard-weekly" padding={22} style={{ display: 'flex', flexDirection: 'column', ...CARD_SHEEN }}>
             <SectionHeader eyebrow="이번 주" title="요일별 작성" accent="var(--moss)" />
-            <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />
+            {overviewLoading ? <AnalyticsLoadingState /> : <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />}
           </Card>
         </div>
 
@@ -931,7 +937,7 @@ function DashboardScreen({ onNav }) {
               ))}
             </div>
           } />
-          <InterestStackedAreaChart interests={interests} />
+          {interestsLoading ? <AnalyticsLoadingState /> : <InterestStackedAreaChart interests={interests} />}
         </Card>
       </div>
     </div>

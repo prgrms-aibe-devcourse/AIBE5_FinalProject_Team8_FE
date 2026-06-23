@@ -716,6 +716,27 @@ function GoalRow({ goal }) {
   );
 }
 
+function AnalyticsLoadingState() {
+  return (
+    <div style={{
+      minHeight: 150,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      border: '0.5px dashed var(--rule-2)',
+      borderRadius: 14,
+      background: 'linear-gradient(180deg, #fbfaf6 0%, #f6f4ed 100%)',
+      color: 'var(--ink-3)',
+      padding: '22px 18px',
+      fontSize: 12.5,
+      lineHeight: 1.6,
+    }}>
+      분석 데이터를 불러오는 중이에요.
+    </div>
+  );
+}
+
 function DashboardScreen({ onNav }) {
   const [summary, setSummary]           = useState(null);
   const [grassState, setGrassState]     = useState(() => buildGrassState([]));
@@ -724,7 +745,7 @@ function DashboardScreen({ onNav }) {
   const [quests, setQuests]                 = useState(null);
   const [currentPoint, setCurrentPoint]     = useState(0);
   const [coreDashboardReady, setCoreDashboardReady] = useState(false);
-  const { weekly, distribution, interests } = useDeferredDashboardAnalytics({
+  const { overviewLoading, interestsLoading, weekly, distribution, interests } = useDeferredDashboardAnalytics({
     enabled: coreDashboardReady,
     interestMonths,
   });
@@ -894,12 +915,12 @@ function DashboardScreen({ onNav }) {
 
           <Card className="guide-dashboard-distribution" padding={22} style={CARD_SHEEN}>
             <SectionHeader eyebrow="화분별 분포" title="주제 비율" accent="var(--moss)" />
-            <PotDistribution distribution={distribution} />
+            {overviewLoading ? <AnalyticsLoadingState /> : <PotDistribution distribution={distribution} />}
           </Card>
 
           <Card className="guide-dashboard-weekly" padding={22} style={{ display: 'flex', flexDirection: 'column', ...CARD_SHEEN }}>
             <SectionHeader eyebrow="이번 주" title="요일별 작성" accent="var(--moss)" />
-            <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />
+            {overviewLoading ? <AnalyticsLoadingState /> : <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />}
           </Card>
         </div>
 
@@ -918,7 +939,7 @@ function DashboardScreen({ onNav }) {
               ))}
             </div>
           } />
-          <InterestStackedAreaChart interests={interests} />
+          {interestsLoading ? <AnalyticsLoadingState /> : <InterestStackedAreaChart interests={interests} />}
         </Card>
       </div>
     </div>

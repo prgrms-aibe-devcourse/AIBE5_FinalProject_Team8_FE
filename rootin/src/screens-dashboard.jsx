@@ -370,7 +370,7 @@ const W = 700, H = 220;
 const PAD = { top: 14, right: 16, bottom: 36, left: 40 };
 const normalizeTag = tag => String(tag ?? '').trim();
 
-function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
+function InterestStackedAreaChart({ interests }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [hiddenTags, setHiddenTags] = useState(new Set());
 
@@ -746,6 +746,27 @@ function GoalRow({ goal }) {
   );
 }
 
+function AnalyticsLoadingState() {
+  return (
+    <div style={{
+      minHeight: 150,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      border: `1px dashed ${SPROUT.line}`,
+      borderRadius: 6,
+      background: 'linear-gradient(180deg, var(--paper-warm), var(--surface-card))',
+      color: SPROUT.muted,
+      padding: '22px 18px',
+      fontSize: 12.5,
+      lineHeight: 1.6,
+    }}>
+      분석 데이터를 불러오는 중이에요.
+    </div>
+  );
+}
+
 function DashboardScreen({ onNav }) {
   const { user } = useUser();
   const [summary, setSummary]           = useState(null);
@@ -755,7 +776,7 @@ function DashboardScreen({ onNav }) {
   const [quests, setQuests]                 = useState(null);
   const [currentPoint, setCurrentPoint]     = useState(0);
   const [coreDashboardReady, setCoreDashboardReady] = useState(false);
-  const { weekly, distribution, interests } = useDeferredDashboardAnalytics({
+  const { overviewLoading, interestsLoading, weekly, distribution, interests } = useDeferredDashboardAnalytics({
     enabled: coreDashboardReady,
     interestMonths,
   });
@@ -923,12 +944,12 @@ function DashboardScreen({ onNav }) {
 
         <div className="rt-card guide-dashboard-distribution">
           <SectionHead eyebrow="화분별 분포" title="주제 비율" />
-          <PotDistribution distribution={distribution} />
+          {overviewLoading ? <AnalyticsLoadingState /> : <PotDistribution distribution={distribution} />}
         </div>
 
         <div className="rt-card guide-dashboard-weekly">
           <SectionHead eyebrow="이번 주" title="요일별 작성" />
-          <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />
+          {overviewLoading ? <AnalyticsLoadingState /> : <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />}
         </div>
       </div>
 
@@ -937,7 +958,7 @@ function DashboardScreen({ onNav }) {
         <SectionHead eyebrow="관심사 변화" title="시기별 학습 주제 흐름" action={
           <SegTabs options={[['6개월', 6], ['12개월', 12]]} cur={interestMonths} onPick={setInterestMonths} />
         } />
-        <InterestStackedAreaChart interests={interests} months={interestMonths} onMonthsChange={setInterestMonths} />
+        {interestsLoading ? <AnalyticsLoadingState /> : <InterestStackedAreaChart interests={interests} />}
       </div>
 
     </div>

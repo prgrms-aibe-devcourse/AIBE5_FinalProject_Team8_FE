@@ -1171,7 +1171,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
             <div className="rt-h3" style={{ margin: 0, fontSize: 15 }}>새 화분 만들기</div>
             <div className="rt-small rt-muted" style={{ marginTop: 4 }}>새로운 주제로 씨앗을 심어요</div>
           </div>
-        </div>
+        </div>}
       </div>
 
       {!potsLoading && !potsError && pots.length > 0 && (

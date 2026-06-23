@@ -1344,7 +1344,7 @@ function AIScreen({ onOpenGuide }) {
               아직 저장한 자료가 없어요. 결과를 만들고 저장해 보세요.
               <button
                 type="button"
-                className="gb-key gb-key--lcd"
+                className="rt-btn"
                 style={{ display: 'block', margin: '12px auto 0' }}
                 onClick={() => aiQuestRef.current?.scrollIntoView({ behavior: 'smooth' })}
               >

@@ -1123,11 +1123,26 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
       </div>
 
       <div className="rt-grid rt-grid--3 guide-garden-pots">
-        {showPotsLoading && (
-          <div className="rt-card" style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13 }}>
-            화분 목록을 불러오는 중이에요.
+        {showPotsLoading && Array.from({ length: 3 }, (_, i) => (
+          <div key={i} className="rt-card" style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div className="gb-pot-skeleton-bar" style={{ height: 12, width: '55%' }} />
+                <div className="gb-pot-skeleton-bar" style={{ height: 20, width: '80%' }} />
+              </div>
+              <div className="gb-pot-skeleton-bar" style={{ height: 22, width: 64, borderRadius: 100 }} />
+            </div>
+            <div className="gb-pot-skeleton-bar" style={{ height: 144 }} />
+            <div className="gb-pot-skeleton-bar" style={{ height: 36 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div className="gb-pot-skeleton-bar" style={{ height: 10, width: '40%' }} />
+                <div className="gb-pot-skeleton-bar" style={{ height: 10, width: '15%' }} />
+              </div>
+              <div className="gb-pot-skeleton-bar" style={{ height: 8, borderRadius: 4 }} />
+            </div>
           </div>
-        )}
+        ))}
 
         {!potsLoading && potsError && (
           <div className="rt-card" style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--berry)', fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>
@@ -1136,14 +1151,15 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
         )}
 
         {!potsLoading && !potsError && pots.length === 0 && (
-          <div className="rt-card" style={{ minHeight: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>
+          <div className="rt-card" style={{ minHeight: 300, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, color: 'var(--muted)', fontSize: 13, textAlign: 'center', lineHeight: 1.6 }}>
             아직 생성된 화분이 없어요.<br />새 화분을 만들어 첫 씨앗을 심어보세요.
+            <button className="rt-btn" onClick={() => setShowCreatePot(true)}>새 화분 만들기</button>
           </div>
         )}
 
         {!potsLoading && !potsError && pots.map(p => <PotCard key={p.id} pot={p} onClick={() => onOpenPot(p.id)} />)}
 
-        <div
+        {!potsLoading && !potsError && pots.length > 0 && <div
           role="button"
           tabIndex={0}
           onClick={() => setShowCreatePot(true)}
@@ -1155,7 +1171,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
             <div className="rt-h3" style={{ margin: 0, fontSize: 15 }}>새 화분 만들기</div>
             <div className="rt-small rt-muted" style={{ marginTop: 4 }}>새로운 주제로 씨앗을 심어요</div>
           </div>
-        </div>
+        </div>}
       </div>
 
       {!potsLoading && !potsError && pots.length > 0 && (

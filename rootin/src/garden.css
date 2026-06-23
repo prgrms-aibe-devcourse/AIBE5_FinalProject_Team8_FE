@@ -258,4 +258,18 @@
   background: linear-gradient(125deg, rgba(255, 255, 255, .16) 0%, rgba(255, 255, 255, .04) 18%, rgba(255, 255, 255, 0) 36%);
 }
 
-@media (prefers-reduced-motion: reduce) { .gb-garden-led { animation: none; } }
+/* 화분 목록 로딩 스켈레톤 */
+.gb-pot-skeleton-bar {
+  background: var(--line);
+  border-radius: 6px;
+  animation: pot-skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes pot-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gb-garden-led { animation: none; }
+  .gb-pot-skeleton-bar { animation: none; }
+}

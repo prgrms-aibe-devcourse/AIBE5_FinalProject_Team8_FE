@@ -307,8 +307,9 @@ function CollectionScreen() {
       )}
 
       {!loading && filteredSections.length === 0 && (
-        <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
+        <div style={{ padding: '48px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           해당 조건의 식물이 없어요.
+          <Btn variant="secondary" size="sm" onClick={() => setFilter('all')}>필터 초기화</Btn>
         </div>
       )}
 

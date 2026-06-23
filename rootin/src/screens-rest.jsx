@@ -410,7 +410,17 @@ function CollectionScreen() {
               </div>
               <div className="gb-dex-list scrollbar">
                 {filteredSections.length === 0 ? (
-                  <div className="gb-dex-empty">해당 조건의 식물이 없어요.</div>
+                  <div className="gb-dex-empty">
+                    해당 조건의 식물이 없어요.
+                    <button
+                      type="button"
+                      className="gb-key gb-key--dark"
+                      style={{ display: 'block', margin: '12px auto 0' }}
+                      onClick={() => { playSfx('toggle'); setFilter('all'); }}
+                    >
+                      필터 초기화
+                    </button>
+                  </div>
                 ) : filteredSections.map(s => (
                   <div key={s.speciesKey} className="gb-dex-group">
                     <div className="gb-dex-group-head">
@@ -834,6 +844,7 @@ function AIScreen({ onOpenGuide }) {
   // 저장 완료 피드백용
   const [saved, setSaved] = useState(false);
   const savedTimerRef = useRef(null);
+  const aiQuestRef = useRef(null);
 
   // TIL 선택 모달
   const [modalOpen, setModalOpen] = useState(false);
@@ -1166,7 +1177,7 @@ function AIScreen({ onOpenGuide }) {
         <div className="gb-ai-main">
 
           {/* ── 좌: 퀘스트 타임라인 (진행 흐름) ── */}
-          <ol className="gb-ai-quest">
+          <ol className="gb-ai-quest" ref={aiQuestRef}>
             {questNodes.map((n, i) => (
               <li key={n.key} className={`gb-ai-node${n.done ? ' is-done' : ''}${i === currentNodeIdx ? ' is-current' : ''}${!n.unlocked ? ' is-locked' : ''}`}>
                 <div className="gb-ai-rail">
@@ -1330,7 +1341,17 @@ function AIScreen({ onOpenGuide }) {
             <span className="gb-ai-vault-count">{savedResults.length}개</span>
           </div>
           {savedResults.length === 0 ? (
-            <div className="gb-ai-vault-empty">아직 저장한 자료가 없어요. 결과를 만들고 저장해 보세요.</div>
+            <div className="gb-ai-vault-empty">
+              아직 저장한 자료가 없어요. 결과를 만들고 저장해 보세요.
+              <button
+                type="button"
+                className="rt-btn"
+                style={{ display: 'block', margin: '12px auto 0' }}
+                onClick={() => aiQuestRef.current?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                퀴즈/요약 만들러 가기
+              </button>
+            </div>
           ) : (
             <div className="gb-ai-vault-grid">
               {savedResults.map(item => {

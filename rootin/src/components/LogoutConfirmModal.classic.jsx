@@ -96,8 +96,8 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
             padding: '10px 12px',
             borderRadius: 9,
             background: 'var(--danger-weak)',
-            border: '0.5px solid #f7c1c1',
-            color: '#9f4055',
+            border: '0.5px solid color-mix(in oklch, var(--danger) 40%, var(--rule))',
+            color: 'var(--danger)',
             fontSize: 12.5,
             lineHeight: 1.6,
           }}>

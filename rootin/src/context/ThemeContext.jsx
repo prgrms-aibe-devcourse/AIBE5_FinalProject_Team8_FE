@@ -26,7 +26,8 @@ export function ThemeProvider({ children }) {
     document.body.dataset.theme = theme === 'gameboy' ? 'gameboy' : 'classic';
   }, [theme]);
 
-  const toggleTheme = () => setTheme((t) => (t === 'gameboy' ? 'classic' : 'gameboy'));
+  // classic↔gameboy 전환. dark는 classic 계열이므로 토글 시 라이트 classic으로 돌아간다.
+  const toggleTheme = () => setTheme((t) => (t === 'classic' ? 'gameboy' : 'classic'));
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme, toggleTheme }}>

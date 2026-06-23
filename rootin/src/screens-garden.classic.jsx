@@ -310,8 +310,8 @@ function GardenScene({ pots, theme, layout, editMode, onMovePot, onOpenPot, dens
           ].map((s, i) => (
             <div key={i} style={{
               position: 'absolute', left: s.l, top: s.t,
-              width: 2, height: 2, background: 'var(--card)',
-              boxShadow: '0 0 4px #fff',
+              width: 2, height: 2, background: '#fff',
+              boxShadow: '0 0 4px rgba(255,255,255,0.8)',
             }} />
           ))}
         </>

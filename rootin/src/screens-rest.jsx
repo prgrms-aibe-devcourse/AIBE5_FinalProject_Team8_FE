@@ -7,6 +7,7 @@ import { getPots } from './api/pot.js';
 import { getMyTils } from './api/til.js';
 import { Pill, Btn } from './ui.jsx';
 import { PixelPlant, PIXEL_SPECIES } from './pixel-plants.jsx';
+import { ThemePreview } from './components/ThemePreview.jsx';
 import { RtIcon } from './pixel-icons.jsx';
 import { RootinWordmark } from './landing/RootinWordmark.jsx';
 import { PixelPals } from './auth-pixel-pals.jsx';
@@ -1486,9 +1487,9 @@ function SummaryResult({ pot, summary, keyPoints }) {
 // === Profile Screen ===
 
 const THEME_OPTIONS = [
-  { id: 'classic', emoji: '🌿', name: '원본', desc: '깔끔한 식물 테마' },
-  { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔' },
-  { id: 'dark', emoji: '🌙', name: '다크', desc: '눈이 편한 야간 정원' },
+  { id: 'classic', emoji: '🌿', name: '원본', desc: '따뜻한 크림빛 식물 테마', tier: 'basic' },
+  { id: 'dark', emoji: '🌙', name: '다크', desc: '눈이 편한 야간 정원', tier: 'basic' },
+  { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔', tier: 'premium' },
 ];
 
 function ProfileScreen() {
@@ -1829,27 +1830,38 @@ function ProfileScreen() {
         )}
       </div>
 
-      {/* 테마 보관함 — 카트리지 컬렉션 */}
+      {/* 테마 보관함 — 카트리지 컬렉션 (기본 / 프리미엄) */}
       <div className="rt-card gb-prof-theme">
         <div className="gb-prof-acct-head">
           <span className="rt-tag"><RtIcon name="star" /> 화면 테마</span>
           <h3 className="rt-h3" style={{ margin: '8px 0 0' }}>테마 보관함</h3>
         </div>
+
         <div className="gb-theme-grid">
           {THEME_OPTIONS.map((opt) => {
             const active = theme === opt.id;
+            const premium = opt.tier === 'premium';
             return (
               <button
                 key={opt.id}
                 type="button"
-                className={`gb-theme-cart${active ? ' is-active' : ''}`}
+                className={`gb-theme-cart${premium ? ' gb-theme-premium' : ''}${active ? ' is-active' : ''}`}
                 onClick={() => { playSfx('nav'); setTheme(opt.id); }}
                 aria-pressed={active}
               >
-                <span className="gb-theme-cart-emoji">{opt.emoji}</span>
-                <span className="gb-theme-cart-name">{opt.name}</span>
-                <span className="gb-theme-cart-desc">{opt.desc}</span>
-                <span className="gb-theme-cart-badge">{active ? '● 장착됨' : '○ 선택'}</span>
+                <span className="gb-theme-art">
+                  <ThemePreview theme={opt.id} />
+                  <span className={`gb-theme-tier${premium ? ' is-premium' : ''}`}>
+                    {premium ? <><RtIcon name="star" /> 프리미엄</> : '기본'}
+                  </span>
+                </span>
+                <span className="gb-theme-meta">
+                  <span className="gb-theme-meta-txt">
+                    <span className="gb-theme-cart-name">{opt.name}</span>
+                    <span className="gb-theme-cart-desc">{opt.desc}</span>
+                  </span>
+                  <span className="gb-theme-cart-badge">{active ? '● 장착됨' : '○ 선택'}</span>
+                </span>
               </button>
             );
           })}

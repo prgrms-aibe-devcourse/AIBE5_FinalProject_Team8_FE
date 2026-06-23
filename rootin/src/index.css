@@ -134,6 +134,18 @@ html.lenis body {
   --grad-paper: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
   --grad-moss: linear-gradient(135deg, var(--moss) 0%, var(--moss-2) 100%);
   --grad-sheen: linear-gradient(180deg, color-mix(in oklch, var(--card) 90%, var(--paper)) 0%, var(--card) 100%);
+
+  /* 인사 카드 — 시간대별 그라데이션 글자색 (다크는 .dark에서 밝게 재정의) */
+  --greet-morning: linear-gradient(90deg, #2D5A27 0%, #68923F 100%);
+  --greet-afternoon: linear-gradient(90deg, #C27616 0%, #D8563A 100%);
+  --greet-evening: linear-gradient(90deg, #2B4C5F 0%, #528091 100%);
+  --greet-night: linear-gradient(90deg, #514266 0%, #8C75A1 100%);
+
+  /* 차트 크롬 — 데이터 색이 아닌 격자선/호버 가이드(모드별 대비 확보) */
+  --chart-grid: rgba(0, 0, 0, 0.05);
+  --chart-guide: #d8d8d8;
+  /* 데이터 색을 '글자'로 쓸 때의 모드별 혼합비 — 라이트는 100%(원색 그대로) */
+  --cat-text-mix: 100%;
 }
 
 .dark {
@@ -219,6 +231,18 @@ html.lenis body {
   --sidebar-accent-foreground: var(--moss-2);
   --sidebar-border: var(--rule);
   --sidebar-ring: var(--moss);
+
+  /* 인사 카드 — 다크 배경에서 읽히도록 밝은 파스텔 그라데이션으로 재정의 */
+  --greet-morning: linear-gradient(90deg, #9AD58F 0%, #CDE98C 100%);
+  --greet-afternoon: linear-gradient(90deg, #F0B65A 0%, #F1936F 100%);
+  --greet-evening: linear-gradient(90deg, #84BBD2 0%, #B6DCE6 100%);
+  --greet-night: linear-gradient(90deg, #C2B0DE 0%, #E0D2EE 100%);
+
+  /* 차트 크롬 — 다크에선 밝은 저투명 라인으로 격자/가이드 가시화 */
+  --chart-grid: rgba(255, 255, 255, 0.07);
+  --chart-guide: rgba(255, 255, 255, 0.22);
+  /* 데이터 색 글자는 어두운 원색이 다크 표면에서 묻히므로 ink(밝은 오프화이트)와 섞어 들어올린다 */
+  --cat-text-mix: 72%;
 }
 
 @theme inline {

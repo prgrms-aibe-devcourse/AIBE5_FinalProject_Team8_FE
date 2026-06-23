@@ -7,6 +7,8 @@ import { useUser } from './context/UserContext.jsx';
 import { playSfx } from './lib/sfx.js';
 import { GRASS_WEEKS, STREAK_CHAR_COUNT_CAP, DAY_LABELS, formatDateKey, formatShortDate, getGrassStartDate, buildGrassState, buildRecentStreakDays, calculateCurrentStreakFromCells, transformWeekly } from './screens-dashboard.logic.js';
 
+const DASHBOARD_DEFERRED_FETCH_DELAY_MS = 700;
+
 // ─── SPROUT 팔레트 — 디자인 시스템 토큰(sprout.css)을 단일 소스로 참조 ──
 // 차트/SVG에서 쓰는 색은 모두 CSS 변수로 위임해 테마와 항상 일치시킨다.
 const SPROUT = {
@@ -756,6 +758,15 @@ function DashboardScreen({ onNav }) {
   const [interestMonths, setInterestMonths] = useState(6);
   const [quests, setQuests]                 = useState(null);
   const [currentPoint, setCurrentPoint]     = useState(0);
+  const [analyticsReady, setAnalyticsReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setAnalyticsReady(true);
+    }, DASHBOARD_DEFERRED_FETCH_DELAY_MS);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // 잔디 — 항상 1년치 데이터 (클래식 테마와 동일)
   useEffect(() => {
@@ -771,13 +782,14 @@ function DashboardScreen({ onNav }) {
 
   // 관심사 기간 변경 시 재요청
   useEffect(() => {
+    if (!analyticsReady) return;
     let active = true;
     getInterests(interestMonths).then(data => {
       if (!active) return;
       setInterests(data?.interests ?? []);
     }).catch(() => {});
     return () => { active = false; };
-  }, [interestMonths]);
+  }, [analyticsReady, interestMonths]);
 
   useEffect(() => {
     // getQuests()는 포인트 적립을 수행하므로, 완료 후 포인트를 재조회한다 (성공/실패 무관)
@@ -786,14 +798,10 @@ function DashboardScreen({ onNav }) {
 
     Promise.allSettled([
       getSummary(),
-      getWeekly(),
-      getDistribution(),
       questsP,
-    ]).then(([sumRes, weekRes, distRes, questRes]) => {
+    ]).then(([sumRes, questRes]) => {
       if (!active) return;
       if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
-      if (weekRes.status === 'fulfilled')  setWeekly(transformWeekly(weekRes.value?.weeklyData ?? []));
-      if (distRes.status === 'fulfilled')  setDistribution(distRes.value?.distribution ?? []);
       if (questRes.status === 'fulfilled') setQuests(questRes.value);
     // allSettled 자체는 reject되지 않음. then() 내부 동기 오류만 여기서 잡힘
     }).catch(error => {
@@ -819,6 +827,25 @@ function DashboardScreen({ onNav }) {
 
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    if (!analyticsReady) return;
+
+    let active = true;
+
+    Promise.allSettled([
+      getWeekly(),
+      getDistribution(),
+    ]).then(([weekRes, distRes]) => {
+      if (!active) return;
+      if (weekRes.status === 'fulfilled') setWeekly(transformWeekly(weekRes.value?.weeklyData ?? []));
+      if (distRes.status === 'fulfilled') setDistribution(distRes.value?.distribution ?? []);
+    }).catch(error => {
+      console.error('대시보드 분석 데이터 조회 중 오류:', error);
+    });
+
+    return () => { active = false; };
+  }, [analyticsReady]);
 
   const recentStreakDays = useMemo(() => buildRecentStreakDays(grassCells, 30), [grassCells]);
   const fallbackStreak = useMemo(() => calculateCurrentStreakFromCells(grassCells), [grassCells]);

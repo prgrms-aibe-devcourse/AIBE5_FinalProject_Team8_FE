@@ -95,7 +95,7 @@ export const HeroZoom = ({ onStart, onNavigate }) => {
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.8, delay: 0.7, ease: [0.16, 1, 0.3, 1] }}
                 onClick={onStart}
-                className="group flex w-fit items-center gap-3 rounded-full bg-[#E1E0CC] py-1.5 pl-6 pr-1.5 text-sm font-bold text-black transition-all"
+                className="group flex w-fit items-center gap-3 rounded-full bg-[#E1E0CC] py-1.5 pl-6 pr-1.5 text-sm font-bold text-black"
               >
                 지금 시작하기
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-[#E1E0CC] transition-transform group-hover:scale-105">

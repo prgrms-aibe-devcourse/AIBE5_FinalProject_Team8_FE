@@ -18,6 +18,7 @@ import { useTilEditor, type DraftData } from './til-editor-context'
 import { getTooLongTilTags, TIL_TAG_MAX_LENGTH } from './til-policy'
 import { updateTil } from '@/api/til.js'
 import { playSfx } from '@/lib/sfx.js'
+import { toast } from 'sonner'
 import { setNavGuard, clearNavGuard } from '@/lib/navGuard.js'
 import { Button } from '@/components/ui/button'
 import {
@@ -376,7 +377,7 @@ export function TilEditorPage({
         }
       }
     } catch {
-      window.alert('TIL 수정에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      toast.error('TIL 수정에 실패했습니다. 잠시 후 다시 시도해주세요.')
     } finally {
       setUpdating(false)
     }
@@ -418,7 +419,7 @@ export function TilEditorPage({
         onNav?.(afterPublishScreen)
       }
     } catch {
-      window.alert('발행에 실패했습니다. 잠시 후 다시 시도해주세요.')
+      toast.error('발행에 실패했습니다. 잠시 후 다시 시도해주세요.')
     }
   }
 

@@ -8,9 +8,9 @@ const STORAGE_KEY = 'rootin.theme';
 function readInitialTheme() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved === 'classic' || saved === 'gameboy' ? saved : 'gameboy';
+    return saved === 'classic' || saved === 'gameboy' ? saved : 'classic';
   } catch {
-    return 'gameboy';
+    return 'classic';
   }
 }
 

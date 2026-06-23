@@ -12,6 +12,7 @@ import { inferSpecies } from './utils/plant.js';
 import './garden.css';
 import './pot-detail.css';
 import { useDeferredLoading } from './hooks/useDeferredLoading.js';
+import { toast } from 'sonner';
 import { POT_TITLE_MAX_LENGTH, POT_DESCRIPTION_MAX_LENGTH, EMPTY_POT_INTRO, POT_TITLE_PREVIEW_STYLE, POT_DESCRIPTION_PREVIEW_STYLE, getPotTier, formatPotExperience, formatPlantGrowthPercent, getPlantStageStatus, getHarvestStatus, toGardenPot, toDashboardPot, formatDateTime, getKstDateString, getMsUntilKstMidnight, formatTilDateTime, toTilListItem, getLayoutSlot, findNearestVisiblePotId, getPottedPlantAlignment } from './screens-garden.logic.js';
 
 const TilContentView = lazy(() =>
@@ -882,7 +883,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
     } catch (err) {
       // 서버에서 전달된 구체적인 에러 메시지가 있을 경우 우선 노출합니다.
       const errMsg = err.body?.message ?? '꾸미기 설정 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.';
-      alert(errMsg);
+      toast.error(errMsg);
     } finally {
       setLayoutSaving(false);
     }

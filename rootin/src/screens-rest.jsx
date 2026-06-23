@@ -16,6 +16,8 @@ import { useUser } from './context/UserContext.jsx';
 import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
 import { useDeferredLoading } from './hooks/useDeferredLoading.js';
+import { toast } from 'sonner';
+import { WithdrawConfirmModal } from './components/WithdrawConfirmModal.jsx';
 import './dex.css';
 import './ai.css';
 import './profile.css';
@@ -1500,7 +1502,7 @@ function ProfileScreen() {
   const [saveError, setSaveError] = useState(null);
   const [imageUploading, setImageUploading] = useState(false);
   const [harvestedCount, setHarvestedCount] = useState(null);
-  const [withdrawing, setWithdrawing] = useState(false);
+  const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   // 비밀번호 변경 폼 상태
@@ -1571,29 +1573,25 @@ function ProfileScreen() {
       // 서버에 profileImageUrl 저장 (nickname은 @NotBlank 필수값이므로 같이 전송)
       await patchUserMe({ nickname, bio, profileImageUrl: displayUrl });
       updateUser({ profileImageUrl: displayUrl });
-    } catch (err) {
-      console.error('[이미지 업로드 실패]', err);
-      alert('이미지 업로드에 실패했습니다: ' + (err?.message ?? err));
+    } catch {
+      toast.error('이미지 업로드에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setImageUploading(false);
     }
   }
 
-  async function handleWithdraw() {
-    if (!window.confirm('정말 탈퇴하시겠습니까? 모든 데이터가 삭제되며 복구할 수 없습니다.')) return;
-    setWithdrawing(true);
-    try {
-      const { deleteUserMe } = await import('./api/user.js');
-      await deleteUserMe();
-      clearUser();
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      window.location.reload();
-    } catch {
-      alert('회원 탈퇴에 실패했습니다. 다시 시도해주세요.');
-    } finally {
-      setWithdrawing(false);
-    }
+  function handleWithdraw() {
+    playSfx('cancel');
+    setWithdrawModalOpen(true);
+  }
+
+  async function doWithdraw() {
+    const { deleteUserMe } = await import('./api/user.js');
+    await deleteUserMe();
+    clearUser();
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    window.location.reload();
   }
 
   function handlePasswordFormCancel() {
@@ -1856,10 +1854,17 @@ function ProfileScreen() {
 
       {/* 회원 탈퇴 */}
       <div className="gb-prof-danger-row">
-        <button className="gb-prof-danger" onClick={handleWithdraw} disabled={withdrawing}>
-          <RtIcon name="xmark" /> {withdrawing ? '처리 중…' : '회원 탈퇴'}
+        <button className="gb-prof-danger" onClick={handleWithdraw}>
+          <RtIcon name="xmark" /> 회원 탈퇴
         </button>
       </div>
+
+      {withdrawModalOpen && (
+        <WithdrawConfirmModal
+          onConfirm={doWithdraw}
+          onClose={() => setWithdrawModalOpen(false)}
+        />
+      )}
 
       {/* 비밀번호 변경 모달 */}
       {showPasswordForm && (

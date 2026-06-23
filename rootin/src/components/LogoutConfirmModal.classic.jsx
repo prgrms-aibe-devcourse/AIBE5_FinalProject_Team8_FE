@@ -45,7 +45,7 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
         onClick={e => e.stopPropagation()}
         style={{
           width: 400,
-          background: '#fff',
+          background: 'var(--card)',
           borderRadius: 18,
           padding: '28px 28px 24px',
           boxShadow: 'var(--shadow-lg)',
@@ -79,7 +79,7 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              background: '#fff',
+              background: 'var(--card)',
               cursor: loading ? 'default' : 'pointer',
               opacity: loading ? 0.5 : 1,
             }}
@@ -95,9 +95,9 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
             marginTop: 14,
             padding: '10px 12px',
             borderRadius: 9,
-            background: '#fff3f5',
-            border: '0.5px solid #f7c1c1',
-            color: '#9f4055',
+            background: 'var(--danger-weak)',
+            border: '0.5px solid color-mix(in oklch, var(--danger) 40%, var(--rule))',
+            color: 'var(--danger)',
             fontSize: 12.5,
             lineHeight: 1.6,
           }}>
@@ -115,7 +115,7 @@ export function LogoutConfirmModal({ onConfirm, onClose }) {
               height: 42,
               borderRadius: 10,
               border: '0.5px solid var(--rule)',
-              background: '#fff',
+              background: 'var(--card)',
               color: 'var(--ink)',
               fontSize: 14,
               fontWeight: 500,

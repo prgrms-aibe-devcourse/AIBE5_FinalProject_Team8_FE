@@ -7,6 +7,7 @@ import { getPots } from './api/pot.js';
 import { getMyTils } from './api/til.js';
 import { Icon, Pill, Btn, Card, SectionHeader, Spinner } from './ui.jsx';
 import { PixelPlant } from './pixel-plants.jsx';
+import { ThemePreview } from './components/ThemePreview.jsx';
 import { RootinWordmark } from './landing/RootinWordmark.jsx';
 import { PixelPals } from './auth-pixel-pals.jsx';
 import { useUser } from './context/UserContext.jsx';
@@ -16,21 +17,96 @@ import { SPECIES_TO_PIXEL, STAGE_KEYS, GROWTH_STAGE_TO_STAGE, TIL_MODAL_PAGE_SIZ
 
 // Collection (식물도감), AI, Profile, Auth screens
 
-// 화면 테마 보관함 — 원본(classic) / 게임보이(gameboy) 전환
+// 화면 테마 보관함 — 원본(classic) / 게임보이(gameboy) / 다크(dark) 전환
+// 다크는 원본과 같은 화면을 색만 바꿔 보여주는 야간 모드다.
 const THEME_OPTIONS = [
-  { id: 'classic', emoji: '🌿', name: '원본', desc: '깔끔한 식물 테마' },
-  { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔' },
+  { id: 'classic', emoji: '🌿', name: '원본', desc: '따뜻한 크림빛 식물 테마', tier: 'basic' },
+  { id: 'dark', emoji: '🌙', name: '다크', desc: '눈이 편한 야간 정원', tier: 'basic' },
+  { id: 'gameboy', emoji: '🎮', name: '게임보이', desc: '레트로 픽셀 콘솔', tier: 'premium' },
 ];
+
+// 테마 보관함 카드 — 세 테마 모두 같은 크기의 미리보기 썸네일.
+// 프리미엄(게임보이)만 골드 테두리 + 포일 "프리미엄" 스티커로 구분한다.
+function ThemeCardClassic({ opt, active, onSelect }) {
+  const premium = opt.tier === 'premium';
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(opt.id)}
+      aria-pressed={active}
+      style={{
+        display: 'flex', flexDirection: 'column', padding: 0, overflow: 'hidden',
+        borderRadius: 13, textAlign: 'left', cursor: 'pointer', transition: 'all 0.18s ease',
+        ...(premium
+          ? {
+              border: '2px solid transparent',
+              background: 'linear-gradient(var(--card), var(--card)) padding-box, linear-gradient(135deg, #F0C868, #C98A2E) border-box',
+              boxShadow: active
+                ? '0 7px 18px color-mix(in oklch, var(--amber) 28%, transparent)'
+                : '0 2px 12px color-mix(in oklch, var(--amber) 16%, transparent)',
+            }
+          : {
+              border: active ? '2px solid var(--moss)' : '1px solid var(--rule)',
+              background: 'var(--card)',
+              boxShadow: active
+                ? '0 5px 14px color-mix(in oklch, var(--moss) 20%, transparent)'
+                : '0 1px 3px rgba(0,0,0,0.04)',
+            }),
+      }}
+    >
+      <span style={{ position: 'relative', display: 'block', aspectRatio: '16 / 10', overflow: 'hidden' }}>
+        <ThemePreview theme={opt.id} />
+        <span style={premium
+          ? {
+              position: 'absolute', top: 8, left: 8, display: 'inline-flex', alignItems: 'center', gap: 3,
+              fontSize: 9.5, fontWeight: 800, letterSpacing: '0.02em', color: '#5A3E08',
+              padding: '3px 8px', borderRadius: 6,
+              background: 'linear-gradient(135deg, #F8DC7C, #DAA32F)',
+              border: '1px solid rgba(255,255,255,0.6)', boxShadow: '0 2px 5px rgba(150,105,20,0.4)',
+            }
+          : {
+              position: 'absolute', top: 8, left: 8, fontSize: 9.5, fontWeight: 700, letterSpacing: '0.02em',
+              color: 'var(--ink-2)', padding: '3px 8px', borderRadius: 6,
+              background: 'color-mix(in oklch, var(--card) 80%, transparent)',
+              backdropFilter: 'blur(2px)', border: '1px solid var(--rule)',
+            }}>
+          {premium ? '★ 프리미엄' : '기본'}
+        </span>
+      </span>
+      <span style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px',
+        borderTop: `1px solid ${premium ? 'color-mix(in oklch, var(--amber) 40%, var(--rule))' : (active ? 'var(--moss)' : 'var(--rule)')}`,
+      }}>
+        <span style={{ minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 13.5, fontWeight: 700, color: 'var(--ink)' }}>{opt.name}</span>
+          <span style={{ display: 'block', fontSize: 11, color: 'var(--ink-3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{opt.desc}</span>
+        </span>
+        <span style={active
+          ? { flexShrink: 0, fontSize: 10.5, fontWeight: 700, padding: '4px 9px', borderRadius: 999, background: premium ? 'var(--gold-ink)' : 'var(--moss)', color: 'var(--on-primary)' }
+          : { flexShrink: 0, fontSize: 10.5, fontWeight: 600, padding: '4px 9px', borderRadius: 999, color: premium ? 'var(--gold-ink)' : 'var(--ink-3)', border: `1px solid ${premium ? 'var(--gold-ink)' : 'var(--rule-2)'}` }}>
+          {active ? '사용 중' : '선택'}
+        </span>
+      </span>
+    </button>
+  );
+}
 
 // BE speciesKey → PixelPlant species 키 매핑
 
 
+// 도감 단계 뱃지 — hue만 다르고 패턴 동일. bg/text/border 모두 토큰 혼합이라 라이트/다크 자동 적응
+// (글자는 hue를 ink와 섞어 라이트=진하게·다크=밝게 → 양 모드 모두 대비 확보).
+const stageBadge = (hue) => ({
+  background: `color-mix(in oklch, ${hue} 16%, var(--card))`,
+  color: `color-mix(in oklch, ${hue} 72%, var(--ink))`,
+  border: `color-mix(in oklch, ${hue} 38%, var(--rule))`,
+});
 const STAGE_BADGE_STYLE = {
-  seed:   { background: '#fff4e0', color: '#8b6340', border: '#f0dcb5' },
-  sprout: { background: '#ebf5ef', color: '#2e6b48', border: '#d4ebdc' },
-  leaf:   { background: '#e3f2e8', color: '#1d5e38', border: '#c4e0cc' },
-  bloom:  { background: '#ffeef2', color: '#b8536a', border: '#ffd4dc' },
-  full:   { background: '#eef2f8', color: '#1a3a5c', border: '#d8e2ee' },
+  seed:   stageBadge('#E6B14E'),
+  sprout: stageBadge('#6CA15C'),
+  leaf:   stageBadge('#4F7C52'),
+  bloom:  stageBadge('#E08A6B'),
+  full:   stageBadge('#7FA9B5'),
 };
 
 // ============================
@@ -42,7 +118,7 @@ function DexCard({ entry, speciesKey, rare }) {
   const badge = STAGE_BADGE_STYLE[stageKey];
 
   const collectedBorder = rare
-    ? '0.5px solid #d8e2ee'
+    ? '0.5px solid color-mix(in oklch, #7FA9B5 30%, var(--rule))'
     : '0.5px solid var(--sprout, #9dd0b0)';
 
   return (
@@ -480,7 +556,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
         ref={dialogRef}
         tabIndex={-1}
         style={{
-          background: '#fff', borderRadius: 16, padding: 24,
+          background: 'var(--card)', borderRadius: 16, padding: 24,
           width: 560, maxHeight: '80vh',
           display: 'flex', flexDirection: 'column', gap: 16,
           boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
@@ -504,7 +580,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               title="이 모달의 이용 가이드 보기"
               style={{
                 width: 28, height: 28, borderRadius: 7,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
+                border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                 fontSize: 13, fontWeight: 'bold', color: 'var(--ink-2)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
@@ -514,7 +590,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               onClick={onClose}
               style={{
                 width: 28, height: 28, borderRadius: 7,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
+                border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                 fontSize: 14, color: 'var(--ink-2)', cursor: 'pointer',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}
@@ -544,8 +620,8 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
                 onClick={() => setSelectedTag(prev => prev === tag ? null : tag)}
                 style={{
                   padding: '4px 10px', borderRadius: 20, fontSize: 11.5,
-                  background: selectedTag === tag ? 'var(--moss)' : '#f3f7f3',
-                  color: selectedTag === tag ? '#fff' : 'var(--ink-2)',
+                  background: selectedTag === tag ? 'var(--moss)' : 'var(--paper-3)',
+                  color: selectedTag === tag ? 'var(--on-primary)' : 'var(--ink-2)',
                   border: selectedTag === tag ? '1px solid var(--moss)' : '0.5px solid var(--rule)',
                   cursor: 'pointer', fontFamily: 'var(--font-body)',
                 }}
@@ -572,7 +648,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               검색·태그로 {TIL_IDS_MAX_SIZE}개 이하로 좁히면 전체 선택할 수 있어요
             </span>
           )}
-          <span style={{ fontSize: 12, fontWeight: 600, color: selectedIds.size >= TIL_IDS_MAX_SIZE ? '#b8536a' : 'var(--moss-2)' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: selectedIds.size >= TIL_IDS_MAX_SIZE ? 'var(--danger)' : 'var(--moss-2)' }}>
             {selectedIds.size} / {TIL_IDS_MAX_SIZE}개 선택
             {selectedIds.size >= TIL_IDS_MAX_SIZE && ' (최대)'}
           </span>
@@ -580,7 +656,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
 
         {/* 부분 로드 실패 안내 */}
         {partialError && (
-          <div style={{ padding: '6px 10px', borderRadius: 7, background: '#fff8e1', border: '0.5px solid #ffe082', fontSize: 11.5, color: '#b8860b' }}>
+          <div style={{ padding: '6px 10px', borderRadius: 7, background: 'var(--amber-soft)', border: '0.5px solid color-mix(in oklch, var(--amber) 45%, var(--rule))', fontSize: 11.5, color: 'var(--gold-ink)' }}>
             일부 TIL을 불러오지 못했어요. 목록이 불완전할 수 있습니다.
           </div>
         )}
@@ -592,7 +668,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               TIL 목록을 불러오는 중...
             </div>
           ) : error ? (
-            <div style={{ padding: '24px 0', textAlign: 'center', color: '#b8536a', fontSize: 13 }}>{error}</div>
+            <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--danger)', fontSize: 13 }}>{error}</div>
           ) : pageTils.length === 0 ? (
             <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--ink-3)', fontSize: 13 }}>
               {tils.length === 0 ? '이 화분에 TIL이 없어요.' : '검색 결과가 없어요.'}
@@ -604,7 +680,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 10,
                   padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                  background: selectedIds.has(til.id) ? 'var(--paper-2)' : '#fcfdfb',
+                  background: selectedIds.has(til.id) ? 'var(--paper-2)' : 'var(--card)',
                   border: selectedIds.has(til.id) ? '1px solid var(--moss)' : '0.5px solid var(--rule)',
                   transition: 'background 0.1s, border-color 0.1s',
                 }}
@@ -623,7 +699,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{formatDate(til.date)}</span>
                     {til.tags.slice(0, 3).map(tag => (
-                      <span key={tag} style={{ fontSize: 10.5, color: 'var(--moss-2)', background: '#f0f7f0', borderRadius: 4, padding: '1px 6px' }}>
+                      <span key={tag} style={{ fontSize: 10.5, color: 'var(--moss-2)', background: 'var(--primary-weak)', borderRadius: 4, padding: '1px 6px' }}>
                         #{tag}
                       </span>
                     ))}
@@ -643,7 +719,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               aria-label="이전 페이지"
               style={{
                 padding: '5px 12px', borderRadius: 7, fontSize: 12,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
+                border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                 color: currentPage === 0 ? 'var(--ink-3)' : 'var(--ink)',
                 cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
               }}
@@ -655,7 +731,7 @@ function AiTilSelectModal({ potId, guideMode = false, onConfirm, onClose, onOpen
               aria-label="다음 페이지"
               style={{
                 padding: '5px 12px', borderRadius: 7, fontSize: 12,
-                border: '0.5px solid var(--rule-2)', background: '#fff',
+                border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                 color: currentPage === totalPages - 1 ? 'var(--ink-3)' : 'var(--ink)',
                 cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
               }}
@@ -699,7 +775,7 @@ function PotCard({ pot, selected, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '12px 14px', borderRadius: 10, textAlign: 'left', width: '100%',
-        background: selected ? 'var(--paper-2)' : '#fff',
+        background: selected ? 'var(--paper-2)' : 'var(--card)',
         border: selected ? '1.5px solid var(--moss)' : '0.5px solid var(--rule)',
         position: 'relative',
         transition: 'border-color 0.12s, background 0.12s',
@@ -708,7 +784,7 @@ function PotCard({ pot, selected, onClick }) {
       {/* 식물 이미지 */}
       <div style={{
         width: 44, height: 44, borderRadius: 10, flexShrink: 0,
-        background: selected ? 'var(--paper)' : '#f7f9f7',
+        background: selected ? 'var(--paper)' : 'var(--paper-3)',
         border: '0.5px solid var(--rule)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
@@ -727,7 +803,7 @@ function PotCard({ pot, selected, onClick }) {
           width: 20, height: 20, borderRadius: '50%',
           background: 'var(--moss)', flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff',
+          color: 'var(--on-primary)',
         }}>
           {Icon.check}
         </div>
@@ -999,7 +1075,7 @@ function AIScreen({ onOpenGuide }) {
           <div className="guide-ai-mode" style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setMode('quiz')} style={{
               flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'quiz' ? 'var(--coral)' : '#fff',
+              background: mode === 'quiz' ? 'var(--coral)' : 'var(--card)',
               color: mode === 'quiz' ? '#fff' : 'var(--ink-2)',
               border: '0.5px solid ' + (mode === 'quiz' ? 'var(--coral)' : 'var(--rule-2)'),
               fontSize: 12.5, fontWeight: 500, textAlign: 'left',
@@ -1009,7 +1085,7 @@ function AIScreen({ onOpenGuide }) {
             </button>
             <button onClick={() => setMode('summary')} style={{
               flex: 1, padding: '12px 10px', borderRadius: 10,
-              background: mode === 'summary' ? 'var(--coral)' : '#fff',
+              background: mode === 'summary' ? 'var(--coral)' : 'var(--card)',
               color: mode === 'summary' ? '#fff' : 'var(--ink-2)',
               border: '0.5px solid ' + (mode === 'summary' ? 'var(--coral)' : 'var(--rule-2)'),
               fontSize: 12.5, fontWeight: 500, textAlign: 'left',
@@ -1033,7 +1109,7 @@ function AIScreen({ onOpenGuide }) {
                     onClick={() => setQuizCount(c => Math.max(1, c - 1))}
                     style={{
                       width: 28, height: 28, borderRadius: 7,
-                      border: '0.5px solid var(--rule-2)', background: '#fff',
+                      border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                       fontSize: 15, color: 'var(--ink-2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
@@ -1046,7 +1122,7 @@ function AIScreen({ onOpenGuide }) {
                     onClick={() => setQuizCount(c => Math.min(10, c + 1))}
                     style={{
                       width: 28, height: 28, borderRadius: 7,
-                      border: '0.5px solid var(--rule-2)', background: '#fff',
+                      border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                       fontSize: 15, color: 'var(--ink-2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
@@ -1104,8 +1180,8 @@ function AIScreen({ onOpenGuide }) {
           {error && (
             <div style={{
               marginTop: 8, padding: '10px 14px', borderRadius: 8,
-              background: '#fff3f5', border: '0.5px solid #f7c1c1',
-              fontSize: 12, color: '#b8536a', textAlign: 'center',
+              background: 'var(--danger-weak)', border: '0.5px solid color-mix(in oklch, var(--danger) 40%, var(--rule))',
+              fontSize: 12, color: 'var(--danger)', textAlign: 'center',
             }}>
               {error}
             </div>
@@ -1133,7 +1209,7 @@ function AIScreen({ onOpenGuide }) {
                         onClick={() => handleSelectSavedItem(item)}
                         style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '10px 12px', borderRadius: 8, background: '#fcfdfb',
+                          padding: '10px 12px', borderRadius: 8, background: 'var(--card)',
                           border: '0.5px solid var(--rule)', cursor: 'pointer'
                         }}
                     >
@@ -1147,7 +1223,7 @@ function AIScreen({ onOpenGuide }) {
                           aria-label="삭제"
                           style={{
                             width: 20, height: 20, borderRadius: 5,
-                            border: '0.5px solid var(--rule-2)', background: '#fff',
+                            border: '0.5px solid var(--rule-2)', background: 'var(--card)',
                             fontSize: 11, color: 'var(--ink-3)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             cursor: 'pointer',
@@ -1255,7 +1331,7 @@ function QuizResult({ pot, quizCount, quizzes }) {
       return {
         ...base,
         background: isSelected ? 'var(--moss)' : 'var(--paper-2)',
-        color: isSelected ? '#fff' : 'var(--ink)',
+        color: isSelected ? 'var(--on-primary)' : 'var(--ink)',
         border: isSelected ? '0.5px solid var(--moss)' : '0.5px solid var(--rule)',
         fontWeight: isSelected ? 600 : 400,
       };
@@ -1263,8 +1339,8 @@ function QuizResult({ pot, quizCount, quizzes }) {
     // 채점 후
     const isCorrect = choice === q.answer;
     const isSelected = selected[i] === choice;
-    if (isCorrect) return { ...base, background: '#e8f5e9', color: '#2e7d32', border: '0.5px solid #81c784', fontWeight: 600 };
-    if (isSelected) return { ...base, background: '#ffebee', color: '#c62828', border: '0.5px solid #e57373' };
+    if (isCorrect) return { ...base, background: 'color-mix(in oklch, var(--moss) 16%, var(--card))', color: 'var(--moss-2)', border: '0.5px solid color-mix(in oklch, var(--moss) 42%, var(--rule))', fontWeight: 600 };
+    if (isSelected) return { ...base, background: 'var(--danger-weak)', color: 'var(--danger)', border: '0.5px solid color-mix(in oklch, var(--danger) 42%, var(--rule))' };
     return { ...base, background: 'var(--paper-2)', color: 'var(--ink-3)', border: '0.5px solid var(--rule)' };
   }
 
@@ -1310,10 +1386,10 @@ function QuizResult({ pot, quizCount, quizzes }) {
           {graded && (
             <div style={{
               padding: '14px 24px', borderRadius: 12, textAlign: 'center',
-              background: correctCount === list.length ? '#e8f5e9' : '#fff8e1',
-              border: `1px solid ${correctCount === list.length ? '#81c784' : '#ffd54f'}`,
+              background: correctCount === list.length ? 'color-mix(in oklch, var(--moss) 16%, var(--card))' : 'var(--amber-soft)',
+              border: `1px solid ${correctCount === list.length ? 'color-mix(in oklch, var(--moss) 42%, var(--rule))' : 'color-mix(in oklch, var(--amber) 45%, var(--rule))'}`,
               fontSize: 14, fontWeight: 600,
-              color: correctCount === list.length ? '#2e7d32' : '#f57f17',
+              color: correctCount === list.length ? 'var(--moss-2)' : 'var(--gold-ink)',
             }}>
               {correctCount === list.length
                 ? `🎉 전체 정답! ${list.length}문제 모두 맞혔어요.`
@@ -1326,7 +1402,7 @@ function QuizResult({ pot, quizCount, quizzes }) {
             style={{
               padding: '12px 32px', borderRadius: 10,
               background: allAnswered && !graded ? 'var(--moss)' : 'var(--rule)',
-              color: allAnswered && !graded ? '#fff' : 'var(--ink-3)',
+              color: allAnswered && !graded ? 'var(--on-primary)' : 'var(--ink-3)',
               border: 'none', fontSize: 14, fontWeight: 600,
               cursor: allAnswered && !graded ? 'pointer' : 'not-allowed',
               transition: 'background 0.15s',
@@ -1560,7 +1636,7 @@ function ProfileScreen() {
                   style={{
                     position: 'absolute', bottom: -2, right: -2,
                     width: 26, height: 26, borderRadius: '50%',
-                    background: '#fff', border: '1px solid var(--rule-2)',
+                    background: 'var(--card)', border: '1px solid var(--rule-2)',
                     fontSize: 12, cursor: imageUploading ? 'not-allowed' : 'pointer',
                     opacity: imageUploading ? 0.5 : 1,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1612,7 +1688,7 @@ function ProfileScreen() {
               <Btn variant="secondary" onClick={() => { setEditing(false); setSaveError(null); setNickname(user?.name ?? ''); setBio(user?.bio ?? ''); }} disabled={saving}>
                 취소
               </Btn>
-              {saveError && <span style={{ fontSize: 12, color: '#e05252', marginLeft: 4 }}>{saveError}</span>}
+              {saveError && <span style={{ fontSize: 12, color: 'var(--danger)', marginLeft: 4 }}>{saveError}</span>}
             </div>
           </div>
         ) : (
@@ -1691,37 +1767,13 @@ function ProfileScreen() {
         </div>
       </Card>
 
-      {/* 테마 보관함 — 원본/게임보이 전환 */}
+      {/* 테마 보관함 — 기본(원본·다크) / 프리미엄(게임보이), 동일 크기 썸네일 */}
       <Card padding={24}>
         <SectionHeader eyebrow="화면 테마" title="테마 보관함" />
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 4 }}>
-          {THEME_OPTIONS.map((opt) => {
-            const active = theme === opt.id;
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setTheme(opt.id)}
-                aria-pressed={active}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 5,
-                  padding: 16,
-                  borderRadius: 14,
-                  border: active ? '1.5px solid var(--moss)' : '1px solid var(--rule)',
-                  background: active ? 'color-mix(in oklch, var(--moss) 8%, var(--paper))' : 'var(--paper)',
-                  boxShadow: active ? '0 2px 12px color-mix(in oklch, var(--moss) 22%, transparent)' : 'none',
-                  cursor: 'pointer', textAlign: 'left', transition: 'all 0.18s ease',
-                }}
-              >
-                <span style={{ fontSize: 26, lineHeight: 1 }}>{opt.emoji}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{opt.name}</span>
-                <span style={{ fontSize: 12, color: 'var(--ink-3)' }}>{opt.desc}</span>
-                <span style={{ marginTop: 3, fontSize: 11.5, fontWeight: 600, color: active ? 'var(--moss)' : 'var(--ink-3)' }}>
-                  {active ? '● 장착됨' : '○ 선택'}
-                </span>
-              </button>
-            );
-          })}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 13, maxWidth: 660, marginTop: 4 }}>
+          {THEME_OPTIONS.map((opt) => (
+            <ThemeCardClassic key={opt.id} opt={opt} active={theme === opt.id} onSelect={setTheme} />
+          ))}
         </div>
       </Card>
 
@@ -1731,9 +1783,9 @@ function ProfileScreen() {
           disabled={withdrawing}
           style={{
             fontSize: 12.5,
-            color: '#b8536a',
+            color: 'var(--danger)',
             background: 'transparent',
-            border: '1px solid #b8536a',
+            border: '1px solid var(--danger)',
             borderRadius: 6,
             padding: '4px 12px',
             cursor: withdrawing ? 'not-allowed' : 'pointer',
@@ -1757,7 +1809,7 @@ function ProfileScreen() {
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              width: 420, background: '#fff', borderRadius: 18,
+              width: 420, background: 'var(--card)', borderRadius: 18,
               padding: '32px 28px', boxShadow: 'var(--shadow-lg)',
             }}
           >
@@ -1801,8 +1853,8 @@ function ProfileScreen() {
                 {pwError && (
                   <div style={{
                     marginTop: 12, padding: '9px 13px', borderRadius: 8,
-                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
-                    fontSize: 12.5, color: '#b8536a',
+                    background: 'var(--danger-weak)', border: '0.5px solid color-mix(in oklch, var(--danger) 40%, var(--rule))',
+                    fontSize: 12.5, color: 'var(--danger)',
                   }}>
                     {pwError}
                   </div>
@@ -1830,8 +1882,8 @@ function ProfileScreen() {
                 {pwError && (
                   <div style={{
                     marginBottom: 14, padding: '9px 13px', borderRadius: 8,
-                    background: '#fff3f5', border: '0.5px solid #f7c1c1',
-                    fontSize: 12.5, color: '#b8536a',
+                    background: 'var(--danger-weak)', border: '0.5px solid color-mix(in oklch, var(--danger) 40%, var(--rule))',
+                    fontSize: 12.5, color: 'var(--danger)',
                   }}>
                     {pwError}
                   </div>
@@ -1920,7 +1972,7 @@ function AuthField({ icon: IconC, type = 'text', placeholder, value, onChange, d
           width: '100%', boxSizing: 'border-box',
           padding: '13px 40px',
           borderRadius: 12, fontSize: 14, outline: 'none',
-          background: '#fff', color: 'var(--ink)',
+          background: 'var(--card)', color: 'var(--ink)',
           border: `1px solid ${focused ? accent : (showValid && valid ? '#9CC7AB' : 'var(--rule-2)')}`,
           boxShadow: focused ? '0 0 0 3px rgba(47,143,84,0.12)' : 'none',
           transition: 'border-color 0.18s, box-shadow 0.18s',
@@ -2127,7 +2179,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
             <button
               type="button"
               onClick={onBackToLanding}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 26, padding: '7px 14px 7px 11px', borderRadius: 999, background: '#fff', border: '1px solid var(--rule-2)', color: 'var(--ink-2)', fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--font-display)', boxShadow: '0 1px 2px rgba(46,42,33,0.05)', cursor: 'pointer' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginBottom: 26, padding: '7px 14px 7px 11px', borderRadius: 999, background: 'var(--card)', border: '1px solid var(--rule-2)', color: 'var(--ink-2)', fontSize: 12.5, fontWeight: 600, fontFamily: 'var(--font-display)', boxShadow: '0 1px 2px rgba(46,42,33,0.05)', cursor: 'pointer' }}
             >
               <ArrowLeft size={15} strokeWidth={2.5} /> 처음으로
             </button>
@@ -2149,7 +2201,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
               width: '100%', marginTop: 26, padding: '12px 16px', borderRadius: 12,
-              background: '#fff', border: '1px solid var(--rule-2)',
+              background: 'var(--card)', border: '1px solid var(--rule-2)',
               fontSize: 13.5, fontWeight: 500, color: 'var(--ink)',
               opacity: (!GOOGLE_CLIENT_ID || loading) ? 0.5 : 1,
               cursor: (!GOOGLE_CLIENT_ID || loading) ? 'not-allowed' : 'pointer',
@@ -2214,7 +2266,7 @@ function AuthScreen({ onAuth, onBackToLanding }) {
                 transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                 style={{ overflow: 'hidden' }}
               >
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12, padding: '13px 15px', borderRadius: 12, background: '#fff', border: '1px solid var(--rule-2)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginTop: 12, padding: '13px 15px', borderRadius: 12, background: 'var(--card)', border: '1px solid var(--rule-2)' }}>
                   <ReqItem ok={emailValid} label="올바른 이메일 형식" />
                   <ReqItem ok={pc.checks.length} label="비밀번호 8자 이상 (필수)" />
                   <div style={{ height: 1, background: 'var(--rule-2)', margin: '2px 0' }} />

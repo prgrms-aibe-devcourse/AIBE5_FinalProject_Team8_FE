@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Plant } from './plants.jsx';
 import { RtIcon } from './pixel-icons.jsx';
-import { getSummary, getGrass, getWeekly, getDistribution, getInterests, getQuests } from './api/dashboard.js';
+import { getSummary, getGrass, getQuests } from './api/dashboard.js';
 import { getPointSummary } from './api/points.js';
 import { useUser } from './context/UserContext.jsx';
+import { useDeferredDashboardAnalytics } from './hooks/useDeferredDashboardAnalytics.js';
 import { playSfx } from './lib/sfx.js';
-import { GRASS_WEEKS, STREAK_CHAR_COUNT_CAP, DAY_LABELS, formatDateKey, formatShortDate, getGrassStartDate, buildGrassState, buildRecentStreakDays, calculateCurrentStreakFromCells, transformWeekly } from './screens-dashboard.logic.js';
+import { GRASS_WEEKS, STREAK_CHAR_COUNT_CAP, DAY_LABELS, formatDateKey, formatShortDate, getGrassStartDate, buildGrassState, buildRecentStreakDays, calculateCurrentStreakFromCells } from './screens-dashboard.logic.js';
 
 // ─── SPROUT 팔레트 — 디자인 시스템 토큰(sprout.css)을 단일 소스로 참조 ──
 // 차트/SVG에서 쓰는 색은 모두 CSS 변수로 위임해 테마와 항상 일치시킨다.
@@ -369,7 +370,7 @@ const W = 700, H = 220;
 const PAD = { top: 14, right: 16, bottom: 36, left: 40 };
 const normalizeTag = tag => String(tag ?? '').trim();
 
-function InterestStackedAreaChart({ interests, months, onMonthsChange }) {
+function InterestStackedAreaChart({ interests }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [hiddenTags, setHiddenTags] = useState(new Set());
 
@@ -745,17 +746,40 @@ function GoalRow({ goal }) {
   );
 }
 
+function AnalyticsLoadingState() {
+  return (
+    <div style={{
+      minHeight: 150,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      textAlign: 'center',
+      border: `1px dashed ${SPROUT.line}`,
+      borderRadius: 6,
+      background: 'linear-gradient(180deg, var(--paper-warm), var(--surface-card))',
+      color: SPROUT.muted,
+      padding: '22px 18px',
+      fontSize: 12.5,
+      lineHeight: 1.6,
+    }}>
+      분석 데이터를 불러오는 중이에요.
+    </div>
+  );
+}
+
 function DashboardScreen({ onNav }) {
   const { user } = useUser();
   const [summary, setSummary]           = useState(null);
   const [grassState, setGrassState]     = useState(() => buildGrassState([]));
   const [grassCells, setGrassCells]     = useState([]);
-  const [weekly, setWeekly]             = useState([]);
-  const [distribution, setDistribution] = useState([]);
-  const [interests, setInterests]           = useState([]);
   const [interestMonths, setInterestMonths] = useState(6);
   const [quests, setQuests]                 = useState(null);
   const [currentPoint, setCurrentPoint]     = useState(0);
+  const [coreDashboardReady, setCoreDashboardReady] = useState(false);
+  const { overviewLoading, interestsLoading, weekly, distribution, interests } = useDeferredDashboardAnalytics({
+    enabled: coreDashboardReady,
+    interestMonths,
+  });
 
   // 잔디 — 항상 1년치 데이터 (클래식 테마와 동일)
   useEffect(() => {
@@ -769,53 +793,37 @@ function DashboardScreen({ onNav }) {
     return () => { active = false; };
   }, []);
 
-  // 관심사 기간 변경 시 재요청
   useEffect(() => {
-    let active = true;
-    getInterests(interestMonths).then(data => {
-      if (!active) return;
-      setInterests(data?.interests ?? []);
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [interestMonths]);
-
-  useEffect(() => {
-    // getQuests()는 포인트 적립을 수행하므로, 완료 후 포인트를 재조회한다 (성공/실패 무관)
     let active = true;
     const questsP = getQuests();
-
-    Promise.allSettled([
-      getSummary(),
-      getWeekly(),
-      getDistribution(),
-      questsP,
-    ]).then(([sumRes, weekRes, distRes, questRes]) => {
-      if (!active) return;
-      if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
-      if (weekRes.status === 'fulfilled')  setWeekly(transformWeekly(weekRes.value?.weeklyData ?? []));
-      if (distRes.status === 'fulfilled')  setDistribution(distRes.value?.distribution ?? []);
-      if (questRes.status === 'fulfilled') setQuests(questRes.value);
-    // allSettled 자체는 reject되지 않음. then() 내부 동기 오류만 여기서 잡힘
-    }).catch(error => {
-      console.error('상태 업데이트 중 오류:', error);
-    });
-
-    // 퀘스트 완료 여부와 무관하게 포인트 잔액 갱신
-    questsP
+    const summaryP = getSummary();
+    const pointP = questsP
       .catch(error => {
         console.error('퀘스트 조회 중 오류 발생:', error);
         return null;
       })
-      .finally(() => {
-        if (!active) return;
-        getPointSummary()
-          .then(pointRes => {
-            if (active && pointRes != null) setCurrentPoint(pointRes.currentPoint ?? 0);
-          })
-          .catch(error => {
-            console.error('포인트 조회 중 오류 발생:', error);
-          });
+      .then(() => getPointSummary())
+      .then(pointRes => {
+        if (active && pointRes != null) setCurrentPoint(pointRes.currentPoint ?? 0);
+      })
+      .catch(error => {
+        console.error('포인트 조회 중 오류 발생:', error);
       });
+
+    Promise.allSettled([
+      summaryP,
+      questsP,
+    ]).then(([sumRes, questRes]) => {
+      if (!active) return;
+      if (sumRes.status === 'fulfilled')   setSummary(sumRes.value);
+      if (questRes.status === 'fulfilled') setQuests(questRes.value);
+      return pointP;
+    // allSettled 자체는 reject되지 않음. then() 내부 동기 오류만 여기서 잡힘
+    }).catch(error => {
+      console.error('상태 업데이트 중 오류:', error);
+    }).finally(() => {
+      if (active) setCoreDashboardReady(true);
+    });
 
     return () => { active = false; };
   }, []);
@@ -934,12 +942,12 @@ function DashboardScreen({ onNav }) {
 
         <div className="rt-card guide-dashboard-distribution">
           <SectionHead eyebrow="화분별 분포" title="주제 비율" />
-          <PotDistribution distribution={distribution} />
+          {overviewLoading ? <AnalyticsLoadingState /> : <PotDistribution distribution={distribution} />}
         </div>
 
         <div className="rt-card guide-dashboard-weekly">
           <SectionHead eyebrow="이번 주" title="요일별 작성" />
-          <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />
+          {overviewLoading ? <AnalyticsLoadingState /> : <WeeklyBar weekly={weekly.length > 0 ? weekly : DAY_LABELS.map(d => ({ day: d, count: 0 }))} />}
         </div>
       </div>
 
@@ -948,7 +956,7 @@ function DashboardScreen({ onNav }) {
         <SectionHead eyebrow="관심사 변화" title="시기별 학습 주제 흐름" action={
           <SegTabs options={[['6개월', 6], ['12개월', 12]]} cur={interestMonths} onPick={setInterestMonths} />
         } />
-        <InterestStackedAreaChart interests={interests} months={interestMonths} onMonthsChange={setInterestMonths} />
+        {interestsLoading ? <AnalyticsLoadingState /> : <InterestStackedAreaChart interests={interests} />}
       </div>
 
     </div>

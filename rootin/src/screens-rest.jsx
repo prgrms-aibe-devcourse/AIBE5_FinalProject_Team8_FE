@@ -1570,7 +1570,6 @@ function ProfileScreen() {
 
       // 서버에 profileImageUrl 저장 (nickname은 @NotBlank 필수값이므로 같이 전송)
       await patchUserMe({ nickname, bio, profileImageUrl: displayUrl });
-      console.log('[이미지 업로드 완료] displayUrl:', displayUrl);
       updateUser({ profileImageUrl: displayUrl });
     } catch (err) {
       console.error('[이미지 업로드 실패]', err);

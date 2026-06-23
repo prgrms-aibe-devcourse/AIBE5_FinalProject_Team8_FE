@@ -34,6 +34,7 @@ const DashboardClassic = lazyNamed(() => import('./screens-dashboard.classic.jsx
 const EditorClassic = lazyNamed(() => import('./screens-editor.classic.jsx'), 'EditorScreen');
 const GardenClassic = lazyNamed(() => import('./screens-garden.classic.jsx'), 'GardenScreen');
 const PotDetailClassic = lazyNamed(() => import('./screens-garden.classic.jsx'), 'PotDetailScreen');
+const TilDetailClassic = lazyNamed(() => import('./screens-garden.classic.jsx'), 'TilDetailScreen');
 const RootinSidebarRightClassic = lazyNamed(() => import('./components/RootinSidebarRight.classic.jsx'), 'RootinSidebarRight');
 const CollectionClassic = lazyNamed(() => import('./screens-rest.classic.jsx'), 'CollectionScreen');
 const AIClassic = lazyNamed(() => import('./screens-rest.classic.jsx'), 'AIScreen');
@@ -170,19 +171,28 @@ function AppShell() {
   const closeLogoutModal = () => setLogoutModalOpen(false);
 
   const screen = getScreenFromPath(location.pathname);
+  // 'dark'는 클래식과 동일한 컴포넌트를 쓰고 색만 다른 팔레트 변형이라, 컴포넌트 선택상 classic 계열(family)로 취급한다.
+  const isClassic = theme === 'classic' || theme === 'dark';
+  const isDark = theme === 'dark';
   // 풀스크린 비전-디스플레이 프레임(어두운 룸 + 모니터 베젤)을 적용할 화면.
   // 게임보이/CRT로 개편된 화면을 여기에 추가하면 양쪽 여백 없이 풀폭 + 테두리가 입혀진다.
   const baseFramed = screen === 'dashboard' || screen === 'garden' || screen === 'pot-detail' || screen === 'collection' || screen === 'ai' || screen === 'profile';
-  // 테마 토글: classic 테마에서는 게임보이 베젤/사이드바를 끄고 원본 셸(RootinSidebarLeft)로 렌더한다.
+  // 테마 토글: classic 계열(classic/dark)에서는 게임보이 베젤/사이드바를 끄고 원본 셸(RootinSidebarLeft)로 렌더한다.
   // 대상 화면(대시보드/정원/화분상세/도감/AI/프로필)은 classic 구현이 있다. 에디터·TIL상세는 게임보이 유지.
   const CLASSIC_SHELL_SCREENS = ['dashboard', 'garden', 'pot-detail', 'til-detail', 'collection', 'ai', 'profile', 'editor'];
-  const useClassicShell = theme === 'classic' && CLASSIC_SHELL_SCREENS.includes(screen);
+  const useClassicShell = isClassic && CLASSIC_SHELL_SCREENS.includes(screen);
   const framed = baseFramed && !useClassicShell;
   // 에디터 스택을 테마별로 선택 (Provider·화면·우측 패널은 같은 til 트리/컨텍스트끼리 묶여야 한다)
-  const isClassic = theme === 'classic';
   const TilProvider = isClassic ? TilEditorProviderClassic : TilEditorProvider;
   const EditorComp = isClassic ? EditorClassic : EditorScreen;
   const RightPanel = isClassic ? RootinSidebarRightClassic : RootinSidebarRight;
+  // 다크 팔레트는 로그인된 앱 화면에서만 입힌다. 랜딩/로그인(미인증)은 테마 대상이 아니므로
+  // 다크가 저장돼 있어도 항상 라이트로 둔다(아래 !authed 분기에서 별도 셸로 렌더됨).
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('dark', authed && isDark);
+    return () => root.classList.remove('dark');
+  }, [authed, isDark]);
   const routePotId = getPotIdFromPath(location.pathname);
   const editorQueryPotId = getEditorPotIdFromSearch(location.search);
   const activeEditorPotId = editorQueryPotId ?? editorInitialPotId;
@@ -340,7 +350,7 @@ function AppShell() {
           <Suspense fallback={<RouteFallback />}>
             <Routes>
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={theme === 'classic' ? <DashboardClassic onNav={handleNav} /> : <DashboardScreen onNav={handleNav} />} />
+              <Route path="/dashboard" element={isClassic ? <DashboardClassic onNav={handleNav} /> : <DashboardScreen onNav={handleNav} />} />
               <Route path="/editor" element={(
                 <EditorComp
                   onNav={handleNav}
@@ -353,12 +363,12 @@ function AppShell() {
                   onToggleFocus={toggleFocusMode}
                 />
               )} />
-              <Route path="/garden" element={theme === 'classic'
+              <Route path="/garden" element={isClassic
                 ? <GardenClassic refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />
                 : <GardenScreen refreshKey={gardenRefreshKey} onOpenPot={(id) => { setPotFocus(id); navigate(`/garden/pots/${id}`); }} />} />
               <Route path="/garden/pots/:potId" element={(
                 <PotDetailRoute
-                  theme={theme}
+                  theme={isClassic ? 'classic' : 'gameboy'}
                   refreshKey={potDetailRefreshKey}
                   celebratePotId={growthCelebratePotId}
                   onCelebrated={() => setGrowthCelebratePotId(null)}
@@ -370,6 +380,7 @@ function AppShell() {
               )} />
               <Route path="/garden/pots/:potId/tils/:tilId" element={(
                 <TilDetailRoute
+                  theme={isClassic ? 'classic' : 'gameboy'}
                   onBack={(potId) => navigate(`/garden/pots/${potId}`)}
                   onEdit={openEditorForTil}
                   onDeleted={(potId) => {
@@ -378,9 +389,9 @@ function AppShell() {
                   }}
                 />
               )} />
-              <Route path="/collection" element={theme === 'classic' ? <CollectionClassic /> : <CollectionScreen />} />
-              <Route path="/ai" element={theme === 'classic' ? <AIClassic onOpenGuide={() => setGuideOpen(true)} /> : <AIScreen />} />
-              <Route path="/profile" element={theme === 'classic' ? <ProfileClassic /> : <ProfileScreen />} />
+              <Route path="/collection" element={isClassic ? <CollectionClassic /> : <CollectionScreen />} />
+              <Route path="/ai" element={isClassic ? <AIClassic onOpenGuide={() => setGuideOpen(true)} /> : <AIScreen />} />
+              <Route path="/profile" element={isClassic ? <ProfileClassic /> : <ProfileScreen />} />
               <Route path="/login" element={<Navigate to="/dashboard" replace />} />
               <Route path="/landing" element={<Navigate to="/dashboard" replace />} />
               <Route path="*" element={<NotFoundScreen />} />
@@ -454,7 +465,7 @@ function AppShell() {
     </SidebarProvider>
     {logoutModalOpen && (
       <Suspense fallback={null}>
-        {theme === 'classic'
+        {isClassic
           ? <LogoutConfirmModalClassic onConfirm={confirmLogout} onClose={closeLogoutModal} />
           : <LogoutConfirmModal onConfirm={confirmLogout} onClose={closeLogoutModal} />}
       </Suspense>

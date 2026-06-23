@@ -37,7 +37,7 @@ export function EditorConfirmModal({ tag = '확인', title, description, confirm
         onClick={e => e.stopPropagation()}
         style={{
           width: 400,
-          background: '#fff',
+          background: 'var(--card)',
           borderRadius: 18,
           padding: '28px 28px 24px',
           boxShadow: 'var(--shadow-lg)',
@@ -70,7 +70,7 @@ export function EditorConfirmModal({ tag = '확인', title, description, confirm
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
-              background: '#fff',
+              background: 'var(--card)',
               cursor: 'pointer',
             }}
             aria-label="닫기"
@@ -91,7 +91,7 @@ export function EditorConfirmModal({ tag = '확인', title, description, confirm
                 height: 42,
                 borderRadius: 10,
                 border: '0.5px solid var(--rule)',
-                background: '#fff',
+                background: 'var(--card)',
                 color: 'var(--ink)',
                 fontSize: 14,
                 fontWeight: 500,

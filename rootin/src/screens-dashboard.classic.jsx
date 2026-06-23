@@ -764,10 +764,8 @@ function DashboardScreen({ onNav }) {
     return () => { active = false; };
   }, []);
 
-  // 관심사 기간 변경 시 재요청
   useEffect(() => {
     let active = true;
-    setCoreDashboardReady(false);
     const questsP = getQuests();
     const summaryP = getSummary();
     const pointP = questsP

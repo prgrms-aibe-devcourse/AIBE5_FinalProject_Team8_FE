@@ -2,14 +2,10 @@ import { useEffect, useState } from 'react';
 import { getDistribution, getInterests, getWeekly } from '../api/dashboard.js';
 import { transformWeekly } from '../screens-dashboard.logic.js';
 
-const DASHBOARD_DEFERRED_FETCH_DELAY_MS = 700;
-
 export function useDeferredDashboardAnalytics({
   enabled,
   interestMonths,
-  delayMs = DASHBOARD_DEFERRED_FETCH_DELAY_MS,
 }) {
-  const [deferredFetchEnabled, setDeferredFetchEnabled] = useState(false);
   const [interestsFetchLoading, setInterestsFetchLoading] = useState(false);
   const [overviewFetchLoading, setOverviewFetchLoading] = useState(false);
   const [weekly, setWeekly] = useState([]);
@@ -17,24 +13,7 @@ export function useDeferredDashboardAnalytics({
   const [interests, setInterests] = useState([]);
 
   useEffect(() => {
-    if (!enabled) {
-      setDeferredFetchEnabled(false);
-      setInterestsFetchLoading(false);
-      setOverviewFetchLoading(false);
-      return undefined;
-    }
-
-    // 핵심 대시보드 데이터가 먼저 그려진 뒤 분석 API가 이어지도록 최소 지연을 둡니다.
-    // 고정값은 초기 API burst를 한 번 더 분산하기 위한 의도적인 완충 시간입니다.
-    const timer = setTimeout(() => {
-      setDeferredFetchEnabled(true);
-    }, delayMs);
-
-    return () => clearTimeout(timer);
-  }, [delayMs, enabled]);
-
-  useEffect(() => {
-    if (!deferredFetchEnabled) return undefined;
+    if (!enabled) return undefined;
 
     let active = true;
     setInterestsFetchLoading(true);
@@ -54,10 +33,10 @@ export function useDeferredDashboardAnalytics({
     return () => {
       active = false;
     };
-  }, [deferredFetchEnabled, interestMonths]);
+  }, [enabled, interestMonths]);
 
   useEffect(() => {
-    if (!deferredFetchEnabled) return undefined;
+    if (!enabled) return undefined;
 
     let active = true;
     setOverviewFetchLoading(true);
@@ -78,10 +57,10 @@ export function useDeferredDashboardAnalytics({
     return () => {
       active = false;
     };
-  }, [deferredFetchEnabled]);
+  }, [enabled]);
 
-  const overviewLoading = !deferredFetchEnabled || overviewFetchLoading;
-  const interestsLoading = !deferredFetchEnabled || interestsFetchLoading;
+  const overviewLoading = !enabled || overviewFetchLoading;
+  const interestsLoading = !enabled || interestsFetchLoading;
 
   return {
     overviewLoading,

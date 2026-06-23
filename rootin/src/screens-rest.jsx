@@ -843,6 +843,7 @@ function AIScreen({ onOpenGuide }) {
   // 저장 완료 피드백용
   const [saved, setSaved] = useState(false);
   const savedTimerRef = useRef(null);
+  const aiQuestRef = useRef(null);
 
   // TIL 선택 모달
   const [modalOpen, setModalOpen] = useState(false);
@@ -1175,7 +1176,7 @@ function AIScreen({ onOpenGuide }) {
         <div className="gb-ai-main">
 
           {/* ── 좌: 퀘스트 타임라인 (진행 흐름) ── */}
-          <ol className="gb-ai-quest">
+          <ol className="gb-ai-quest" ref={aiQuestRef}>
             {questNodes.map((n, i) => (
               <li key={n.key} className={`gb-ai-node${n.done ? ' is-done' : ''}${i === currentNodeIdx ? ' is-current' : ''}${!n.unlocked ? ' is-locked' : ''}`}>
                 <div className="gb-ai-rail">
@@ -1345,7 +1346,7 @@ function AIScreen({ onOpenGuide }) {
                 type="button"
                 className="gb-key gb-key--lcd"
                 style={{ display: 'block', margin: '12px auto 0' }}
-                onClick={() => document.querySelector('.gb-ai-quest')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => aiQuestRef.current?.scrollIntoView({ behavior: 'smooth' })}
               >
                 퀴즈/요약 만들러 가기
               </button>

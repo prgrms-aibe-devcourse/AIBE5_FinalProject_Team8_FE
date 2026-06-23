@@ -1159,7 +1159,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
 
         {!potsLoading && !potsError && pots.map(p => <PotCard key={p.id} pot={p} onClick={() => onOpenPot(p.id)} />)}
 
-        <div
+        {!potsLoading && !potsError && pots.length > 0 && <div
           role="button"
           tabIndex={0}
           onClick={() => setShowCreatePot(true)}

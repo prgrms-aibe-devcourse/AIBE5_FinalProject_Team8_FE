@@ -1120,7 +1120,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
 
         {!potsLoading && !potsError && pots.map(p => <PotCard key={p.id} pot={p} onClick={() => onOpenPot(p.id)} />)}
 
-        <Card padding={20} hoverable onClick={() => setShowCreatePot(true)} style={{
+        {!potsLoading && !potsError && pots.length > 0 && <Card padding={20} hoverable onClick={() => setShowCreatePot(true)} style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 14, minHeight: 320,
           background: 'repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(168, 213, 181, 0.08) 8px, rgba(168, 213, 181, 0.08) 16px)',
@@ -1136,7 +1136,7 @@ function GardenScreen({ refreshKey = 0, onOpenPot }) {
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, color: 'var(--ink)', fontSize: 14 }}>새 화분 만들기</div>
             <div style={{ fontSize: 11.5, color: 'var(--ink-3)', marginTop: 4 }}>새로운 주제로 씨앗을 심어요</div>
           </div>
-        </Card>
+        </Card>}
       </div>
 
       {!potsLoading && !potsError && pots.length > 0 && (

@@ -53,6 +53,7 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
     onCollapseChange?.(collapsed ? WIDTH_EXPANDED - WIDTH_COLLAPSED : 0);
   }, [collapsed, onCollapseChange]);
 
+
   const activeIndex = MENU.findIndex((m) => m.key === current);
   const labelOpacity = collapsed ? 0 : 1;
   const streak = user?.streak ?? 0;

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext.jsx';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -53,6 +53,20 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
     onCollapseChange?.(collapsed ? WIDTH_EXPANDED - WIDTH_COLLAPSED : 0);
   }, [collapsed, onCollapseChange]);
 
+  // Cmd+B / Ctrl+B 단축키를 가로채 Shadcn의 providerOpen 토글 대신 collapsed 토글로 연결한다.
+  // capture phase로 등록해 Shadcn의 window bubble 핸들러보다 먼저 실행되도록 한다.
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        setCollapsed((c) => !c);
+      }
+    };
+    document.addEventListener('keydown', handler, true);
+    return () => document.removeEventListener('keydown', handler, true);
+  }, []);
+
   const activeIndex = MENU.findIndex((m) => m.key === current);
   const labelOpacity = collapsed ? 0 : 1;
   const streak = user?.streak ?? 0;
@@ -80,6 +94,7 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
         onClick={toggleSidebar}
         className="rl-reopen"
         title="사이드바 열기"
+        aria-label="사이드바 열기"
         style={{ position: 'fixed', top: 23, left: 0, width: 28, height: 34, display: 'grid', placeItems: 'center', border: 'none', background: 'var(--moss)', borderRadius: '0 11px 11px 0', cursor: 'pointer', color: 'var(--on-primary)', boxShadow: '3px 3px 12px -4px color-mix(in oklch, var(--moss) 75%, transparent)', transition: 'background 0.2s ease', zIndex: 50 }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>

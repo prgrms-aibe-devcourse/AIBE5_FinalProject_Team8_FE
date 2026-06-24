@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../context/UserContext.jsx';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -53,17 +53,6 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
     onCollapseChange?.(collapsed ? WIDTH_EXPANDED - WIDTH_COLLAPSED : 0);
   }, [collapsed, onCollapseChange]);
 
-  // Shadcn SidebarProvider의 Cmd+B / Ctrl+B 단축키가 사이드바를 완전히 숨기는 것을 차단한다.
-  useEffect(() => {
-    const handler = (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-      }
-    };
-    document.addEventListener('keydown', handler, true);
-    return () => document.removeEventListener('keydown', handler, true);
-  }, []);
 
   const activeIndex = MENU.findIndex((m) => m.key === current);
   const labelOpacity = collapsed ? 0 : 1;

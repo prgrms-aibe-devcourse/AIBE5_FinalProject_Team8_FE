@@ -724,6 +724,9 @@ body[data-theme="classic"] .til-prose .ProseMirror code {
 .rootin-sidebar-left .rl-toggle:hover {
   background: var(--moss-2);
 }
+.rl-reopen:hover {
+  background: var(--moss-2);
+}
 
 /* ---------------------------------------------------------------- */
 /* 3단계: 에디터 버블 메뉴 등장 모션 (선택 시 부드럽게 떠오름)        */

@@ -41,7 +41,7 @@ const WIDTH_COLLAPSED = 78; // 접은 사이드바 너비(px)
 export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }) {
   const { user } = useUser();
   const navigate = useNavigate();
-  const { open: providerOpen } = useSidebar();
+  const { open: providerOpen, toggleSidebar } = useSidebar();
   const [collapsed, setCollapsed] = useState(false);
   const [hovered, setHovered] = useState(-1);
   const logoRef = useRef(null);
@@ -73,6 +73,18 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
   };
 
   return (
+    <>
+    {!providerOpen && (
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        className="rl-reopen"
+        title="사이드바 열기"
+        style={{ position: 'fixed', top: 23, left: 0, width: 28, height: 34, display: 'grid', placeItems: 'center', border: 'none', background: 'var(--moss)', borderRadius: '0 11px 11px 0', cursor: 'pointer', color: 'var(--on-primary)', boxShadow: '3px 3px 12px -4px color-mix(in oklch, var(--moss) 75%, transparent)', transition: 'background 0.2s ease', zIndex: 50 }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+      </button>
+    )}
     <aside
       className="rootin-sidebar-left"
       style={{
@@ -215,5 +227,6 @@ export function RootinSidebarLeft({ current, onNav, onLogout, onCollapseChange }
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ transform: `rotate(${collapsed ? '180deg' : '0deg'})`, transition: 'transform 0.42s cubic-bezier(0.4,0,0.2,1)' }}><polyline points="15 18 9 12 15 6" /></svg>
       </button>
     </aside>
+    </>
   );
 }

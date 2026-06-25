@@ -92,6 +92,8 @@ export function TilEditorPage({
   // 반영 전(=이전 persisted 값이 남아있을 때)에 URL 로 되돌려보내면 두 화분이 무한 토글됨.
   const pendingInitialPotRef = useRef<string | null>(null)
   const handledEntryRef = useRef<string | null>(null)
+  // 현재 등록한 이탈 가드 함수 — 저장 성공 후 프로그램적 이동 직전에 동기 해제하기 위해 보관한다.
+  const leaveGuardFnRef = useRef<(() => string | null) | null>(null)
   const normalizedInitialPotId = initialSelectedPotId == null
     ? null
     : String(initialSelectedPotId)
@@ -147,11 +149,21 @@ export function TilEditorPage({
       ? '작성 중인 내용이 저장되지 않았어요.\n나가면 변경한 내용이 사라질 수 있어요.'
       : null
   useEffect(() => {
-    if (leaveGuardMessage == null) return
+    if (leaveGuardMessage == null) { leaveGuardFnRef.current = null; return }
     const fn = () => leaveGuardMessage
+    leaveGuardFnRef.current = fn
     setNavGuard(fn)
-    return () => clearNavGuard(fn)
+    return () => { clearNavGuard(fn); leaveGuardFnRef.current = null }
   }, [leaveGuardMessage])
+
+  // 저장(발행·수정) 성공 후 프로그램적 이동은 의도된 이탈이므로, onNav 직전에 가드를 동기 해제한다.
+  // (saved 상태 갱신은 비동기 재렌더라 그 시점엔 아직 가드가 '미저장'을 반환하기 때문)
+  const releaseLeaveGuard = () => {
+    if (leaveGuardFnRef.current) {
+      clearNavGuard(leaveGuardFnRef.current)
+      leaveGuardFnRef.current = null
+    }
+  }
 
   useEffect(() => {
     if (isEditMode || !editor || entryMode !== 'new') return
@@ -362,6 +374,7 @@ export function TilEditorPage({
       setSaved(true)
       if (moveAfterSave) {
         // 수정 완료 후 해당 TIL 상세 페이지로 이동한다.
+        releaseLeaveGuard()
         const targetPotId = result?.potId ?? initialTil?.potId ?? selectedPotId
         const targetTilId = result?.tilId ?? editTilId
         editor.commands.clearContent()
@@ -409,6 +422,8 @@ export function TilEditorPage({
     try {
       const result = await publish()
       onPublished?.(selectedPotId)
+      // 발행 성공 — 의도된 이동이므로 이탈 가드를 해제한 뒤 이동한다.
+      releaseLeaveGuard()
       // 발행 후 방금 만든 TIL의 상세 페이지로 이동한다.
       const created = result as { potId?: number | string; tilId?: number | string } | null | undefined
       const targetPotId = created?.potId ?? selectedPotId

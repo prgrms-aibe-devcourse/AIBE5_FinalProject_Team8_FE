@@ -10,6 +10,8 @@ import { PixelPlant } from './pixel-plants.jsx';
 import { ThemePreview } from './components/ThemePreview.jsx';
 import { RootinWordmark } from './landing/RootinWordmark.jsx';
 import { PixelPals } from './auth-pixel-pals.jsx';
+import { setNavGuard, clearNavGuard } from './lib/navGuard.js';
+import { EditorConfirmModal } from './components/EditorConfirmModal.classic.jsx';
 import { useUser } from './context/UserContext.jsx';
 import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
@@ -814,7 +816,7 @@ function PotCard({ pot, selected, onClick }) {
 }
 
 function AIScreen({ onOpenGuide }) {
-  const { user } = useUser();
+  const { user, updateUser } = useUser();
   const [mode, setMode] = useState('quiz'); // quiz | summary — 입력 UI 탭 선택
   const [resultMode, setResultMode] = useState('quiz'); // quiz | summary — 현재 표시 중인 결과 타입
   const [potId, setPotId] = useState(null);
@@ -826,8 +828,9 @@ function AIScreen({ onOpenGuide }) {
   const [aiResult, setAiResult] = useState(null);
   // 에러 메시지 (null이면 에러 없음)
   const [error, setError] = useState(null);
-  // 포인트 — Context의 user.points로 초기화, AI 응답의 remainPoint로 즉시 갱신
-  const [remainPoint, setRemainPoint] = useState(user?.points ?? 0);
+  // 포인트 — 전역 Context의 user.points를 단일 소스로 사용. 생성 응답이 오면
+  // updateUser로 user.points를 갱신해, 이 화면·사이드바·재진입 표시가 모두 일관되게 줄어든다.
+  const remainPoint = user?.points ?? 0;
 
   // 화분 목록 — 진입 시 getPots()로 로딩
   const [pots, setPots] = useState([]);
@@ -883,8 +886,45 @@ function AIScreen({ onOpenGuide }) {
   }, []);
   // 마지막으로 선택한 tilIds (다시 생성 시 재사용)
   const [lastTilIds, setLastTilIds] = useState([]);
+  // 미저장 결과를 덮어쓰는 동작 대기 — null이면 모달 없음, 함수면 확인 모달 표시
+  const [pendingReplace, setPendingReplace] = useState(null);
+  // 보관함 삭제 확인 대기 — 삭제할 resultId, null이면 모달 없음
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const selectedPot = pots.find(p => p.id === potId) ?? null;
+
+  // 생성했지만 보관함에 저장하지 않은 결과가 있는지 — 이탈 가드와 인페이지 덮어쓰기 경고가 공유한다.
+  const hasUnsavedResult =
+    generated &&
+    !!aiResult &&
+    !guideMockActive &&
+    !savedResults.some((r) => r.content === aiResult);
+
+  // 미저장 결과를 잃게 만드는 동작을 가드한다. 미저장이면 확인 모달, 아니면 즉시 실행.
+  const requestReplace = (action) => {
+    if (hasUnsavedResult) setPendingReplace(() => action);
+    else action();
+  };
+  const confirmReplace = () => {
+    const action = pendingReplace;
+    setPendingReplace(null);
+    // 확인 시 현재 결과를 비운다. 생성·보관함 선택은 곧 새 결과로 대체되므로 무해하고,
+    // 종류·화분 변경은 비워야 "결과가 사라진다"는 경고가 사실이 된다.
+    setGenerated(false);
+    setAiResult(null);
+    setError(null);
+    action?.();
+  };
+  const cancelReplace = () => setPendingReplace(null);
+
+  // 미저장 결과가 있으면 페이지 이탈 가드를 등록한다(handleNav가 확인해 경고 모달을 띄움).
+  useEffect(() => {
+    const fn = () => (hasUnsavedResult
+      ? '생성한 AI 학습 결과를 아직 저장하지 않았어요.\n나가면 결과가 사라져요.'
+      : null);
+    setNavGuard(fn);
+    return () => clearNavGuard(fn);
+  }, [hasUnsavedResult]);
 
   useEffect(() => () => {
     if (savedTimerRef.current) {
@@ -967,7 +1007,7 @@ function AIScreen({ onOpenGuide }) {
         : await generateQuiz(potId, quizCount, ids);
 
       setAiResult(data);
-      setRemainPoint(data.remainPoint);
+      updateUser({ points: data.remainPoint });
       setResultMode(mode);
       setGenerated(true);
     } catch (err) {
@@ -985,7 +1025,8 @@ function AIScreen({ onOpenGuide }) {
   const handleModalConfirm = (tilIds) => {
     setModalOpen(false);
     setLastTilIds(tilIds);
-    handleGenerate(tilIds);
+    // 미저장 결과가 있으면 실제 생성 직전에 확인을 받는다(TIL 선택 취소 시 결과 보존).
+    requestReplace(() => handleGenerate(tilIds));
   };
 
   const handleModalClose = useCallback(() => {
@@ -1038,9 +1079,16 @@ function AIScreen({ onOpenGuide }) {
     }
   };
 
-  // 보관함 항목 삭제 — DELETE /ai/results/{resultId}
-  const handleDelete = async (e, resultId) => {
+  // 보관함 항목 삭제 — 바로 지우지 않고 확인 모달을 띄운다.
+  const handleDelete = (e, resultId) => {
     e.stopPropagation(); // 클릭이 상위 handleSelectSavedItem으로 전파되지 않도록
+    setPendingDelete(resultId);
+  };
+  // 삭제 확인 — DELETE /ai/results/{resultId}
+  const confirmDelete = async () => {
+    const resultId = pendingDelete;
+    setPendingDelete(null);
+    if (resultId == null) return;
     try {
       await deleteResult(resultId);
       setSavedResults(prev => prev.filter(r => r.id !== resultId));
@@ -1048,6 +1096,7 @@ function AIScreen({ onOpenGuide }) {
       setError('삭제에 실패했어요. 잠시 후 다시 시도해 주세요.');
     }
   };
+  const cancelDelete = () => setPendingDelete(null);
 
   const guideMockQuizzes = guideMockActive ? [
     { id: 1, question: 'React에서 useEffect의 의존성 배열을 빈 배열([])로 설정하면 어떤 시점에 실행되나요?', options: ['컴포넌트가 처음 화면에 나타날 때(마운트)', '상태가 바뀔 때마다', '화면에서 사라질 때만', '렌더링되기 직전'], answer: 1, explanation: '의존성 배열이 빈 배열인 경우 컴포넌트가 마운트될 때 최초 1회만 동작합니다.' },
@@ -1074,7 +1123,7 @@ function AIScreen({ onOpenGuide }) {
           <div className="eyebrow" style={{ marginBottom: 8 }}>목적</div>
           {/* 가이드 하이라이트 매칭을 위해 guide-ai-mode 클래스를 추가합니다 */}
           <div className="guide-ai-mode" style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => setMode('quiz')} style={{
+            <button onClick={() => requestReplace(() => setMode('quiz'))} style={{
               flex: 1, padding: '12px 10px', borderRadius: 10,
               background: mode === 'quiz' ? 'var(--coral)' : 'var(--card)',
               color: mode === 'quiz' ? '#fff' : 'var(--ink-2)',
@@ -1084,7 +1133,7 @@ function AIScreen({ onOpenGuide }) {
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 600, marginBottom: 4 }}>📝 복습 문제 생성</div>
               <div style={{ fontSize: 10.5, opacity: 0.7, lineHeight: 1.5 }}>TIL에서 {quizCount}문제 자동 생성</div>
             </button>
-            <button onClick={() => setMode('summary')} style={{
+            <button onClick={() => requestReplace(() => setMode('summary'))} style={{
               flex: 1, padding: '12px 10px', borderRadius: 10,
               background: mode === 'summary' ? 'var(--coral)' : 'var(--card)',
               color: mode === 'summary' ? '#fff' : 'var(--ink-2)',
@@ -1158,7 +1207,7 @@ function AIScreen({ onOpenGuide }) {
                   key={p.id}
                   pot={p}
                   selected={potId === p.id}
-                  onClick={() => handlePotChange(p.id)}
+                  onClick={() => requestReplace(() => handlePotChange(p.id))}
                 />
               ))
             )}
@@ -1207,7 +1256,7 @@ function AIScreen({ onOpenGuide }) {
                   return (
                     <div
                         key={item.id}
-                        onClick={() => handleSelectSavedItem(item)}
+                        onClick={() => requestReplace(() => handleSelectSavedItem(item))}
                         style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                           padding: '10px 12px', borderRadius: 8, background: 'var(--card)',
@@ -1248,7 +1297,7 @@ function AIScreen({ onOpenGuide }) {
           action={generated ? (
             <div style={{ display: 'flex', gap: 8 }}>
               {lastTilIds.length > 0 && (
-                <Btn variant="secondary" size="sm" onClick={() => handleGenerate(lastTilIds)}>다시 생성</Btn>
+                <Btn variant="secondary" size="sm" onClick={() => requestReplace(() => handleGenerate(lastTilIds))}>다시 생성</Btn>
               )}
               <Btn variant="primary" size="sm" onClick={handleSave}>
                 {saved ? '✓ 저장됨' : '결과 저장'}
@@ -1294,6 +1343,26 @@ function AIScreen({ onOpenGuide }) {
         onConfirm={handleModalConfirm}
         onClose={handleModalClose}
         onOpenGuide={onOpenGuide}
+      />
+    )}
+    {pendingReplace && (
+      <EditorConfirmModal
+        tag="확인"
+        title="저장하지 않은 결과가 있어요"
+        description="아직 보관함에 저장하지 않았어요. 계속하면 지금 만든 결과를 잃을 수 있어요."
+        confirmLabel="계속"
+        onConfirm={confirmReplace}
+        onClose={cancelReplace}
+      />
+    )}
+    {pendingDelete != null && (
+      <EditorConfirmModal
+        tag="삭제"
+        title="이 자료를 삭제할까요?"
+        description="삭제하면 보관함에서 사라지고 되돌릴 수 없어요."
+        confirmLabel="삭제하기"
+        onConfirm={confirmDelete}
+        onClose={cancelDelete}
       />
     )}
     </>

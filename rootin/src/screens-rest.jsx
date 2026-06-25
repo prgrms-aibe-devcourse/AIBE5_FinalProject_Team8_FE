@@ -13,6 +13,7 @@ import { RootinWordmark } from './landing/RootinWordmark.jsx';
 import { PixelPals } from './auth-pixel-pals.jsx';
 import { playSfx } from './lib/sfx.js';
 import { setNavGuard, clearNavGuard } from './lib/navGuard.js';
+import { EditorConfirmModal } from './components/EditorConfirmModal.jsx';
 import { useUser } from './context/UserContext.jsx';
 import { useTheme } from './context/ThemeContext.jsx';
 import { inferSpecies } from './utils/plant.js';
@@ -819,7 +820,7 @@ function PotCard({ pot, selected, onClick }) {
 }
 
 function AIScreen({ onOpenGuide }) {
-  const { user } = useUser();
+  const { user, updateUser } = useUser();
   const [mode, setMode] = useState(null); // null | quiz | summary — 선택 전엔 null (① 퀘스트 종류부터 순차 해금)
   const [resultMode, setResultMode] = useState('quiz'); // quiz | summary — 현재 표시 중인 결과 타입
   const [potId, setPotId] = useState(null);
@@ -831,8 +832,9 @@ function AIScreen({ onOpenGuide }) {
   const [aiResult, setAiResult] = useState(null);
   // 에러 메시지 (null이면 에러 없음)
   const [error, setError] = useState(null);
-  // 포인트 — Context의 user.points로 초기화, AI 응답의 remainPoint로 즉시 갱신
-  const [remainPoint, setRemainPoint] = useState(user?.points ?? 0);
+  // 포인트 — 전역 Context의 user.points를 단일 소스로 사용. 생성 응답이 오면
+  // updateUser로 user.points를 갱신해, 이 화면·사이드바·재진입 표시가 모두 일관되게 줄어든다.
+  const remainPoint = user?.points ?? 0;
 
   // 화분 목록 — 진입 시 getPots()로 로딩
   const [pots, setPots] = useState([]);
@@ -850,8 +852,36 @@ function AIScreen({ onOpenGuide }) {
   const [modalOpen, setModalOpen] = useState(false);
   // 마지막으로 선택한 tilIds (다시 생성 시 재사용)
   const [lastTilIds, setLastTilIds] = useState([]);
+  // 미저장 결과를 덮어쓰는 동작 대기 — null이면 모달 없음, 함수면 확인 모달 표시
+  const [pendingReplace, setPendingReplace] = useState(null);
+  // 보관함 삭제 확인 대기 — 삭제할 resultId, null이면 모달 없음
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const selectedPot = pots.find(p => p.id === potId) ?? null;
+
+  // 생성했지만 보관함에 저장하지 않은 결과가 있는지 — 이탈 가드와 인페이지 덮어쓰기 경고가 공유한다.
+  const hasUnsavedResult =
+    generated &&
+    !!aiResult &&
+    !aiResult.isGuideMock &&
+    !savedResults.some((r) => r.content === aiResult);
+
+  // 미저장 결과를 잃게 만드는 동작을 가드한다. 미저장이면 확인 모달, 아니면 즉시 실행.
+  const requestReplace = (action) => {
+    if (hasUnsavedResult) setPendingReplace(() => action);
+    else action();
+  };
+  const confirmReplace = () => {
+    const action = pendingReplace;
+    setPendingReplace(null);
+    // 확인 시 현재 결과를 비운다. 생성·보관함 선택은 곧 새 결과로 대체되므로 무해하고,
+    // 종류·화분 변경은 비워야 "결과가 사라진다"는 경고가 사실이 된다.
+    setGenerated(false);
+    setAiResult(null);
+    setError(null);
+    action?.();
+  };
+  const cancelReplace = () => setPendingReplace(null);
 
   useEffect(() => () => {
     if (savedTimerRef.current) {
@@ -863,19 +893,12 @@ function AIScreen({ onOpenGuide }) {
   // → 사이드바 뒤로가기(B) 시 경고 모달. (saved는 2초 피드백이라 못 쓰고,
   //   현재 결과가 보관함 목록에 들어갔는지로 "저장됨"을 판정한다)
   useEffect(() => {
-    const fn = () => {
-      const unsaved =
-        generated &&
-        !!aiResult &&
-        !aiResult.isGuideMock &&
-        !savedResults.some((r) => r.content === aiResult);
-      return unsaved
-        ? '생성한 AI 학습 결과를 아직 저장하지 않았어요.\n나가면 결과가 사라져요.'
-        : null;
-    };
+    const fn = () => (hasUnsavedResult
+      ? '생성한 AI 학습 결과를 아직 저장하지 않았어요.\n나가면 결과가 사라져요.'
+      : null);
     setNavGuard(fn);
     return () => clearNavGuard(fn);
-  }, [generated, aiResult, savedResults]);
+  }, [hasUnsavedResult]);
 
   // 이용 가이드 투어가 AI 화면 단계(.guide-ai-*)를 지날 때 화면 상태를 자동 제어한다.
   // (classic AI 화면과 동일한 rootin-guide-step 프로토콜 공유)
@@ -1016,7 +1039,7 @@ function AIScreen({ onOpenGuide }) {
         : await generateQuiz(potId, quizCount, ids);
 
       setAiResult(data);
-      setRemainPoint(data.remainPoint);
+      updateUser({ points: data.remainPoint });
       setResultMode(mode);
       setGenerated(true);
       playSfx('powerup');   // 결과 도착 — 파워업 부팅음
@@ -1036,8 +1059,8 @@ function AIScreen({ onOpenGuide }) {
   const handleModalConfirm = (tilIds) => {
     setModalOpen(false);
     setLastTilIds(tilIds);
-    playSfx('coin');
-    handleGenerate(tilIds);
+    // 미저장 결과가 있으면 실제 생성 직전에 확인을 받는다(TIL 선택 취소 시 결과 보존).
+    requestReplace(() => { playSfx('coin'); handleGenerate(tilIds); });
   };
 
   const handleModalClose = useCallback(() => setModalOpen(false), []);
@@ -1088,9 +1111,16 @@ function AIScreen({ onOpenGuide }) {
     }
   };
 
-  // 보관함 항목 삭제 — DELETE /ai/results/{resultId}
-  const handleDelete = async (e, resultId) => {
+  // 보관함 항목 삭제 — 바로 지우지 않고 확인 모달을 띄운다.
+  const handleDelete = (e, resultId) => {
     e.stopPropagation(); // 클릭이 상위 handleSelectSavedItem으로 전파되지 않도록
+    setPendingDelete(resultId);
+  };
+  // 삭제 확인 — DELETE /ai/results/{resultId}
+  const confirmDelete = async () => {
+    const resultId = pendingDelete;
+    setPendingDelete(null);
+    if (resultId == null) return;
     try {
       await deleteResult(resultId);
       setSavedResults(prev => prev.filter(r => r.id !== resultId));
@@ -1098,6 +1128,7 @@ function AIScreen({ onOpenGuide }) {
       setError('삭제에 실패했어요. 잠시 후 다시 시도해 주세요.');
     }
   };
+  const cancelDelete = () => setPendingDelete(null);
 
   const generateCost = mode === 'quiz' ? quizCount * 10 : mode === 'summary' ? 50 : 0;
   const canGenerate = !!potId && !generating;
@@ -1198,12 +1229,12 @@ function AIScreen({ onOpenGuide }) {
                     <>
                       <div className="gb-ai-node-head"><span className="gb-ai-node-title">종류 선택</span><span className="gb-ai-node-sub">무엇을 만들까요?</span></div>
                       <div className="gb-ai-intent guide-ai-mode">
-                        <button type="button" className={`gb-ai-quest-opt${mode === 'quiz' ? ' is-active' : ''}`} onClick={() => { playSfx('toggle'); setMode('quiz'); }}>
+                        <button type="button" className={`gb-ai-quest-opt${mode === 'quiz' ? ' is-active' : ''}`} onClick={() => requestReplace(() => { playSfx('toggle'); setMode('quiz'); })}>
                           <span className="gb-ai-quest-ic" aria-hidden="true"><RtIcon name="check" /></span>
                           <span className="gb-ai-quest-t">복습 퀴즈</span>
                           <span className="gb-ai-quest-d">4지선다로 이해도 점검</span>
                         </button>
-                        <button type="button" className={`gb-ai-quest-opt${mode === 'summary' ? ' is-active' : ''}`} onClick={() => { playSfx('toggle'); setMode('summary'); }}>
+                        <button type="button" className={`gb-ai-quest-opt${mode === 'summary' ? ' is-active' : ''}`} onClick={() => requestReplace(() => { playSfx('toggle'); setMode('summary'); })}>
                           <span className="gb-ai-quest-ic" aria-hidden="true"><RtIcon name="star" /></span>
                           <span className="gb-ai-quest-t">핵심 요약</span>
                           <span className="gb-ai-quest-d">한 편의 정리 노트로</span>
@@ -1226,7 +1257,7 @@ function AIScreen({ onOpenGuide }) {
                               key={p.id}
                               pot={p}
                               selected={potId === p.id}
-                              onClick={() => { playSfx('nav'); handlePotChange(p.id); }}
+                              onClick={() => requestReplace(() => { playSfx('nav'); handlePotChange(p.id); })}
                             />
                           ))
                         )}
@@ -1299,7 +1330,7 @@ function AIScreen({ onOpenGuide }) {
                         <span className="gb-ai-clear-title">{resultMode === 'quiz' ? '복습 퀴즈가 완성됐어요' : '핵심 요약이 완성됐어요'}</span>
                         <div className="gb-ai-clear-acts">
                           {lastTilIds.length > 0 && (
-                            <button type="button" className="gb-ai-act" onClick={() => handleGenerate(lastTilIds)}>다시 만들기</button>
+                            <button type="button" className="gb-ai-act" onClick={() => requestReplace(() => handleGenerate(lastTilIds))}>다시 만들기</button>
                           )}
                           <button type="button" className="gb-ai-act gb-ai-act--save" onClick={handleSave}>{saved ? '✓ 저장됨' : '저장하기'}</button>
                         </div>
@@ -1360,7 +1391,7 @@ function AIScreen({ onOpenGuide }) {
                   ? `${itemPot?.title ?? item.potId} 화분 복습 문제`
                   : `${itemPot?.title ?? item.potId} 화분 요약본`);
                 return (
-                  <article key={item.id} className="gb-ai-loot" onClick={() => { playSfx('nav'); handleSelectSavedItem(item); }}>
+                  <article key={item.id} className="gb-ai-loot" onClick={() => requestReplace(() => { playSfx('nav'); handleSelectSavedItem(item); })}>
                     <span className={`gb-ai-loot-ic ${item.type === 'quiz' ? 'is-quiz' : 'is-summary'}`} aria-hidden="true">
                       <RtIcon name={item.type === 'quiz' ? 'check' : 'star'} />
                     </span>
@@ -1392,6 +1423,28 @@ function AIScreen({ onOpenGuide }) {
         potId={potId}
         onConfirm={handleModalConfirm}
         onClose={handleModalClose}
+      />
+    )}
+    {pendingReplace && (
+      <EditorConfirmModal
+        icon="spark"
+        tag="확인"
+        title="저장하지 않은 결과가 있어요"
+        description="아직 보관함에 저장하지 않았어요. 계속하면 지금 만든 결과를 잃을 수 있어요."
+        confirmLabel="계속"
+        onConfirm={confirmReplace}
+        onClose={cancelReplace}
+      />
+    )}
+    {pendingDelete != null && (
+      <EditorConfirmModal
+        icon="xmark"
+        tag="삭제"
+        title="이 자료를 삭제할까요?"
+        description="삭제하면 보관함에서 사라지고 되돌릴 수 없어요."
+        confirmLabel="삭제하기"
+        onConfirm={confirmDelete}
+        onClose={cancelDelete}
       />
     )}
     </>

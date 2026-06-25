@@ -7,6 +7,7 @@ import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
 import { TilEditorProvider } from '@/components/til-shared/til-editor-context';
 import { logout, clearTokens } from './api/auth.js';
+import { checkNavGuard } from './lib/navGuard.js';
 import { useSmoothScroll } from './hooks/useSmoothScroll.js';
 import { NotFoundScreen } from './screens-error.jsx';
 
@@ -41,6 +42,8 @@ const ProfileClassic = lazyNamed(() => import('./screens-rest.classic.jsx'), 'Pr
 const GuideOverlay = lazyNamed(() => import('./components/GuideOverlay.jsx'), 'GuideOverlay');
 const LogoutConfirmModal = lazyNamed(() => import('./components/LogoutConfirmModal.jsx'), 'LogoutConfirmModal');
 const LogoutConfirmModalClassic = lazyNamed(() => import('./components/LogoutConfirmModal.classic.jsx'), 'LogoutConfirmModal');
+const LeaveConfirmModal = lazyNamed(() => import('./components/EditorConfirmModal.jsx'), 'EditorConfirmModal');
+const LeaveConfirmModalClassic = lazyNamed(() => import('./components/EditorConfirmModal.classic.jsx'), 'EditorConfirmModal');
 
 function RouteFallback() {
   return (
@@ -122,6 +125,8 @@ function AppShell() {
   const [editorInitialTil, setEditorInitialTil] = useState(null);
   const [editorReturnScreen, setEditorReturnScreen] = useState(null);
   const [logoutModalOpen, setLogoutModalOpen] = useState(false);
+  // 미저장 작업(AI 결과·에디터 글)이 있을 때 메뉴 이동을 가로채는 이탈 확인 — { message, target } | null
+  const [navConfirm, setNavConfirm] = useState(null);
   const [potDetailRefreshKey, setPotDetailRefreshKey] = useState(0);
   const [gardenRefreshKey, setGardenRefreshKey] = useState(0);
   // 발행 후 화분 복귀 시 식물 성장 연출(물주기)을 1회 발동시키는 신호.
@@ -225,7 +230,7 @@ function AppShell() {
     if (screen === 'editor') setRightOpen(true);
   }, [screen]);
 
-  const handleNav = (nextScreen) => {
+  const doNav = (nextScreen) => {
     setFocusMode(false);
     if (nextScreen?.startsWith?.('/')) {
       navigate(nextScreen);
@@ -238,6 +243,25 @@ function AppShell() {
     }
     navigate(screenToPath(nextScreen, potFocus));
   };
+
+  // 메뉴 이동 등 화면 전환 진입점. 미저장 작업 가드(AI 결과·에디터 글)가 걸려 있으면
+  // 실제 이동 전에 이탈 확인 모달을 띄운다. 저장 완료 후의 프로그램적 이동은
+  // 각 화면이 이동 직전 자기 가드를 해제하므로 여기서 막히지 않는다.
+  const handleNav = (nextScreen) => {
+    const warn = checkNavGuard();
+    if (warn) {
+      setNavConfirm({ message: warn, target: nextScreen });
+      return;
+    }
+    doNav(nextScreen);
+  };
+
+  const confirmNav = () => {
+    const target = navConfirm?.target;
+    setNavConfirm(null);
+    if (target != null) doNav(target);
+  };
+  const cancelNav = () => setNavConfirm(null);
 
   const openEditorForPot = (potId) => {
     setPotFocus(potId);
@@ -466,6 +490,28 @@ function AppShell() {
         {isClassic
           ? <LogoutConfirmModalClassic onConfirm={confirmLogout} onClose={closeLogoutModal} />
           : <LogoutConfirmModal onConfirm={confirmLogout} onClose={closeLogoutModal} />}
+      </Suspense>
+    )}
+    {navConfirm && (
+      <Suspense fallback={null}>
+        {isClassic
+          ? <LeaveConfirmModalClassic
+              tag="확인"
+              title="저장하지 않고 나갈까요?"
+              description={navConfirm.message}
+              confirmLabel="나가기"
+              onConfirm={confirmNav}
+              onClose={cancelNav}
+            />
+          : <LeaveConfirmModal
+              icon="lock"
+              tag="확인"
+              title="저장하지 않고 나갈까요?"
+              description={navConfirm.message}
+              confirmLabel="나가기"
+              onConfirm={confirmNav}
+              onClose={cancelNav}
+            />}
       </Suspense>
     )}
     </TilEditorProvider>

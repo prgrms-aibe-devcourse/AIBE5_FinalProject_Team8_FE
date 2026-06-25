@@ -49,6 +49,12 @@ import { getPots } from '../api/pot.js';
 import { getMyTils } from '../api/til.js';
 import { useUser } from '../context/UserContext.jsx';
 
+// 가변 user 객체 + updateUser 스파이.
+// updateUser({ points })는 user 객체를 그 자리에서 갱신하므로(Object.assign),
+// 생성 직후 AIScreen 재렌더 시 user.points가 차감된 값으로 읽힌다(전역 동기화 검증).
+let mockUser;
+let updateUser;
+
 // ──────────────────────────────────────────────
 // Mock 데이터 상수 (BE 응답 구조 기준)
 // ──────────────────────────────────────────────
@@ -128,7 +134,9 @@ const MOCK_FETCH_RESULTS_RESPONSE = [
 beforeEach(() => {
   getPots.mockResolvedValue(MOCK_POTS);
   getMyTils.mockResolvedValue(MOCK_TILS);
-  useUser.mockReturnValue({ user: { points: MOCK_ME.point } });
+  mockUser = { points: MOCK_ME.point };
+  updateUser = vi.fn((patch) => { if (mockUser) Object.assign(mockUser, patch); });
+  useUser.mockReturnValue({ user: mockUser, updateUser });
   fetchResults.mockResolvedValue(MOCK_FETCH_RESULTS_RESPONSE);
   generateQuiz.mockResolvedValue(MOCK_QUIZ_RESPONSE);
   generateSummary.mockResolvedValue(MOCK_SUMMARY_RESPONSE);
@@ -588,21 +596,81 @@ describe('API 호출', () => {
     expect(screen.getAllByText(/1190P/).length).toBeGreaterThan(0);
   });
 
-  it('다시 생성 버튼 클릭 시 모달 없이 이전 tilIds로 재호출된다', async () => {
+  it('생성 완료 후 updateUser로 전역 보유 포인트(user.points)가 갱신된다', async () => {
+    await renderAndGenerate();
+    expect(updateUser).toHaveBeenCalledWith({ points: MOCK_QUIZ_RESPONSE.remainPoint });
+  });
+
+  it('다시 만들기 클릭 후 확인하면 이전 tilIds로 재호출된다', async () => {
     await renderAndGenerate();
 
     fireEvent.click(screen.getByRole('button', { name: '다시 만들기' }));
+    // 미저장 결과가 있어 덮어쓰기 확인 모달이 먼저 뜬다
+    fireEvent.click(screen.getByRole('button', { name: '계속' }));
 
     await waitFor(() => expect(generateQuiz).toHaveBeenCalledTimes(2));
     expect(generateQuiz).toHaveBeenNthCalledWith(2, MOCK_POTS[0].id, 5, [MOCK_TILS.content[0].tilId]);
   });
 
-  it('다시 생성 버튼 클릭 시 모달이 열리지 않는다', async () => {
+  it('다시 만들기 클릭 시 TIL 선택 모달은 열리지 않는다', async () => {
     await renderAndGenerate();
 
     fireEvent.click(screen.getByRole('button', { name: '다시 만들기' }));
 
     expect(screen.queryByRole('dialog', { name: '기록 불러오기' })).not.toBeInTheDocument();
+  });
+});
+
+// ──────────────────────────────────────────────
+// 미저장 결과 덮어쓰기 경고 (Issue 2-B)
+//   생성한 결과를 보관함에 저장하지 않은 채 결과를 잃게 만드는 동작을 누르면
+//   확인 모달을 띄운다. 확인 시 현재 결과를 비우고 동작을 진행, 취소 시 유지.
+// ──────────────────────────────────────────────
+describe('미저장 결과 덮어쓰기 경고', () => {
+  it('미저장 결과가 있을 때 다른 화분을 클릭하면 확인 모달이 뜬다', async () => {
+    await renderAndGenerate();
+
+    fireEvent.click(screen.getByRole('button', { name: /독서/ }));
+
+    expect(screen.getByText('저장하지 않은 결과가 있어요')).toBeInTheDocument();
+  });
+
+  it('확인 모달에서 취소하면 결과가 유지되고 화분이 바뀌지 않는다', async () => {
+    await renderAndGenerate();
+
+    fireEvent.click(screen.getByRole('button', { name: /독서/ }));
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.getByRole('button', { name: '저장하기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /코딩/ }).className).toMatch(/is-active/);
+  });
+
+  it('확인 모달에서 계속을 누르면 결과가 사라지고 화분이 변경된다', async () => {
+    await renderAndGenerate();
+
+    fireEvent.click(screen.getByRole('button', { name: /독서/ }));
+    fireEvent.click(screen.getByRole('button', { name: '계속' }));
+
+    await waitFor(() => expect(screen.getByText('시작 대기 중')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: /독서/ }).className).toMatch(/is-active/);
+  });
+
+  it('종류를 바꿀 때도 미저장 결과가 있으면 확인 모달이 뜬다', async () => {
+    await renderAndGenerate();
+
+    fireEvent.click(screen.getByRole('button', { name: /핵심 요약/ }));
+
+    expect(screen.getByText('저장하지 않은 결과가 있어요')).toBeInTheDocument();
+  });
+
+  it('저장을 마친 뒤에는 화분을 바꿔도 확인 모달이 뜨지 않는다', async () => {
+    await renderAndGenerate();
+    fireEvent.click(screen.getByRole('button', { name: '저장하기' }));
+    await waitFor(() => screen.getByRole('button', { name: /저장됨/ }));
+
+    fireEvent.click(screen.getByRole('button', { name: /독서/ }));
+
+    expect(screen.queryByText('저장하지 않은 결과가 있어요')).not.toBeInTheDocument();
   });
 });
 
@@ -693,15 +761,37 @@ describe('결과 저장 및 보관함', () => {
     expect(screen.getByRole('button', { name: '저장하기' })).toBeInTheDocument();
   });
 
-  it('보관함 항목 삭제 버튼을 누르면 deleteResult API가 호출된다', async () => {
+  it('보관함 삭제 버튼 클릭 시 확인 모달이 뜨고 즉시 삭제되지 않는다', async () => {
     renderAI();
     await waitFor(() => expect(screen.getAllByRole('button', { name: '삭제' }).length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getAllByRole('button', { name: '삭제' })[0]);
 
+    expect(screen.getByText('이 자료를 삭제할까요?')).toBeInTheDocument();
+    expect(deleteResult).not.toHaveBeenCalled();
+  });
+
+  it('삭제 확인 모달에서 삭제하기를 누르면 deleteResult API가 호출된다', async () => {
+    renderAI();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '삭제' }).length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getAllByRole('button', { name: '삭제' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '삭제하기' }));
+
     await waitFor(() =>
       expect(deleteResult).toHaveBeenCalledWith(2)
     );
+  });
+
+  it('삭제 확인 모달에서 취소하면 삭제되지 않는다', async () => {
+    renderAI();
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '삭제' }).length).toBeGreaterThan(0));
+
+    fireEvent.click(screen.getAllByRole('button', { name: '삭제' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(deleteResult).not.toHaveBeenCalled();
+    expect(screen.getByText(/코딩 화분 복습 문제/)).toBeInTheDocument();
   });
 
   it('삭제 후 보관함 목록에서 해당 항목이 제거된다', async () => {
@@ -709,6 +799,7 @@ describe('결과 저장 및 보관함', () => {
     await waitFor(() => expect(screen.getByText(/코딩 화분 복습 문제/)).toBeInTheDocument());
 
     fireEvent.click(screen.getAllByRole('button', { name: '삭제' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '삭제하기' }));
 
     await waitFor(() =>
       expect(screen.queryByText(/코딩 화분 복습 문제/)).not.toBeInTheDocument()
@@ -733,6 +824,7 @@ describe('결과 저장 및 보관함', () => {
     await waitFor(() => expect(screen.getAllByRole('button', { name: '삭제' }).length).toBeGreaterThan(0));
 
     fireEvent.click(screen.getAllByRole('button', { name: '삭제' })[0]);
+    fireEvent.click(screen.getByRole('button', { name: '삭제하기' }));
 
     await waitFor(() =>
       expect(screen.getByText('삭제에 실패했어요. 잠시 후 다시 시도해 주세요.')).toBeInTheDocument()

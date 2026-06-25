@@ -119,8 +119,10 @@ export function InsertMenu({ editor }: { editor: Editor }) {
 
   const insertVideo = () => {
     const url = videoUrl.trim()
-    if (url && editor.commands.setYoutubeVideo({ src: url })) {
-      editor.chain().focus().command(continueBelowMedia).run()
+    if (url) {
+      // 이미지와 동일하게 단일 chain으로 삽입+커서 이동을 한 트랜잭션에 묶는다.
+      // 두 트랜잭션으로 나누면 빈 단락이 동영상 위에 들어갈 수 있다.
+      editor.chain().focus().setYoutubeVideo({ src: url }).command(continueBelowMedia).run()
     }
     setVideoUrl('')
     setVideoOpen(false)

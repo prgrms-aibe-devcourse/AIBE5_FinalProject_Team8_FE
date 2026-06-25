@@ -13,7 +13,10 @@ const YOUTUBE_REGEX =
 function getVideoOrPlaylistId(url: URL): { id: string; isPlaylist?: boolean } | null {
   if (url.searchParams.has('v')) return { id: url.searchParams.get('v')! }
   if (url.hostname === 'youtu.be' || url.pathname.includes('shorts') || url.pathname.includes('live')) {
-    return { id: url.pathname.split('/').pop()! }
+    // 끝에 '/'가 붙은 URL(youtu.be/ID/, shorts/ID/ 등)은 split 마지막이 ''이 되므로 빈 칸을 걸러낸다.
+    const segments = url.pathname.split('/').filter(Boolean)
+    const id = segments[segments.length - 1]
+    if (id) return { id }
   }
   if (url.searchParams.has('list')) return { id: url.searchParams.get('list')!, isPlaylist: true }
   return null

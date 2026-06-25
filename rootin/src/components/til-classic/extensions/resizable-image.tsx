@@ -67,6 +67,7 @@ function ResizableImageView({ node, updateAttributes, selected, editor, deleteNo
         </button>
       )}
       {selected &&
+        editor.isEditable &&
         CORNERS.map((corner) => (
           <span
             key={corner}

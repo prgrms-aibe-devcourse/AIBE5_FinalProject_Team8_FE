@@ -626,6 +626,47 @@ html.lenis body {
   cursor: nwse-resize;
 }
 
+/* 미디어(이미지·동영상) 삭제 버튼 — 호버 또는 선택 시 노출 */
+.til-prose .ProseMirror .til-media-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 9999px;
+  background: var(--card);
+  color: var(--muted-foreground);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.12s ease, transform 0.12s ease, background 0.12s ease,
+    color 0.12s ease, border-color 0.12s ease;
+}
+.til-prose .ProseMirror .til-media-delete:hover {
+  background: var(--destructive);
+  border-color: var(--destructive);
+  color: var(--destructive-foreground);
+}
+.til-prose .ProseMirror .til-media-delete-icon {
+  width: 16px;
+  height: 16px;
+}
+.til-prose .ProseMirror .til-image-wrapper:hover .til-media-delete,
+.til-prose .ProseMirror .til-image-wrapper[data-selected='true'] .til-media-delete,
+.til-prose .ProseMirror .til-video-wrapper:hover .til-media-delete,
+.til-prose .ProseMirror .til-video-wrapper[data-selected='true'] .til-media-delete {
+  opacity: 1;
+  transform: scale(1);
+}
+
 /* Inline code */
 .til-prose .ProseMirror code {
   font-family: var(--font-mono);
@@ -884,6 +925,24 @@ body[data-theme="classic"] .til-prose .ProseMirror code {
   display: block;
 }
 .til-prose .ProseMirror div[data-youtube-video].ProseMirror-selectednode iframe {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+/* 편집 중 동영상 카드: 클릭막(재생 대신 선택) + 선택 표시 */
+.til-prose .ProseMirror .til-video-wrapper {
+  position: relative;
+}
+.til-prose .ProseMirror .til-video-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.til-prose .ProseMirror .til-video-wrapper[data-selected='true'] iframe {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }

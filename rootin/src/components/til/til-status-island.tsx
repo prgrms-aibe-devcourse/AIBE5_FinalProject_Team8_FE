@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { useTilEditor } from './til-editor-context'
+import { useTilEditor } from '../til-shared/til-editor-context'
 import { playSfx } from '@/lib/sfx.js'
 import { EditorConfirmModal } from '@/components/EditorConfirmModal.jsx'
 

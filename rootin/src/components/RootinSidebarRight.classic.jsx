@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { useTilEditor } from '@/components/til-classic/til-editor-context';
+import { useTilEditor } from '@/components/til-shared/til-editor-context';
 import { PixelPlant, PIXEL_SPECIES } from '@/pixel-plants.jsx';
 import {
   Select,

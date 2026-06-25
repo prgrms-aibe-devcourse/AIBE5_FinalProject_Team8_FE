@@ -18,7 +18,6 @@ import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Mathematics } from '@tiptap/extension-mathematics'
-import Youtube from '@tiptap/extension-youtube'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
@@ -26,18 +25,19 @@ import TableCell from '@tiptap/extension-table-cell'
 
 import { FileClock, Minimize2 } from 'lucide-react'
 
-import { createCodeBlock } from './extensions/code-block'
-import { FontSize } from './extensions/font-size'
-import { Callout } from './extensions/callout'
-import { TrailingNode } from './extensions/trailing-node'
-import { ResizableImage } from './extensions/resizable-image'
+import { createCodeBlock } from '../til-shared/extensions/code-block'
+import { FontSize } from '../til-shared/extensions/font-size'
+import { Callout } from '../til-shared/extensions/callout'
+import { TrailingNode } from '../til-shared/extensions/trailing-node'
+import { ResizableImage } from '../til-shared/extensions/resizable-image'
+import { SelectableYoutube } from '../til-shared/extensions/resizable-video'
 import { EditorToolbarIsland } from './editor-toolbar-island'
 import { EditorBubbleMenu } from './editor-bubble-menu'
 
 import { TilStatusIsland } from './til-status-island'
 import { TilMeta } from './til-meta'
-import { useTilEditor, type DraftData } from './til-editor-context'
-import { getTooLongTilTags, TIL_TAG_MAX_LENGTH } from './til-policy'
+import { useTilEditor, type DraftData } from '../til-shared/til-editor-context'
+import { getTooLongTilTags, TIL_TAG_MAX_LENGTH } from '../til-shared/til-policy'
 import { updateTil } from '@/api/til.js'
 import { Button } from '@/components/ui/button'
 import {
@@ -145,7 +145,7 @@ export function TilEditorPage({
       Callout,
       Mathematics,
       ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),
-      Youtube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
+      SelectableYoutube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
       Table.configure({ resizable: true, HTMLAttributes: { class: 'til-table' } }),
       TableRow,
       TableHeader,

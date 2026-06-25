@@ -11,17 +11,17 @@ import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Mathematics } from '@tiptap/extension-mathematics'
-import Youtube from '@tiptap/extension-youtube'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 
-import { createCodeBlock } from './extensions/code-block'
-import { FontSize } from './extensions/font-size'
-import { Callout } from './extensions/callout'
-import { TrailingNode } from './extensions/trailing-node'
-import { ResizableImage } from './extensions/resizable-image'
+import { createCodeBlock } from '../til-shared/extensions/code-block'
+import { FontSize } from '../til-shared/extensions/font-size'
+import { Callout } from '../til-shared/extensions/callout'
+import { TrailingNode } from '../til-shared/extensions/trailing-node'
+import { ResizableImage } from '../til-shared/extensions/resizable-image'
+import { SelectableYoutube } from '../til-shared/extensions/resizable-video'
 
 const PLACEHOLDER_TEXT =
   '오늘 배운 것을 자유롭게 기록해보세요. “/” 없이 위 도구 모음을 사용하세요…'
@@ -52,7 +52,7 @@ export function createTilExtensions({ editing = true }: { editing?: boolean } = 
     Callout,
     Mathematics,
     ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),
-    Youtube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
+    SelectableYoutube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
     Table.configure({ resizable: true, HTMLAttributes: { class: 'til-table' } }),
     TableRow,
     TableHeader,

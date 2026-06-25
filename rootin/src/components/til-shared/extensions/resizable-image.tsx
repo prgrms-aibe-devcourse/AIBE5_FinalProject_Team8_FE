@@ -1,6 +1,7 @@
 import Image from '@tiptap/extension-image'
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
 import { useRef } from 'react'
+import { X } from 'lucide-react'
 
 // 이미지를 클릭하면 모서리 핸들이 뜨고, 드래그로 폭을 조절한다.
 // width 속성만 저장하고 height는 auto로 두어 종횡비가 유지된다(저장 HTML에 width 반영됨).
@@ -9,7 +10,7 @@ type Corner = (typeof CORNERS)[number]
 
 const MIN_WIDTH = 60
 
-function ResizableImageView({ node, updateAttributes, selected, editor }: any) {
+function ResizableImageView({ node, updateAttributes, selected, editor, deleteNode }: any) {
   const imgRef = useRef<HTMLImageElement>(null)
   const { src, alt, title, width } = node.attrs
 
@@ -50,7 +51,23 @@ function ResizableImageView({ node, updateAttributes, selected, editor }: any) {
         style={width ? { width: `${width}px` } : undefined}
         draggable={false}
       />
+      {editor.isEditable && (
+        <button
+          type="button"
+          className="til-media-delete"
+          aria-label="이미지 삭제"
+          contentEditable={false}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            deleteNode()
+          }}
+        >
+          <X className="til-media-delete-icon" />
+        </button>
+      )}
       {selected &&
+        editor.isEditable &&
         CORNERS.map((corner) => (
           <span
             key={corner}

@@ -16,12 +16,12 @@ import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 
-import { createCodeBlock } from './extensions/code-block'
-import { FontSize } from './extensions/font-size'
-import { Callout } from './extensions/callout'
-import { TrailingNode } from './extensions/trailing-node'
-import { ResizableImage } from './extensions/resizable-image'
-import { SelectableYoutube } from './extensions/resizable-video'
+import { createCodeBlock } from '../til-shared/extensions/code-block'
+import { FontSize } from '../til-shared/extensions/font-size'
+import { Callout } from '../til-shared/extensions/callout'
+import { TrailingNode } from '../til-shared/extensions/trailing-node'
+import { ResizableImage } from '../til-shared/extensions/resizable-image'
+import { SelectableYoutube } from '../til-shared/extensions/resizable-video'
 
 const PLACEHOLDER_TEXT =
   '오늘 배운 것을 자유롭게 기록해보세요. “/” 없이 위 도구 모음을 사용하세요…'

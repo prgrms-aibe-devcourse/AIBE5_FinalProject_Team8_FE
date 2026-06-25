@@ -21,11 +21,11 @@ import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
 import TableCell from '@tiptap/extension-table-cell'
 
-import { createCodeBlock } from './extensions/code-block'
-import { FontSize } from './extensions/font-size'
-import { Callout } from './extensions/callout'
-import { ResizableImage } from './extensions/resizable-image'
-import { SelectableYoutube } from './extensions/resizable-video'
+import { createCodeBlock } from '../til-shared/extensions/code-block'
+import { FontSize } from '../til-shared/extensions/font-size'
+import { Callout } from '../til-shared/extensions/callout'
+import { ResizableImage } from '../til-shared/extensions/resizable-image'
+import { SelectableYoutube } from '../til-shared/extensions/resizable-video'
 
 // 발행된 TIL을 (클래식 테마) 에디터와 동일한 모양으로 보여주는 읽기 전용 렌더러.
 // 클래식 에디터(til-editor-page.tsx)와 같은 확장 세트 + 전역 `.til-prose` 스킨(index.css)을

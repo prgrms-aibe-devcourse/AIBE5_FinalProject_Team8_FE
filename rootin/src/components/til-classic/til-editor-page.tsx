@@ -25,12 +25,12 @@ import TableCell from '@tiptap/extension-table-cell'
 
 import { FileClock, Minimize2 } from 'lucide-react'
 
-import { createCodeBlock } from './extensions/code-block'
-import { FontSize } from './extensions/font-size'
-import { Callout } from './extensions/callout'
-import { TrailingNode } from './extensions/trailing-node'
-import { ResizableImage } from './extensions/resizable-image'
-import { SelectableYoutube } from './extensions/resizable-video'
+import { createCodeBlock } from '../til-shared/extensions/code-block'
+import { FontSize } from '../til-shared/extensions/font-size'
+import { Callout } from '../til-shared/extensions/callout'
+import { TrailingNode } from '../til-shared/extensions/trailing-node'
+import { ResizableImage } from '../til-shared/extensions/resizable-image'
+import { SelectableYoutube } from '../til-shared/extensions/resizable-video'
 import { EditorToolbarIsland } from './editor-toolbar-island'
 import { EditorBubbleMenu } from './editor-bubble-menu'
 

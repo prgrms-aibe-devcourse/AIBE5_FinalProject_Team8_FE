@@ -2,6 +2,7 @@
 
 import type { Editor } from '@tiptap/react'
 import { BubbleMenu } from '@tiptap/react'
+import { NodeSelection } from '@tiptap/pm/state'
 import {
   Bold,
   Italic,
@@ -47,8 +48,11 @@ export function EditorBubbleMenu({ editor }: { editor: Editor }) {
     <BubbleMenu
       editor={editor}
       tippyOptions={{ duration: 150, maxWidth: 'none' }}
-      shouldShow={({ editor: e, from, to }) =>
-        from !== to && !e.isActive('codeBlock') && !e.isActive('image')
+      shouldShow={({ editor: e, state, from, to }) =>
+        // 이미지·동영상 등 노드 선택에서는 텍스트 버블 메뉴를 띄우지 않는다.
+        !(state.selection instanceof NodeSelection) &&
+        from !== to &&
+        !e.isActive('codeBlock')
       }
       className="til-bubble-menu flex items-center gap-0.5 p-1"
     >

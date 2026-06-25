@@ -2,6 +2,8 @@
 
 import { useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
+import type { CommandProps } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
 import katex from 'katex'
 import {
   Plus,
@@ -79,6 +81,18 @@ function TableGridPicker({ onPick }: { onPick: (rows: number, cols: number) => v
   )
 }
 
+// 미디어(이미지·동영상) 삽입 직후, 바로 아래에 빈 단락을 만들고 커서를 그 줄로 옮긴다.
+// 커서가 미디어에 갇히지 않고 곧바로 이어 쓸 수 있게 해준다.
+function continueBelowMedia({ tr, state, dispatch }: CommandProps) {
+  const pos = tr.selection.to
+  if (dispatch) {
+    tr.insert(pos, state.schema.nodes.paragraph.create())
+    tr.setSelection(TextSelection.create(tr.doc, pos + 1))
+    tr.scrollIntoView()
+  }
+  return true
+}
+
 export function InsertMenu({ editor }: { editor: Editor }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [videoOpen, setVideoOpen] = useState(false)
@@ -95,7 +109,7 @@ export function InsertMenu({ editor }: { editor: Editor }) {
       reader.onload = () => {
         const src = reader.result
         if (typeof src === 'string') {
-          editor.chain().focus().setImage({ src }).run()
+          editor.chain().focus().setImage({ src }).command(continueBelowMedia).run()
         }
       }
       reader.readAsDataURL(file)
@@ -105,8 +119,8 @@ export function InsertMenu({ editor }: { editor: Editor }) {
 
   const insertVideo = () => {
     const url = videoUrl.trim()
-    if (url) {
-      editor.commands.setYoutubeVideo({ src: url })
+    if (url && editor.commands.setYoutubeVideo({ src: url })) {
+      editor.chain().focus().command(continueBelowMedia).run()
     }
     setVideoUrl('')
     setVideoOpen(false)

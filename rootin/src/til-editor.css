@@ -193,6 +193,24 @@
   outline-color: var(--peach);
 }
 
+/* 미디어 삭제 버튼 — 게임보이: 각진 픽셀 버튼 + 하드 섀도 */
+.rt-app-editor .til-prose .ProseMirror .til-media-delete {
+  border-radius: 4px;
+  border: 2px solid var(--line-strong);
+  background: var(--paper-card);
+  color: var(--leaf);
+  box-shadow: 2px 2px 0 var(--line-strong);
+}
+.rt-app-editor .til-prose .ProseMirror .til-media-delete:hover {
+  background: var(--peach);
+  border-color: var(--leaf);
+  color: var(--leaf);
+}
+.rt-app-editor .til-prose .ProseMirror .til-video-wrapper[data-selected='true'] iframe,
+.rt-app-editor .til-prose .ProseMirror div[data-youtube-video].ProseMirror-selectednode iframe {
+  outline-color: var(--peach);
+}
+
 /* 표 — 헤더/테두리/선택셀/리사이즈 */
 .rt-app-editor .til-prose .ProseMirror td,
 .rt-app-editor .til-prose .ProseMirror th {

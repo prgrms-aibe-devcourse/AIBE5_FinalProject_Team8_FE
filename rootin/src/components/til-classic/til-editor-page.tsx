@@ -18,7 +18,6 @@ import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Mathematics } from '@tiptap/extension-mathematics'
-import Youtube from '@tiptap/extension-youtube'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
@@ -31,6 +30,7 @@ import { FontSize } from './extensions/font-size'
 import { Callout } from './extensions/callout'
 import { TrailingNode } from './extensions/trailing-node'
 import { ResizableImage } from './extensions/resizable-image'
+import { SelectableYoutube } from './extensions/resizable-video'
 import { EditorToolbarIsland } from './editor-toolbar-island'
 import { EditorBubbleMenu } from './editor-bubble-menu'
 
@@ -145,7 +145,7 @@ export function TilEditorPage({
       Callout,
       Mathematics,
       ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),
-      Youtube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
+      SelectableYoutube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
       Table.configure({ resizable: true, HTMLAttributes: { class: 'til-table' } }),
       TableRow,
       TableHeader,

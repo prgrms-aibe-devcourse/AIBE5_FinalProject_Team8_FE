@@ -16,7 +16,6 @@ import TaskItem from '@tiptap/extension-task-item'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
 import { Mathematics } from '@tiptap/extension-mathematics'
-import Youtube from '@tiptap/extension-youtube'
 import Table from '@tiptap/extension-table'
 import TableRow from '@tiptap/extension-table-row'
 import TableHeader from '@tiptap/extension-table-header'
@@ -26,6 +25,7 @@ import { createCodeBlock } from './extensions/code-block'
 import { FontSize } from './extensions/font-size'
 import { Callout } from './extensions/callout'
 import { ResizableImage } from './extensions/resizable-image'
+import { SelectableYoutube } from './extensions/resizable-video'
 
 // 발행된 TIL을 (클래식 테마) 에디터와 동일한 모양으로 보여주는 읽기 전용 렌더러.
 // 클래식 에디터(til-editor-page.tsx)와 같은 확장 세트 + 전역 `.til-prose` 스킨(index.css)을
@@ -56,7 +56,7 @@ export function TilContentView({ content }: { content: string }) {
       Callout,
       Mathematics,
       ResizableImage.configure({ HTMLAttributes: { class: 'til-image' } }),
-      Youtube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
+      SelectableYoutube.configure({ controls: true, nocookie: true, HTMLAttributes: { class: 'til-video' } }),
       Table.configure({ resizable: true, HTMLAttributes: { class: 'til-table' } }),
       TableRow,
       TableHeader,

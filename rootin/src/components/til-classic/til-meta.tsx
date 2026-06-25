@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { useTilEditor } from './til-editor-context'
-import { normalizeTilTag, TIL_TAG_MAX_COUNT, TIL_TAG_MAX_LENGTH } from './til-policy'
+import { normalizeTilTag, TIL_TAG_MAX_COUNT, TIL_TAG_MAX_LENGTH } from '../til-shared/til-policy'
 
 const TODAY = new Date().toLocaleDateString('ko-KR', {
   year: 'numeric',

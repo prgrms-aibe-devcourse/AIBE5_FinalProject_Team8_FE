@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useTilEditor } from './til-editor-context'
+import { useTilEditor } from '../til-shared/til-editor-context'
 import { normalizeTilTag, TIL_TAG_MAX_COUNT, TIL_TAG_MAX_LENGTH } from '../til-shared/til-policy'
 
 const TODAY = new Date().toLocaleDateString('ko-KR', {

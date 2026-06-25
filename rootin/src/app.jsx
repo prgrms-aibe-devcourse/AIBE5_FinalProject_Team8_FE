@@ -5,8 +5,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { GameBoySidebar } from '@/components/GameBoySidebar.jsx';
 import { RootinSidebarLeft } from '@/components/RootinSidebarLeft.jsx';
 import { ThemeProvider, useTheme } from './context/ThemeContext.jsx';
-import { TilEditorProvider as TilEditorProviderClassic } from '@/components/til-classic/til-editor-context';
-import { TilEditorProvider } from '@/components/til/til-editor-context';
+import { TilEditorProvider } from '@/components/til-shared/til-editor-context';
 import { logout, clearTokens } from './api/auth.js';
 import { useSmoothScroll } from './hooks/useSmoothScroll.js';
 import { NotFoundScreen } from './screens-error.jsx';
@@ -182,8 +181,7 @@ function AppShell() {
   const CLASSIC_SHELL_SCREENS = ['dashboard', 'garden', 'pot-detail', 'til-detail', 'collection', 'ai', 'profile', 'editor'];
   const useClassicShell = isClassic && CLASSIC_SHELL_SCREENS.includes(screen);
   const framed = baseFramed && !useClassicShell;
-  // 에디터 스택을 테마별로 선택 (Provider·화면·우측 패널은 같은 til 트리/컨텍스트끼리 묶여야 한다)
-  const TilProvider = isClassic ? TilEditorProviderClassic : TilEditorProvider;
+  // 에디터 화면·우측 패널은 테마별로 선택. Provider는 til-shared 공용이라 분기하지 않는다.
   const EditorComp = isClassic ? EditorClassic : EditorScreen;
   const RightPanel = isClassic ? RootinSidebarRightClassic : RootinSidebarRight;
   // 다크 팔레트는 로그인된 앱 화면에서만 입힌다. 랜딩/로그인(미인증)은 테마 대상이 아니므로
@@ -317,7 +315,7 @@ function AppShell() {
   }
 
   return (
-    <TilProvider>
+    <TilEditorProvider>
     <SidebarProvider
       open={focusMode ? false : leftOpen}
       onOpenChange={setLeftOpen}
@@ -470,7 +468,7 @@ function AppShell() {
           : <LogoutConfirmModal onConfirm={confirmLogout} onClose={closeLogoutModal} />}
       </Suspense>
     )}
-    </TilProvider>
+    </TilEditorProvider>
   );
 }
 

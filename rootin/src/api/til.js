@@ -47,10 +47,16 @@ export async function deleteTil(tilId) {
 
 // PUT /api/v1/tils/{tilId}
 // 발행된 TIL의 제목, 본문, 태그를 수정합니다.
-export async function updateTil(tilId, { title, content, tags }) {
+// thumbnailImage: 새 썸네일 파일(File)이 있을 때만 전달, 없으면 생략
+export async function updateTil(tilId, { title, content, tags, thumbnailImage }) {
+  const formData = new FormData();
+  formData.append('data', new Blob([JSON.stringify({ title, content, tags })], { type: 'application/json' }));
+  if (thumbnailImage) {
+    formData.append('image', thumbnailImage);
+  }
   const res = await request(`/api/v1/tils/${tilId}`, {
     method: 'PUT',
-    body: JSON.stringify({ title, content, tags }),
+    body: formData,
   });
   return res.data;
 }

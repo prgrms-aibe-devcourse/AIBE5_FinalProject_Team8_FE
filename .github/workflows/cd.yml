@@ -67,6 +67,12 @@ jobs:
             case "$STATUS" in
               Success|Failed|Cancelled|TimedOut) break ;;
             esac
+          
+            COUNT=$((COUNT + 1))
+            if [ "$COUNT" -ge "$MAX_WAIT" ]; then
+              echo "::error::Timed out waiting for SSM command"
+              exit 1
+            fi
             sleep 5
           done
 
